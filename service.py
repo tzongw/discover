@@ -29,10 +29,12 @@ class Service:
         self._addresses = defaultdict(set)
 
     def start(self):
+        print(f'start')
         if not self._runner:
             self._runner = gevent.spawn(self._run)
 
     def stop(self):
+        print(f'stop')
         if self._runner:
             gevent.kill(self._runner)
             self._runner = None
