@@ -61,6 +61,8 @@ class Service:
                     if not published:
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
+                sub = self._redis.pubsub()
+                sub.subscribe(self._PREFIX)
                 keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
                 self._addresses.clear()
                 for key in keys:
@@ -68,8 +70,6 @@ class Service:
                     name, address = self._unpack(key)
                     self._addresses[name].add(address)
                 print(f'{self._addresses}')
-                sub = self._redis.pubsub()
-                sub.subscribe(self._PREFIX)
                 timeout = self._INTERVAL
                 while timeout > 0:
                     before = time.time()
