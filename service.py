@@ -6,7 +6,7 @@ from collections import defaultdict
 
 class Service:
     _PREFIX = 'sErvIcE'
-    _INTERVAL = 5
+    _INTERVAL = 1
 
     @classmethod
     def _key_prefix(cls, name):
@@ -36,14 +36,12 @@ class Service:
     def stop(self):
         if self._runner:
             gevent.kill(self._runner)
-            self._runner.join()
             self._runner = None
 
     def address(self, name):
         return self._addresses[name]
 
     def _run(self):
-        running = True
         while True:
             try:
                 if self._services:
@@ -52,19 +50,16 @@ class Service:
                         key = self._full_key(name, address)
                         pipe.set(key, '', 3 * self._INTERVAL)
                     pipe.execute()
+                    pipe.scan_iter()
                 keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
                 self._addresses.clear()
                 for key in keys:
                     key = key.decode()
                     name, address = self._unpack(key)
                     self._addresses[name].add(address)
-            except gevent.GreenletExit:
-                logging.info(f'stopped')
-                running = False
-                return
+                print(f'running')
             except Exception as e:
-                logging.error(f'error: {e}')
+                print(f'error: {e}')
             finally:
-                if running:
-                    gevent.sleep(self._INTERVAL)
+                gevent.sleep(self._INTERVAL)
 

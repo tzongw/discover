@@ -1,3 +1,5 @@
+from gevent import monkey
+monkey.patch_all()
 import redis
 
 if __name__ == '__main__':
