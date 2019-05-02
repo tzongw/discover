@@ -1,12 +1,12 @@
 from redis import Redis
 import gevent
-import logging
+import time
 from collections import defaultdict
 
 
 class Service:
     _PREFIX = 'sErvIcE'
-    _INTERVAL = 1
+    _INTERVAL = 10
 
     @classmethod
     def _key_prefix(cls, name):
@@ -22,10 +22,9 @@ class Service:
         _, name, address = key.split(':')
         return name, address
 
-    def __init__(self, redis: Redis, services=None, watching=None):
+    def __init__(self, redis: Redis, services=None):
         self._redis = redis
         self._services = services
-        self._watching = watching
         self._runner = None
         self._addresses = defaultdict(set)
 
@@ -37,11 +36,18 @@ class Service:
         if self._runner:
             gevent.kill(self._runner)
             self._runner = None
+            keys = []
+            for name, address in self._services:
+                key = self._full_key(name, address)
+                keys.append(key)
+            self._redis.delete(*keys)
+            self._redis.publish(self._PREFIX, 'unregister')
 
-    def address(self, name):
+    def address(self, name) -> set:
         return self._addresses[name]
 
     def _run(self):
+        published = False
         while True:
             try:
                 if self._services:
@@ -50,16 +56,26 @@ class Service:
                         key = self._full_key(name, address)
                         pipe.set(key, '', 3 * self._INTERVAL)
                     pipe.execute()
-                    pipe.scan_iter()
+                    if not published:
+                        self._redis.publish(self._PREFIX, 'register')
+                        published = True
                 keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
                 self._addresses.clear()
                 for key in keys:
                     key = key.decode()
                     name, address = self._unpack(key)
                     self._addresses[name].add(address)
+                print(f'{self._addresses}')
+                sub = self._redis.pubsub()
+                sub.subscribe(self._PREFIX)
+                timeout = self._INTERVAL
+                while timeout > 0:
+                    before = time.time()
+                    if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
+                        break
+                    timeout -= time.time() - before
                 print(f'running')
             except Exception as e:
                 print(f'error: {e}')
-            finally:
                 gevent.sleep(self._INTERVAL)
 
