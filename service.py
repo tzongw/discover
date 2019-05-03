@@ -19,7 +19,7 @@ class Service:
     @classmethod
     def _unpack(cls, key: str):
         assert key.startswith(cls._PREFIX)
-        _, name, address = key.split(':')
+        _, name, address = key.split(sep=':', maxsplit=2)
         return name, address
 
     def __init__(self, redis: Redis, services=None):
