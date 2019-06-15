@@ -4,9 +4,10 @@ import time
 from collections import defaultdict
 import logging
 
+
 class Service:
     _PREFIX = 'sErvIcE'
-    _INTERVAL = 10
+    _INTERVAL = 1
 
     @classmethod
     def _key_prefix(cls, name):
