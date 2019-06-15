@@ -4,6 +4,9 @@ import redis
 import service
 import gevent
 import os
+from tornado import options
+
+options.parse_command_line()
 
 r = redis.Redis()
 s = service.Service(r, [(os.urandom(4).hex(), os.urandom(4).hex())])

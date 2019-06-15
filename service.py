@@ -2,7 +2,7 @@ from redis import Redis
 import gevent
 import time
 from collections import defaultdict
-
+import logging
 
 class Service:
     _PREFIX = 'sErvIcE'
@@ -29,12 +29,12 @@ class Service:
         self._addresses = defaultdict(set)
 
     def start(self):
-        print(f'start')
+        logging.info(f'start')
         if not self._runner:
             self._runner = gevent.spawn(self._run)
 
     def stop(self):
-        print(f'stop')
+        logging.info(f'stop')
         if self._runner:
             gevent.kill(self._runner)
             self._runner = None
@@ -69,15 +69,15 @@ class Service:
                     key = key.decode()
                     name, address = self._unpack(key)
                     self._addresses[name].add(address)
-                print(f'{self._addresses}')
+                logging.debug(f'{self._addresses}')
                 timeout = self._INTERVAL
                 while timeout > 0:
                     before = time.time()
                     if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
                         break
                     timeout -= time.time() - before
-                print(f'running')
+                logging.debug(f'running')
             except Exception as e:
-                print(f'error: {e}')
+                logging.error(f'error: {e}')
                 gevent.sleep(self._INTERVAL)
 
