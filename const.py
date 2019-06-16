@@ -1,0 +1,3 @@
+PING_INTERVAL = 10
+SERVICE_USER = 'user'
+SERVICE_GATE = 'gate'

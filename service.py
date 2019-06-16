@@ -6,7 +6,7 @@ import logging
 
 
 class Service:
-    _PREFIX = 'sErvIcE'
+    _PREFIX = 'service'
     _INTERVAL = 3
 
     @classmethod
