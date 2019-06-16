@@ -10,6 +10,7 @@ import gevent
 
 class ServicePools:
     _INTERVAL = 10
+
     def __init__(self, service: Service):
         self._service = service
         self._service_pools = defaultdict(dict)  # type: dict[str, dict[str, ThriftPool]]
