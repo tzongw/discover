@@ -1,12 +1,14 @@
+import contextlib
+import logging
 from collections import defaultdict
 from random import choice
-import contextlib
-from typing import Dict
+from typing import Dict, DefaultDict
+
+import gevent
+from thrift.Thrift import TException
+
 from service import Service
 from thrift_pool import ThriftPool
-from thrift.Thrift import TException
-import logging
-import gevent
 
 Pools = Dict[str, ThriftPool]
 
@@ -16,7 +18,7 @@ class ServicePools:
 
     def __init__(self, service: Service, **settings):
         self._service = service
-        self._service_pools = defaultdict(dict)  # type: Dict[str, Pools]
+        self._service_pools = defaultdict(dict)  # type: DefaultDict[str, Pools]
         self._settings = settings
         self._runner = gevent.spawn(self._run)
 
@@ -63,5 +65,3 @@ class ServicePools:
                 logging.error(f'error: {e}')
             finally:
                 gevent.sleep(self._INTERVAL)
-
-

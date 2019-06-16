@@ -3,7 +3,7 @@ import gevent
 import time
 from collections import defaultdict
 import logging
-from typing import Set, Dict, Tuple
+from typing import Set, DefaultDict, Tuple
 
 
 class Service:
@@ -28,7 +28,7 @@ class Service:
         self._redis = redis
         self._services = set()  # type: Set[Tuple[str, str]]
         self._runner = None
-        self._addresses = defaultdict(set)  # type: Dict[str, Set[str]]
+        self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
 
     def register(self, service_name, address):
         assert self._runner is None
