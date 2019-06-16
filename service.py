@@ -7,7 +7,7 @@ import logging
 
 class Service:
     _PREFIX = 'sErvIcE'
-    _INTERVAL = 1
+    _INTERVAL = 3
 
     @classmethod
     def _key_prefix(cls, name):

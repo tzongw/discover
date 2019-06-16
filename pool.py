@@ -22,6 +22,16 @@ class Pool:
     def close_connection(self, conn):
         raise NotImplementedError()
 
+    def close_all(self):
+        self.idle = 0
+        while not self.pool.empty():
+            conn = self.pool.get_nowait()
+            self.size -= 1
+            try:
+                self.close_connection(conn)
+            except Exception as e:
+                logging.error(f'error: {e}')
+
     def get(self):
         pool = self.pool
         if self.size >= self.maxsize or pool.qsize():
