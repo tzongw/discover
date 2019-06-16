@@ -3,6 +3,7 @@ import gevent
 import time
 from collections import defaultdict
 import logging
+from typing import Set, Dict, Tuple
 
 
 class Service:
@@ -23,11 +24,15 @@ class Service:
         _, name, address = key.split(sep=':', maxsplit=2)
         return name, address
 
-    def __init__(self, redis: Redis, services=None):
+    def __init__(self, redis: Redis):
         self._redis = redis
-        self._services = services
+        self._services = set()  # type: Set[Tuple[str, str]]
         self._runner = None
-        self._addresses = defaultdict(set)
+        self._addresses = defaultdict(set)  # type: Dict[str, Set[str]]
+
+    def register(self, service_name, address):
+        assert self._runner is None
+        self._services.add((service_name, address))
 
     def start(self):
         logging.info(f'start')
@@ -46,7 +51,7 @@ class Service:
             self._redis.delete(*keys)
             self._redis.publish(self._PREFIX, 'unregister')
 
-    def address(self, name) -> set[str]:
+    def address(self, name) -> Set[str]:
         return self._addresses[name]
 
     def _run(self):

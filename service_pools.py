@@ -1,19 +1,23 @@
 from collections import defaultdict
 from random import choice
 import contextlib
+from typing import Dict
 from service import Service
 from thrift_pool import ThriftPool
 from thrift.Thrift import TException
 import logging
 import gevent
 
+Pools = Dict[str, ThriftPool]
+
 
 class ServicePools:
     _INTERVAL = 10
 
-    def __init__(self, service: Service):
+    def __init__(self, service: Service, **settings):
         self._service = service
-        self._service_pools = defaultdict(dict)  # type: dict[str, dict[str, ThriftPool]]
+        self._service_pools = defaultdict(dict)  # type: Dict[str, Pools]
+        self._settings = settings
         self._runner = gevent.spawn(self._run)
 
     def __del__(self):
@@ -35,7 +39,7 @@ class ServicePools:
         pool = pools.get(address)
         if not pool:
             host, port = address.split(':')
-            pool = ThriftPool(host, int(port))
+            pool = ThriftPool(host, int(port), **self._settings)
             pools[address] = pool
         with pool.connection() as conn:
             try:
