@@ -2,10 +2,11 @@ import contextlib
 import logging
 from collections import defaultdict
 from random import choice
-from typing import Dict, DefaultDict
+from typing import Dict, DefaultDict, ContextManager
 
 import gevent
 from thrift.Thrift import TException
+from thrift.protocol.TProtocol import TProtocolBase
 
 from service import Service
 from thrift_pool import ThriftPool
@@ -26,14 +27,14 @@ class ServicePools:
         gevent.kill(self._runner)
 
     @contextlib.contextmanager
-    def connection(self, service_name):
+    def connection(self, service_name) -> ContextManager[TProtocolBase]:
         addresses = self._service.address(service_name)
         address = choice(tuple(addresses))  # type: str
         with self.address_connection(service_name, address) as conn:
             yield conn
 
     @contextlib.contextmanager
-    def address_connection(self, service_name, address):
+    def address_connection(self, service_name, address) -> ContextManager[TProtocolBase]:
         addresses = self._service.address(service_name)
         if address not in addresses:
             raise LookupError()
