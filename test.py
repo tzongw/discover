@@ -6,6 +6,14 @@ import gevent
 import os
 from tornado import options
 options.parse_command_line()
+from contextlib import contextmanager
+import logging
+
+@contextmanager
+def f():
+    logging.info('before f')
+    yield 10
+    logging.info('after f')
 
 
 def main():
@@ -17,7 +25,24 @@ def main():
     s.stop()
 
 
+@contextmanager
+def g():
+    with f() as r:
+        logging.info('before g')
+        yield r
+        logging.info('after g')
+
+
+def k():
+    try:
+        with g() as r:
+            logging.info('block k')
+            return r
+    finally:
+        logging.info('finally')
+
+
 if __name__ == "__main__":
-    main()
+    s = k()
 
 
