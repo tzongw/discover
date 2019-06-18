@@ -38,7 +38,7 @@ class _ServicePools(ServicePools):
             return partial(self._one_shot, self.user_client, item)
         if hasattr(gate.Iface, item):
             addresses = self._service.addresses(const.SERVICE_GATE)
-            return partial(self._traverse, addresses, item)
+            return partial(self._traverse, self.address_gate_client, addresses, item)
         return super().__getattr__(item)
 
 
