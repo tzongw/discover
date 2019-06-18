@@ -3,7 +3,7 @@ from redis import Redis
 from service_pools import ServicePools
 from service import Service
 import const
-from .generated.service import gate, user
+from generated.service import gate, user
 from typing import ContextManager, Union
 from functools import partial
 
@@ -37,7 +37,7 @@ class _ServicePools(ServicePools):
         if hasattr(user.Iface, item):
             return partial(self._one_shot, self.user_client, item)
         if hasattr(gate.Iface, item):
-            addresses = self._service.address(const.SERVICE_GATE)
+            addresses = self._service.addresses(const.SERVICE_GATE)
             return partial(self._traverse, addresses, item)
         return super().__getattr__(item)
 

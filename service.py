@@ -51,7 +51,7 @@ class Service:
             self._redis.delete(*keys)
             self._redis.publish(self._PREFIX, 'unregister')
 
-    def address(self, name) -> Set[str]:
+    def addresses(self, name) -> Set[str]:
         return self._addresses[name]
 
     def _run(self):
