@@ -25,13 +25,13 @@ class _ServicePools(ServicePools):
     @staticmethod
     def _one_shot(client_factory, item, *args, **kwargs):
         with client_factory() as client:
-            return getattr(client, item)(client, *args, **kwargs)
+            return getattr(client, item)(*args, **kwargs)
 
     @staticmethod
     def _traverse(address_client_factory, addresses, item, *args, **kwargs):
         for address in addresses:
             with address_client_factory(address) as client:
-                getattr(client, item)(client, *args, **kwargs)
+                getattr(client, item)(*args, **kwargs)
 
     def __getattr__(self, item):
         if hasattr(user.Iface, item):
