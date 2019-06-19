@@ -75,6 +75,7 @@ class Service:
                         pipe.set(key, '', 3 * self._INTERVAL)
                     pipe.execute()
                     if not published:
+                        logging.info(f'publish')
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
                 sub = self._redis.pubsub()
@@ -90,4 +91,3 @@ class Service:
             except Exception as e:
                 logging.error(f'error: {e}')
                 gevent.sleep(self._INTERVAL)
-

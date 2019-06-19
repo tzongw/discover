@@ -11,9 +11,30 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from generated.service import gate
+from flask import Flask
+from flask_sockets import Sockets
+from gevent import pywsgi, joinall, spawn
+from geventwebsocket.handler import WebSocketHandler
 
 define("host", "127.0.0.1", str, "listen host")
-define("port", 40001, int, "listen port")
+define("rpc_port", 40001, int, "rpc port")
+define("ws_port", 40002, int, "ws port")
+
+app = Flask(__name__)
+sockets = Sockets(app)
+
+
+def ws_serve():
+    server = pywsgi.WSGIServer((options.host, options.ws_port), app, handler_class=WebSocketHandler)
+    logging.info(f'Starting ws server {options.host}:{options.ws_port} ...')
+    server.serve_forever()
+
+
+@sockets.route('/')
+def echo_socket(ws):
+    while not ws.closed:
+        message = ws.receive()
+        ws.send(message)
 
 
 class Handler:
@@ -27,20 +48,24 @@ class Handler:
         pass
 
 
-def main():
-    parse_command_line()
-    common.service.register(const.SERVICE_GATE, f'{options.host}:{options.port}')
+def rpc_serve():
+    common.service.register(const.SERVICE_GATE, f'{options.host}:{options.rpc_port}')
     common.service.start()
 
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket(options.host, options.port)
+    transport = TSocket.TServerSocket(options.host, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-    logging.info(f'Starting the server {options.host}:{options.port} ...')
+    logging.info(f'Starting rpc server {options.host}:{options.rpc_port} ...')
     server.serve()
+
+
+def main():
+    parse_command_line()
+    joinall([spawn(ws_serve), spawn(rpc_serve)])
 
 
 if __name__ == '__main__':
