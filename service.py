@@ -37,6 +37,7 @@ class Service:
     def start(self):
         logging.info(f'start')
         if not self._runner:
+            self._refresh()
             self._runner = gevent.spawn(self._run)
 
     def stop(self):
@@ -54,6 +55,15 @@ class Service:
     def addresses(self, name) -> Set[str]:
         return self._addresses[name]
 
+    def _refresh(self):
+        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
+        self._addresses.clear()
+        for key in keys:
+            key = key.decode()
+            name, address = self._unpack(key)
+            self._addresses[name].add(address)
+        logging.debug(f'{self._addresses}')
+
     def _run(self):
         published = False
         while True:
@@ -69,13 +79,7 @@ class Service:
                         published = True
                 sub = self._redis.pubsub()
                 sub.subscribe(self._PREFIX)
-                keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
-                self._addresses.clear()
-                for key in keys:
-                    key = key.decode()
-                    name, address = self._unpack(key)
-                    self._addresses[name].add(address)
-                logging.debug(f'{self._addresses}')
+                self._refresh()
                 timeout = self._INTERVAL
                 while timeout > 0:
                     before = time.time()

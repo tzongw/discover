@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from gevent import monkey
+
 monkey.patch_all()
 import common
 import const
@@ -11,20 +12,19 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from generated.service import gate
 
-
-host = "localhost"
+host = "127.0.0.1"
 port = 40001
 
 
 class Handler:
-  def set_context(self, conn_id, context):
-    pass
+    def set_context(self, conn_id, context):
+        pass
 
-  def unset_context(self, conn_id, context):
-    pass
+    def unset_context(self, conn_id, context):
+        pass
 
-  def remove_conn(self, conn_id):
-    pass
+    def remove_conn(self, conn_id):
+        pass
 
 
 def main():
@@ -38,7 +38,7 @@ def main():
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
-    server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
+    server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     logging.info('Starting the server...')
     server.serve()
 
