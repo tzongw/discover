@@ -16,10 +16,16 @@ from flask_sockets import Sockets
 from gevent import pywsgi, joinall, spawn
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
+import uuid
+from typing import Dict
+import json
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
 define("ws_port", 40002, int, "ws port")
+
+rpc_address = f'{options.host}:{options.rpc_port}'
+ws_address = f'{options.host}:{options.ws_port}'
 
 app = Flask(__name__)
 sockets = Sockets(app)
@@ -27,16 +33,35 @@ sockets = Sockets(app)
 
 def ws_serve():
     server = pywsgi.WSGIServer((options.host, options.ws_port), app, handler_class=WebSocketHandler)
-    logging.info(f'Starting ws server {options.host}:{options.ws_port} ...')
+    logging.info(f'Starting ws server {ws_address} ...')
     server.serve_forever()
+
+
+class Client:
+    def __init__(self, ws: WebSocket):
+        self.context = {}
+        self.ws = ws
+
+
+clients = {}  # type: Dict[str, Client]
 
 
 @sockets.route('/')
 def client_serve(ws: WebSocket):
     h = ws.handler  # type: WebSocketHandler
-    logging.debug(f'{h.headers}')
-    while not ws.closed:
-        ws.receive()
+    conn_id = str(uuid.uuid4())
+    clients[conn_id] = Client(ws)
+    logging.debug(f'{h.headers} f{conn_id}')
+    common.service_pools.login(rpc_address, conn_id, h.headers)
+    try:
+        while not ws.closed:
+            ws.receive()
+    except Exception as e:
+        logging.error(f'{conn_id} f{e}')
+    finally:
+        client = clients.pop(conn_id)
+        context = json.dumps(client.context)
+        common.service_pools.disconnect(rpc_address, conn_id, context)
 
 
 class Handler:
@@ -51,7 +76,7 @@ class Handler:
 
 
 def rpc_serve():
-    common.service.register(const.SERVICE_GATE, f'{options.host}:{options.rpc_port}')
+    common.service.register(const.SERVICE_GATE, rpc_address)
     common.service.start()
 
     handler = Handler()
@@ -61,7 +86,7 @@ def rpc_serve():
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-    logging.info(f'Starting rpc server {options.host}:{options.rpc_port} ...')
+    logging.info(f'Starting rpc server {rpc_address} ...')
     server.serve()
 
 
