@@ -214,7 +214,7 @@ class login_args:
         if ftype == TType.MAP:
           self.params = {}
           (_ktype8, _vtype9, _size7 ) = iprot.readMapBegin()
-          for _i11 in xrange(_size7):
+          for _i11 in range(_size7):
             _key12 = iprot.readString()
             _val13 = iprot.readString()
             self.params[_key12] = _val13

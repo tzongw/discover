@@ -13,7 +13,7 @@ from thrift.server import TServer
 from generated.service import user
 
 define("host", "127.0.0.1", str, "listen host")
-define("port", 40002, int, "listen port")
+define("port", 50002, int, "listen port")
 
 
 class Handler:

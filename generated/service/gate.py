@@ -272,7 +272,7 @@ class unset_context_args:
         if ftype == TType.SET:
           self.context = set()
           (_etype3, _size0) = iprot.readSetBegin()
-          for _i4 in xrange(_size0):
+          for _i4 in range(_size0):
             _elem5 = iprot.readString()
             self.context.add(_elem5)
           iprot.readSetEnd()
