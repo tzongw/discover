@@ -15,6 +15,7 @@ from flask import Flask
 from flask_sockets import Sockets
 from gevent import pywsgi, joinall, spawn
 from geventwebsocket.handler import WebSocketHandler
+from geventwebsocket.websocket import WebSocket
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -31,10 +32,11 @@ def ws_serve():
 
 
 @sockets.route('/')
-def echo_socket(ws):
+def client_serve(ws: WebSocket):
+    h = ws.handler  # type: WebSocketHandler
+    logging.debug(f'{h.headers}')
     while not ws.closed:
-        message = ws.receive()
-        ws.send(message)
+        ws.receive()
 
 
 class Handler:

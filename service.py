@@ -75,7 +75,7 @@ class Service:
                         pipe.set(key, '', 3 * self._INTERVAL)
                     pipe.execute()
                     if not published:
-                        logging.info(f'publish')
+                        logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
                 sub = self._redis.pubsub()
