@@ -1,9 +1,11 @@
-from redis import Redis
-import gevent
+import logging
 import time
 from collections import defaultdict
-import logging
 from typing import Set, DefaultDict, Tuple
+
+import gevent
+from redis import Redis
+import const
 
 
 class Service:
@@ -77,7 +79,7 @@ class Service:
                     pipe = self._redis.pipeline()
                     for name, address in self._services:
                         key = self._full_key(name, address)
-                        pipe.set(key, '', 3 * self._INTERVAL)
+                        pipe.set(key, '', const.MISS_TIMES * self._INTERVAL)
                     pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
