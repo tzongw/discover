@@ -57,6 +57,7 @@ class Service:
 
     def _refresh(self):
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
+        before = self._addresses.copy()
         self._addresses.clear()
         for key in keys:
             try:
@@ -65,7 +66,8 @@ class Service:
                 self._addresses[name].add(address)
             except Exception as e:
                 logging.error(f'error: {e}')
-        logging.debug(f'{self._addresses}')
+        if before != self._addresses:
+            logging.info(f'updated {self._addresses}')
 
     def _run(self):
         published = False
@@ -90,7 +92,6 @@ class Service:
                     if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
                         break
                     timeout -= time.time() - before
-                logging.debug(f'running')
             except Exception as e:
                 logging.error(f'error: {e}')
                 gevent.sleep(self._INTERVAL)

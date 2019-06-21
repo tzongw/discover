@@ -18,13 +18,13 @@ define("port", 50002, int, "listen port")
 
 class Handler:
     def login(self, address, conn_id, params):
-        pass
+        logging.info(f'{address} {conn_id}, {params}')
 
     def ping(self, address, conn_id, context):
-        pass
+        logging.info(f'{address} {conn_id}, {context}')
 
     def disconnect(self, address, conn_id, context):
-        pass
+        logging.info(f'{address} {conn_id}, {context}')
 
 
 def main():

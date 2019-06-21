@@ -39,29 +39,37 @@ def ws_serve():
 
 class Client:
     def __init__(self, ws: WebSocket):
-        self.context = {}
+        self._context = {}
         self.ws = ws
+
+    @property
+    def context(self):
+        return json.dumps(self._context)
+
+    def __repr__(self):
+        return repr(self._context)
 
 
 clients = {}  # type: Dict[str, Client]
 
 
-@sockets.route('/')
+@sockets.route('/ws')
 def client_serve(ws: WebSocket):
     h = ws.handler  # type: WebSocketHandler
     conn_id = str(uuid.uuid4())
-    clients[conn_id] = Client(ws)
-    logging.debug(f'{h.headers} f{conn_id}')
+    client = Client(ws)
+    clients[conn_id] = client
+    logging.debug(f'{h.headers} f{conn_id} f{client}')
     common.service_pools.login(rpc_address, conn_id, h.headers)
     try:
         while not ws.closed:
             ws.receive()
     except Exception as e:
-        logging.error(f'{conn_id} f{e}')
+        logging.error(f'{conn_id} f{client} f{e}')
     finally:
-        client = clients.pop(conn_id)
-        context = json.dumps(client.context)
-        common.service_pools.disconnect(rpc_address, conn_id, context)
+        logging.info(f'{conn_id} f{client}')
+        clients.pop(conn_id, None)
+        common.service_pools.disconnect(rpc_address, conn_id, client.context)
 
 
 class Handler:

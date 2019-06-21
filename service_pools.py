@@ -54,7 +54,7 @@ class ServicePools:
                 logging.error(f'error: {e}')  # biz error, never mind
 
     def _clean_pools(self):
-        for service_name, pools in self._service_pools:
+        for service_name, pools in self._service_pools.items():
             available_addresses = self._service.addresses(service_name)
             holding_addresses = set(pools.keys())
             for removed_address in (holding_addresses - available_addresses):
