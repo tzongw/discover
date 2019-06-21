@@ -59,9 +59,12 @@ class Service:
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
         self._addresses.clear()
         for key in keys:
-            key = key.decode()
-            name, address = self._unpack(key)
-            self._addresses[name].add(address)
+            try:
+                key = key.decode()
+                name, address = self._unpack(key)
+                self._addresses[name].add(address)
+            except Exception as e:
+                logging.error(f'error: {e}')
         logging.debug(f'{self._addresses}')
 
     def _run(self):
