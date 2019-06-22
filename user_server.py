@@ -11,6 +11,9 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from generated.service import user
+import gevent
+import common
+import json
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50002, int, "listen port")
@@ -19,9 +22,15 @@ define("port", 50002, int, "listen port")
 class Handler:
     def login(self, address, conn_id, params):
         logging.info(f'{address} {conn_id}, {params}')
+        gevent.sleep(1)
+        common.service_pools.set_context(conn_id, json.dumps({"uid": 1, "token": "token"}))
+        gevent.sleep(1)
+        common.service_pools.unset_context(conn_id, {"token"})
+        gevent.sleep(1)
+        common.service_pools.remove_conn(conn_id)
 
     def ping(self, address, conn_id, context):
-        logging.info(f'{address} {conn_id}, {context}')
+        logging.debug(f'{address} {conn_id}, {context}')
 
     def disconnect(self, address, conn_id, context):
         logging.info(f'{address} {conn_id}, {context}')

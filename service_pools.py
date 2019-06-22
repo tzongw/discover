@@ -47,7 +47,7 @@ class ServicePools:
         with pool.connection() as conn:
             try:
                 yield conn
-            except TTransportException as e:
+            except (TTransportException, OSError) as e:
                 logging.error(f'error: {e}')
                 raise  # io error, drop connection
             except Exception as e:
