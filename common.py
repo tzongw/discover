@@ -1,11 +1,15 @@
 import contextlib
+import signal
+from functools import partial
+from typing import ContextManager, Union
+
 from redis import Redis
-from service_pools import ServicePools
-from service import Service
+
 import const
 from generated.service import gate, user
-from typing import ContextManager, Union
-from functools import partial
+from service import Service
+from service_pools import ServicePools
+import gevent
 
 
 class _ServicePools(ServicePools):
@@ -45,3 +49,10 @@ class _ServicePools(ServicePools):
 redis = Redis()
 service = Service(redis)
 service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface, gate.Iface]
+
+
+def sigusr1_handler(sig, frame):
+    gevent.spawn(service.stop)
+
+
+signal.signal(signal.SIGUSR1, sigusr1_handler)

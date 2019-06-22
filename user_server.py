@@ -16,7 +16,7 @@ import common
 import json
 
 define("host", "127.0.0.1", str, "listen host")
-define("port", 50002, int, "listen port")
+define("port", 50001, int, "listen port")
 
 
 class Handler:
