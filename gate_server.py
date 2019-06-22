@@ -22,6 +22,7 @@ from typing import Dict
 import json
 from gevent import queue
 from urllib import parse
+import time
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -42,7 +43,7 @@ def ws_serve():
 
 class Client:
 
-    def __init__(self, ws: WebSocket):
+    def __init__(self, ws: WebSocket, ping):
         self._context = {}
         self.ws = ws
         ws.handler.socket.timeout = const.MISS_TIMES * const.PING_INTERVAL
@@ -53,6 +54,7 @@ class Client:
         self.messages = queue.Queue()
         self.writer = gevent.spawn(self._writer)
         self.stopping = False
+        self.ping = ping
 
     @property
     def context(self):
@@ -70,12 +72,20 @@ class Client:
 
     def _writer(self):
         try:
+            timeout = const.PING_INTERVAL
             while not self.stopping or not self.messages.empty():
+                before = time.time()
                 try:
                     message = self.messages.get(timeout=1)
                     self.ws.send(message)
                 except queue.Empty:
                     pass
+                finally:
+                    timeout -= time.time() - before
+                    if timeout < 0:
+                        timeout = const.PING_INTERVAL
+                        self.ping(self.context)
+
         except Exception as e:
             logging.error(f'{self} {e}')
             raise
@@ -101,7 +111,7 @@ clients = {}  # type: Dict[str, Client]
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
-    client = Client(ws)
+    client = Client(ws, lambda context: common.service_pools.ping(rpc_address, conn_id, context))
     clients[conn_id] = client
     logging.info(f'{conn_id} {client}')
     common.service_pools.login(rpc_address, conn_id, client.params)
