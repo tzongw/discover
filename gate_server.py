@@ -48,6 +48,9 @@ class Client:
         self.messages = Queue()
         self.writer = gevent.spawn(self._writer)
 
+    def __del__(self):
+        self.stop()
+
     @property
     def context(self):
         return json.dumps(self._context)
@@ -112,21 +115,24 @@ def client_serve(ws: WebSocket):
 
 class Handler:
     def set_context(self, conn_id, context):
-        logging.info(f'{conn_id} {context}')
+        logging.debug(f'{conn_id} {context}')
         client = clients.get(conn_id)
         if client:
+            logging.debug(f'{conn_id} {client}')
             client.set_context(context)
 
     def unset_context(self, conn_id, context):
         logging.debug(f'{conn_id} {context}')
         client = clients.get(conn_id)
         if client:
+            logging.debug(f'{conn_id} {client}')
             client.unset_context(context)
 
     def remove_conn(self, conn_id):
         logging.info(f'{conn_id}')
         client = clients.get(conn_id)
         if client:
+            logging.info(f'{conn_id} {client}')
             client.stop()
 
 
