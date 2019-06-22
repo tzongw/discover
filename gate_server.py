@@ -20,7 +20,7 @@ from geventwebsocket.websocket import WebSocket
 import uuid
 from typing import Dict
 import json
-from gevent.queue import Queue
+from gevent import queue
 from urllib import parse
 
 define("host", "127.0.0.1", str, "listen host")
@@ -50,11 +50,9 @@ class Client:
         self.params = {}
         for k, v in params:
             self.params[k] = v
-        self.messages = Queue()
+        self.messages = queue.Queue()
         self.writer = gevent.spawn(self._writer)
-
-    def __del__(self):
-        self.stop()
+        self.stopping = False
 
     @property
     def context(self):
@@ -72,18 +70,21 @@ class Client:
 
     def _writer(self):
         try:
-            while True:
-                message = self.messages.get()
-                self.ws.send(message)
+            while not self.stopping or not self.messages.empty():
+                try:
+                    message = self.messages.get(timeout=1)
+                    self.ws.send(message)
+                except queue.Empty:
+                    pass
         except Exception as e:
             logging.error(f'{self} {e}')
             raise
         finally:
             logging.info(f'{self}')
+            self.ws.close()
 
     def stop(self):
-        self.ws.close()
-        gevent.kill(self.writer)
+        self.stopping = True
 
     def set_context(self, context):
         d = json.loads(context)
