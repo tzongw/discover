@@ -49,7 +49,7 @@ class Client:
         self.writer = gevent.spawn(self._writer)
 
     def __del__(self):
-        self.stop()
+        gevent.kill(self.writer)
 
     @property
     def context(self):
@@ -81,9 +81,15 @@ class Client:
             logging.info(f'{self}')
 
     def stop(self):
-        if self.writer:
-            gevent.kill(self.writer)
-            self.writer = None
+        pass
+
+    def set_context(self, context):
+        d = json.loads(context)
+        self._context.update(d)
+
+    def unset_context(self, context):
+        for key in context:
+            self._context.pop(key, None)
 
 
 clients = {}  # type: Dict[str, Client]
@@ -109,13 +115,19 @@ def client_serve(ws: WebSocket):
 
 class Handler:
     def set_context(self, conn_id, context):
-        pass
+        client = clients.get(conn_id)
+        if client:
+            client.set_context(context)
 
     def unset_context(self, conn_id, context):
-        pass
+        client = clients.get(conn_id)
+        if client:
+            client.unset_context(context)
 
     def remove_conn(self, conn_id):
-        pass
+        client = clients.get(conn_id)
+        if client:
+            client.stop()
 
 
 def rpc_serve():
