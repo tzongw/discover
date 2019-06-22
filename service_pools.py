@@ -36,7 +36,7 @@ class ServicePools:
     def address_connection(self, service_name, address) -> ContextManager[TProtocolBase]:
         addresses = self._service.addresses(service_name)
         if address not in addresses:
-            raise ValueError()
+            raise ValueError("address")
         pools = self._service_pools[service_name]
         pool = pools.get(address)
         if not pool:

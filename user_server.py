@@ -14,25 +14,31 @@ from generated.service import user
 import gevent
 import common
 import json
+from typing import Dict
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
 
 
 class Handler:
-    def login(self, address, conn_id, params):
+    def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id}, {params}')
-        gevent.sleep(1)
-        common.service_pools.set_context(conn_id, json.dumps({"uid": 1, "token": "token"}))
-        gevent.sleep(1)
-        common.service_pools.unset_context(conn_id, {"token"})
-        gevent.sleep(1)
-        common.service_pools.remove_conn(conn_id)
+        try:
+            uid = int(params.pop(const.PARAM_UID))
+            token = params.pop(const.PARAM_TOKEN)
+            if token != "pass":
+                raise ValueError("token")
+        except Exception as e:
+            logging.error(f'error: {e}')
+            common.service_pools.remove_conn(conn_id)
+            raise
+        else:
+            common.service_pools.set_context(conn_id, json.dumps({const.PARAM_UID: uid}))
 
-    def ping(self, address, conn_id, context):
+    def ping(self, address: str, conn_id: str, context: str):
         logging.debug(f'{address} {conn_id}, {context}')
 
-    def disconnect(self, address, conn_id, context):
+    def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id}, {context}')
 
 

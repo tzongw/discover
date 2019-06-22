@@ -21,6 +21,7 @@ import uuid
 from typing import Dict
 import json
 from gevent.queue import Queue
+from urllib import parse
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -44,7 +45,11 @@ class Client:
     def __init__(self, ws: WebSocket):
         self._context = {}
         self.ws = ws
-        self.ws.handler.socket.timeout = const.MISS_TIMES * const.PING_INTERVAL
+        ws.handler.socket.timeout = const.MISS_TIMES * const.PING_INTERVAL
+        params = parse.parse_qsl(ws.handler.environ['QUERY_STRING'])
+        self.params = {}
+        for k, v in params:
+            self.params[k] = v
         self.messages = Queue()
         self.writer = gevent.spawn(self._writer)
 
@@ -54,10 +59,6 @@ class Client:
     @property
     def context(self):
         return json.dumps(self._context)
-
-    @property
-    def params(self):
-        return {}
 
     def __repr__(self):
         return f'{self._context} {self.params}'
