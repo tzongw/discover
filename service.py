@@ -5,6 +5,7 @@ from typing import Set, DefaultDict, Tuple
 
 import gevent
 from redis import Redis
+
 import const
 
 
@@ -55,7 +56,7 @@ class Service:
             self._redis.publish(self._PREFIX, 'unregister')
 
     def addresses(self, name) -> Set[str]:
-        return self._addresses[name]
+        return self._addresses.get(name) or set()
 
     def _refresh(self):
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
@@ -69,7 +70,7 @@ class Service:
             except Exception as e:
                 logging.error(f'error: {e}')
         if before != self._addresses:
-            logging.info(f'updated {self._addresses}')
+            logging.info(f'{before} -> {self._addresses}')
 
     def _run(self):
         published = False
