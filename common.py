@@ -10,7 +10,8 @@ from generated.service import gate, user
 from service import Service
 from service_pools import ServicePools
 import gevent
-
+from tornado.log import LogFormatter
+import logging
 
 class _ServicePools(ServicePools):
     def __init__(self, service, **settings):
@@ -56,3 +57,9 @@ def sigusr1_handler(sig, frame):
 
 
 signal.signal(signal.SIGUSR1, sigusr1_handler)
+
+LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
+channel = logging.StreamHandler()
+channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt=None))
+logger = logging.getLogger()
+logger.addHandler(channel)
