@@ -13,12 +13,14 @@ from thrift.server import TServer
 from generated.service import gate
 from flask import Flask
 from flask_sockets import Sockets
-from gevent import pywsgi, joinall, spawn
+from gevent import pywsgi
+import gevent
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 import uuid
 from typing import Dict
 import json
+from gevent.queue import Queue
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -38,16 +40,50 @@ def ws_serve():
 
 
 class Client:
+
     def __init__(self, ws: WebSocket):
         self._context = {}
         self.ws = ws
+        self.ws.handler.socket.timeout = const.MISS_TIMES * const.PING_INTERVAL
+        self.messages = Queue()
+        self.writer = gevent.spawn(self._writer)
+
+    def __del__(self):
+        self.stop()
 
     @property
     def context(self):
         return json.dumps(self._context)
 
+    @property
+    def params(self):
+        return {}
+
     def __repr__(self):
-        return repr(self._context)
+        return f'{self._context} {self.params}'
+
+    def send(self, message):
+        self.messages.put_nowait(message)
+
+    def serve(self):
+        while not self.ws.closed:
+            self.ws.receive()
+
+    def _writer(self):
+        try:
+            while True:
+                message = self.messages.get()
+                self.ws.send(message)
+        except Exception as e:
+            logging.error(f'{self} {e}')
+            raise
+        finally:
+            logging.info(f'{self}')
+
+    def stop(self):
+        if self.writer:
+            gevent.kill(self.writer)
+            self.writer = None
 
 
 clients = {}  # type: Dict[str, Client]
@@ -55,20 +91,19 @@ clients = {}  # type: Dict[str, Client]
 
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
-    h = ws.handler  # type: WebSocketHandler
     conn_id = str(uuid.uuid4())
     client = Client(ws)
     clients[conn_id] = client
-    logging.debug(f'{h.headers} f{conn_id} f{client}')
-    common.service_pools.login(rpc_address, conn_id, h.headers)
+    logging.info(f'{conn_id} {client}')
+    common.service_pools.login(rpc_address, conn_id, client.params)
     try:
-        while not ws.closed:
-            ws.receive()
+        client.serve()
     except Exception as e:
-        logging.error(f'{conn_id} f{client} f{e}')
+        logging.error(f'{conn_id} {client} {e}')
     finally:
-        logging.info(f'{conn_id} f{client}')
+        logging.info(f'{conn_id} {client}')
         clients.pop(conn_id, None)
+        client.stop()
         common.service_pools.disconnect(rpc_address, conn_id, client.context)
 
 
@@ -100,7 +135,7 @@ def rpc_serve():
 
 def main():
     parse_command_line()
-    joinall([spawn(ws_serve), spawn(rpc_serve)])
+    gevent.joinall([gevent.spawn(ws_serve), gevent.spawn(rpc_serve)])
 
 
 if __name__ == '__main__':
