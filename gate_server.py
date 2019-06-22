@@ -136,6 +136,16 @@ class Handler:
             logging.info(f'{conn_id} {client}')
             client.stop()
 
+    def _send_message(self, conn_id, message):
+        logging.debug(f'{conn_id} {message}')
+        client = clients.get(conn_id)
+        if client:
+            logging.debug(f'{conn_id} {client}')
+            client.send(message)
+
+    send_text = _send_message
+    send_binary = _send_message
+
 
 def rpc_serve():
     common.service.register(const.SERVICE_GATE, rpc_address)

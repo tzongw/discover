@@ -2,7 +2,6 @@
 from gevent import monkey
 
 monkey.patch_all()
-import common
 import const
 from tornado.options import options, define, parse_command_line
 import logging
@@ -11,7 +10,6 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from generated.service import user
-import gevent
 import common
 import json
 from typing import Dict
@@ -30,10 +28,12 @@ class Handler:
                 raise ValueError("token")
         except Exception as e:
             logging.error(f'error: {e}')
+            common.service_pools.send_text(conn_id, f'login fail {e}')
             common.service_pools.remove_conn(conn_id)
             raise
         else:
             common.service_pools.set_context(conn_id, json.dumps({const.PARAM_UID: uid}))
+            common.service_pools.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: str):
         logging.debug(f'{address} {conn_id}, {context}')
