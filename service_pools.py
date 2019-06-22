@@ -6,7 +6,6 @@ from typing import Dict, DefaultDict, ContextManager
 
 import gevent
 from thrift.protocol.TProtocol import TProtocolBase
-from thrift.transport.TTransport import TTransportException
 
 from service import Service
 from thrift_pool import ThriftPool
@@ -37,7 +36,7 @@ class ServicePools:
     def address_connection(self, service_name, address) -> ContextManager[TProtocolBase]:
         addresses = self._service.addresses(service_name)
         if address not in addresses:
-            raise LookupError()
+            raise ValueError()
         pools = self._service_pools[service_name]
         pool = pools.get(address)
         if not pool:
@@ -45,13 +44,7 @@ class ServicePools:
             pool = ThriftPool(host, int(port), **self._settings)
             pools[address] = pool
         with pool.connection() as conn:
-            try:
-                yield conn
-            except (TTransportException, OSError) as e:
-                logging.error(f'error: {e}')
-                raise  # io error, drop connection
-            except Exception as e:
-                logging.error(f'error: {e}')  # biz error, never mind
+            yield conn
 
     def _clean_pools(self):
         for service_name, pools in self._service_pools.items():
