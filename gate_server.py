@@ -78,15 +78,15 @@ class Client:
         try:
             timeout = const.PING_INTERVAL
             while not self.stopping or not self.messages.empty():
+                if timeout < 0:
+                    timeout = const.PING_INTERVAL
+                    with common.LogSuppress(Exception):
+                        self.ping(self.context)
                 before = time.time()
                 with suppress(queue.Empty):
                     message = self.messages.get(timeout=1)
                     self.ws.send(message)
                 timeout -= time.time() - before
-                if timeout < 0:
-                    timeout = const.PING_INTERVAL
-                    with common.LogSuppress(Exception):
-                        self.ping(self.context)
         except Exception:
             logging.exception(f'{self}')
             raise
@@ -129,7 +129,7 @@ def client_serve(ws: WebSocket):
     except Exception:
         logging.exception(f'{conn_id} {client}')
     finally:
-        logging.info(f'service finish {conn_id} {client}')
+        logging.info(f'finish {conn_id} {client}')
         clients.pop(conn_id, None)
         client.stop()
         common.service_pools.disconnect(rpc_address, conn_id, client.context)
