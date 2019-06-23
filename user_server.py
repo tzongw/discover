@@ -32,8 +32,8 @@ class Handler:
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
-            uid = int(params.pop(const.PARAM_UID))
-            token = params.pop(const.PARAM_TOKEN)
+            uid = int(params.pop(const.CONTEXT_UID))
+            token = params.pop(const.CONTEXT_TOKEN)
             if token != "pass":
                 raise ValueError("token")
         except Exception as e:
@@ -44,7 +44,7 @@ class Handler:
             common.service_pools.send_text(conn_id, f'login fail {e}')
             common.service_pools.remove_conn(conn_id)
         else:
-            common.service_pools.set_context(conn_id, json.dumps({const.PARAM_UID: uid}))
+            common.service_pools.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
             common.service_pools.send_text(conn_id, f'login success')
 
             key = self._key(uid)
@@ -65,7 +65,7 @@ class Handler:
     def ping(self, address: str, conn_id: str, context: str):
         logging.debug(f'{address} {conn_id}, {context}')
         d = json.loads(context)
-        uid = d[const.PARAM_UID]
+        uid = d[const.CONTEXT_UID]
         common.redis.expire(self._key(uid), self._TTL)
 
     def disconnect(self, address: str, conn_id: str, context: str):

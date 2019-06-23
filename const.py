@@ -4,8 +4,8 @@ MISS_TIMES = 3
 SERVICE_USER = 'user'
 SERVICE_GATE = 'gate'
 
-PARAM_UID = 'uid'
-PARAM_TOKEN = 'token'
+CONTEXT_UID = 'uid'
+CONTEXT_TOKEN = 'token'
 
 ONLINE_ADDRESS = 'address'
 ONLINE_CONN_ID = 'conn_id'
