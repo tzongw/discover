@@ -52,8 +52,9 @@ class Handler:
                 if status:
                     logging.warning(f'kick conn {uid} {status}')
                     with common.LogSuppress(Exception):
-                        common.service_pools.send_text(status[const.ONLINE_CONN_ID], f'login other device')
-                        common.service_pools.remove_conn(conn_id)
+                        old_conn_id = status[const.ONLINE_CONN_ID]
+                        common.service_pools.send_text(old_conn_id, f'login other device')
+                        common.service_pools.remove_conn(old_conn_id)
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
@@ -76,6 +77,7 @@ class Handler:
             def unset_login_status(pipe: Pipeline):
                 status = pipe.hgetall(key)
                 if status.get(const.ONLINE_CONN_ID) == conn_id:
+                    logging.info(f'clear {uid} {status}')
                     pipe.multi()
                     pipe.delete(key)
 
