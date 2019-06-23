@@ -48,7 +48,7 @@ class _ServicePools(ServicePools):
         return super().__getattr__(item)
 
 
-redis = Redis()
+redis = Redis(decode_responses=True)
 service = Service(redis)
 service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface, gate.Iface]
 
@@ -67,3 +67,10 @@ channel = logging.StreamHandler()
 channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt=None))
 logger = logging.getLogger()
 logger.addHandler(channel)
+
+
+class LogSuppress(contextlib.suppress):
+    def __exit__(self, exctype, excinst, exctb):
+        if excinst:
+            logging.error(f'{exctype} {excinst} {exctb}')
+        return super().__exit__(exctype, excinst, exctb)

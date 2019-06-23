@@ -85,7 +85,7 @@ class Client:
                 timeout -= time.time() - before
                 if timeout < 0:
                     timeout = const.PING_INTERVAL
-                    with suppress(Exception):
+                    with common.LogSuppress(Exception):
                         self.ping(self.context)
         except Exception as e:
             logging.error(f'{self} {e}')

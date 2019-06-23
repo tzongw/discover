@@ -65,7 +65,6 @@ class Service:
         self._addresses.clear()
         for key in keys:
             try:
-                key = key.decode()
                 name, address = self._unpack(key)
                 self._addresses[name].add(address)
             except Exception as e:

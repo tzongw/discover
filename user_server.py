@@ -14,8 +14,6 @@ import common
 import json
 from typing import Dict
 from redis.client import Pipeline
-from contextlib import suppress
-
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
@@ -53,7 +51,7 @@ class Handler:
                 status = pipe.hgetall(key)
                 if status:
                     logging.warning(f'kick conn {uid} {status}')
-                    with suppress(Exception):
+                    with common.LogSuppress(Exception):
                         common.service_pools.send_text(status[const.ONLINE_CONN_ID], f'login other device')
                         common.service_pools.remove_conn(conn_id)
                 pipe.multi()
@@ -70,6 +68,18 @@ class Handler:
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id}, {context}')
+        d = json.loads(context)
+        if d:
+            uid = d[const.CONTEXT_UID]
+            key = self._key(uid)
+
+            def unset_login_status(pipe: Pipeline):
+                status = pipe.hgetall(key)
+                if status.get(const.ONLINE_CONN_ID) == conn_id:
+                    pipe.multi()
+                    pipe.delete(key)
+
+            common.redis.transaction(unset_login_status, key)
 
 
 def main():
