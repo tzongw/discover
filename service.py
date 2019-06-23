@@ -7,6 +7,7 @@ import gevent
 from redis import Redis
 
 import const
+from contextlib import closing
 
 
 class Service:
@@ -86,15 +87,15 @@ class Service:
                         logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
-                sub = self._redis.pubsub()
-                sub.subscribe(self._PREFIX)
-                self._refresh()
-                timeout = self._INTERVAL
-                while timeout > 0:
-                    before = time.time()
-                    if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
-                        break
-                    timeout -= time.time() - before
+                with closing(self._redis.pubsub()) as sub:
+                    sub.subscribe(self._PREFIX)
+                    self._refresh()
+                    timeout = self._INTERVAL
+                    while timeout > 0:
+                        before = time.time()
+                        if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
+                            break
+                        timeout -= time.time() - before
             except Exception as e:
                 logging.error(f'error: {e}')
                 gevent.sleep(self._INTERVAL)
