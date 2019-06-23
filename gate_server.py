@@ -23,6 +23,7 @@ import json
 from gevent import queue
 from urllib import parse
 import time
+from contextlib import suppress
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -75,17 +76,14 @@ class Client:
             timeout = const.PING_INTERVAL
             while not self.stopping or not self.messages.empty():
                 before = time.time()
-                try:
+                with suppress(queue.Empty):
                     message = self.messages.get(timeout=1)
                     self.ws.send(message)
-                except queue.Empty:
-                    pass
-                finally:
-                    timeout -= time.time() - before
-                    if timeout < 0:
-                        timeout = const.PING_INTERVAL
+                timeout -= time.time() - before
+                if timeout < 0:
+                    timeout = const.PING_INTERVAL
+                    with suppress(Exception):
                         self.ping(self.context)
-
         except Exception as e:
             logging.error(f'{self} {e}')
             raise
@@ -130,6 +128,7 @@ def client_serve(ws: WebSocket):
     finally:
         logging.info(f'{conn_id} {client}')
         clients.pop(conn_id, None)
+        client.stop()
         common.service_pools.disconnect(rpc_address, conn_id, client.context)
 
 
