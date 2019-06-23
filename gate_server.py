@@ -57,6 +57,9 @@ class Client:
         self.stopping = False
         self.ping = ping
 
+    def __del__(self):
+        logging.debug(f'del {self}')
+
     @property
     def context(self):
         return json.dumps(self._context)
@@ -88,7 +91,7 @@ class Client:
             logging.error(f'{self} {e}')
             raise
         finally:
-            logging.info(f'{self}')
+            logging.info(f'exit {self}')
             self.ws.close()
 
     def stop(self):
@@ -119,14 +122,14 @@ def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
     client = Client(ws, lambda context: common.service_pools.ping(rpc_address, conn_id, context))
     clients[conn_id] = client
-    logging.info(f'{conn_id} {client}')
+    logging.info(f'new client {conn_id} {client}')
     common.service_pools.login(rpc_address, conn_id, client.params)
     try:
         client.serve()
     except Exception as e:
         logging.error(f'{conn_id} {client} {e}')
     finally:
-        logging.info(f'{conn_id} {client}')
+        logging.info(f'service finish {conn_id} {client}')
         clients.pop(conn_id, None)
         client.stop()
         common.service_pools.disconnect(rpc_address, conn_id, client.context)
@@ -134,32 +137,36 @@ def client_serve(ws: WebSocket):
 
 class Handler:
     def set_context(self, conn_id, context):
-        logging.debug(f'{conn_id} {context}')
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client}')
+            logging.debug(f'{conn_id} {client} {context}')
             client.set_context(context)
+        else:
+            logging.debug(f'not found {conn_id} {context}')
 
     def unset_context(self, conn_id, context):
-        logging.debug(f'{conn_id} {context}')
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client}')
+            logging.debug(f'{conn_id} {client} {context}')
             client.unset_context(context)
+        else:
+            logging.debug(f'not found {conn_id} {context}')
 
     def remove_conn(self, conn_id):
-        logging.info(f'{conn_id}')
         client = clients.get(conn_id)
         if client:
             logging.info(f'{conn_id} {client}')
             client.stop()
+        else:
+            logging.info(f'not found {conn_id}')
 
     def _send_message(self, conn_id, message):
-        logging.debug(f'{conn_id} {message}')
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client}')
+            logging.debug(f'{conn_id} {client} {message}')
             client.send(message)
+        else:
+            logging.debug(f'not found {conn_id} {message}')
 
     send_text = _send_message
     send_binary = _send_message

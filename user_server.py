@@ -28,9 +28,9 @@ class Handler:
                 raise ValueError("token")
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
-                logging.warning(f'{address} {conn_id} {params}')
+                logging.warning(f'login fail {address} {conn_id} {params}')
             else:
-                logging.error(f'{address} {conn_id} {params} {e}')
+                logging.error(f'login error {address} {conn_id} {params} {e}')
             common.service_pools.send_text(conn_id, f'login fail {e}')
             common.service_pools.remove_conn(conn_id)
         else:
