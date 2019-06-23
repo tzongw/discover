@@ -10,6 +10,7 @@ import gevent
 from redis import Redis
 
 import const
+import common
 
 Node = namedtuple('Node', ['name', 'address', 'node_id'])
 
@@ -68,14 +69,12 @@ class Service:
         before = self._addresses.copy()
         self._addresses.clear()
         for key, value in zip(keys, values):
-            try:
+            with common.LogSuppress(Exception):
                 name = self._name(key)
                 if value:
                     self._addresses[name].add(value)
                 else:
                     logging.warning(f'invalid {key} {value}')
-            except Exception:
-                logging.exception(f'')
         if before != self._addresses:
             logging.info(f'{before} -> {self._addresses}')
 

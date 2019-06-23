@@ -2,6 +2,7 @@ import contextlib
 from gevent.queue import Queue
 import logging
 import abc
+import common
 
 
 class Pool:
@@ -27,10 +28,8 @@ class Pool:
         while not self._pool.empty():
             conn = self._pool.get_nowait()
             self._size -= 1
-            try:
+            with common.LogSuppress(Exception):
                 self.close_connection(conn)
-            except Exception:
-                logging.exception(f'')
 
     def get(self):
         pool = self._pool

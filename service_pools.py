@@ -9,6 +9,7 @@ from thrift.protocol.TProtocol import TProtocolBase
 
 from service import Service
 from thrift_pool import ThriftPool
+import common
 
 Pools = Dict[str, ThriftPool]
 
@@ -56,9 +57,6 @@ class ServicePools:
 
     def _run(self):
         while True:
-            try:
+            with common.LogSuppress(Exception):
                 self._clean_pools()
-            except Exception:
-                logging.exception(f'clean pool')
-            finally:
-                gevent.sleep(self._INTERVAL)
+            gevent.sleep(self._INTERVAL)
