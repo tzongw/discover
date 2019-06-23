@@ -14,6 +14,7 @@ import common
 import json
 from typing import Dict
 from redis.client import Pipeline
+from utils import LogSuppress
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
@@ -51,7 +52,7 @@ class Handler:
                 status = pipe.hgetall(key)
                 if status:
                     logging.warning(f'kick conn {uid} {status}')
-                    with common.LogSuppress(Exception):
+                    with LogSuppress(Exception):
                         old_conn_id = status[const.ONLINE_CONN_ID]
                         common.service_pools.send_text(old_conn_id, f'login other device')
                         common.service_pools.remove_conn(old_conn_id)

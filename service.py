@@ -10,7 +10,7 @@ import gevent
 from redis import Redis
 
 import const
-import common
+from utils import LogSuppress
 
 Node = namedtuple('Node', ['name', 'address', 'node_id'])
 
@@ -69,7 +69,7 @@ class Service:
         before = self._addresses.copy()
         self._addresses.clear()
         for key, value in zip(keys, values):
-            with common.LogSuppress(Exception):
+            with LogSuppress(Exception):
                 name = self._name(key)
                 if value:
                     self._addresses[name].add(value)

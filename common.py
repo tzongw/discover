@@ -67,10 +67,3 @@ channel = logging.StreamHandler()
 channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt=None))
 logger = logging.getLogger()
 logger.addHandler(channel)
-
-
-class LogSuppress(contextlib.suppress):
-    def __exit__(self, exctype, excinst, exctb):
-        if excinst:
-            logging.exception(f'')
-        return super().__exit__(exctype, excinst, exctb)

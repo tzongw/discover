@@ -1,5 +1,4 @@
 import contextlib
-import logging
 from collections import defaultdict
 from random import choice
 from typing import Dict, DefaultDict, ContextManager
@@ -9,7 +8,7 @@ from thrift.protocol.TProtocol import TProtocolBase
 
 from service import Service
 from thrift_pool import ThriftPool
-import common
+from utils import LogSuppress
 
 Pools = Dict[str, ThriftPool]
 
@@ -57,6 +56,6 @@ class ServicePools:
 
     def _run(self):
         while True:
-            with common.LogSuppress(Exception):
+            with LogSuppress(Exception):
                 self._clean_pools()
             gevent.sleep(self._INTERVAL)

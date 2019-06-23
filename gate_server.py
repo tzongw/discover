@@ -24,6 +24,7 @@ from gevent import queue
 from urllib import parse
 import time
 from contextlib import suppress
+from utils import LogSuppress
 
 define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
@@ -80,7 +81,7 @@ class Client:
             while not self.stopping or not self.messages.empty():
                 if timeout < 0:
                     timeout = const.PING_INTERVAL
-                    with common.LogSuppress(Exception):
+                    with LogSuppress(Exception):
                         self.ping(self.context)
                 before = time.time()
                 with suppress(queue.Empty):
