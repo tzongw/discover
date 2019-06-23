@@ -78,11 +78,11 @@ class Service:
         while True:
             try:
                 if self._services:
-                    pipe = self._redis.pipeline()
-                    for name, address in self._services:
-                        key = self._full_key(name, address)
-                        pipe.set(key, '', const.MISS_TIMES * self._INTERVAL)
-                    pipe.execute()
+                    with self._redis.pipeline() as pipe:
+                        for name, address in self._services:
+                            key = self._full_key(name, address)
+                            pipe.set(key, '', const.MISS_TIMES * self._INTERVAL)
+                        pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')

@@ -13,12 +13,22 @@ from generated.service import user
 import common
 import json
 from typing import Dict
+from redis.client import Pipeline
+from contextlib import suppress
+
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
 
 
 class Handler:
+    _PREFIX = 'online'
+    _TTL = const.MISS_TIMES * const.PING_INTERVAL
+
+    @classmethod
+    def _key(cls, uid):
+        return f'{cls._PREFIX}:{uid}'
+
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
@@ -37,8 +47,26 @@ class Handler:
             common.service_pools.set_context(conn_id, json.dumps({const.PARAM_UID: uid}))
             common.service_pools.send_text(conn_id, f'login success')
 
+            key = self._key(uid)
+
+            def set_login_status(pipe: Pipeline):
+                status = pipe.hgetall(key)
+                if status:
+                    logging.warning(f'kick conn {uid} {status}')
+                    with suppress(Exception):
+                        common.service_pools.send_text(status[const.ONLINE_CONN_ID], f'login other device')
+                        common.service_pools.remove_conn(conn_id)
+                pipe.multi()
+                pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
+                pipe.expire(key, self._TTL)
+
+            common.redis.transaction(set_login_status, key)
+
     def ping(self, address: str, conn_id: str, context: str):
         logging.debug(f'{address} {conn_id}, {context}')
+        d = json.loads(context)
+        uid = d[const.PARAM_UID]
+        common.redis.expire(self._key(uid), self._TTL)
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id}, {context}')
