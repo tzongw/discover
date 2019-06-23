@@ -67,8 +67,8 @@ class Service:
             try:
                 name, address = self._unpack(key)
                 self._addresses[name].add(address)
-            except Exception as e:
-                logging.error(f'error: {e}')
+            except Exception:
+                logging.exception(f'')
         if before != self._addresses:
             logging.info(f'{before} -> {self._addresses}')
 
@@ -95,6 +95,6 @@ class Service:
                         if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
                             break
                         timeout -= time.time() - before
-            except Exception as e:
-                logging.error(f'error: {e}')
+            except Exception:
+                logging.exception(f'')
                 gevent.sleep(self._INTERVAL)

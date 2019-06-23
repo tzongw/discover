@@ -38,7 +38,7 @@ class Handler:
             if isinstance(e, (KeyError, ValueError)):
                 logging.warning(f'login fail {address} {conn_id} {params}')
             else:
-                logging.error(f'login error {address} {conn_id} {params} {e}')
+                logging.exception(f'login error {address} {conn_id} {params}')
             common.service_pools.send_text(conn_id, f'login fail {e}')
             common.service_pools.remove_conn(conn_id)
         else:

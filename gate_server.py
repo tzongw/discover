@@ -87,8 +87,8 @@ class Client:
                     timeout = const.PING_INTERVAL
                     with common.LogSuppress(Exception):
                         self.ping(self.context)
-        except Exception as e:
-            logging.error(f'{self} {e}')
+        except Exception:
+            logging.exception(f'{self}')
             raise
         finally:
             logging.info(f'exit {self}')
@@ -126,8 +126,8 @@ def client_serve(ws: WebSocket):
     common.service_pools.login(rpc_address, conn_id, client.params)
     try:
         client.serve()
-    except Exception as e:
-        logging.error(f'{conn_id} {client} {e}')
+    except Exception:
+        logging.exception(f'{conn_id} {client}')
     finally:
         logging.info(f'service finish {conn_id} {client}')
         clients.pop(conn_id, None)

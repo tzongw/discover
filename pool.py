@@ -29,8 +29,8 @@ class Pool:
             self._size -= 1
             try:
                 self.close_connection(conn)
-            except Exception as e:
-                logging.error(f'error: {e}')
+            except Exception:
+                logging.exception(f'')
 
     def get(self):
         pool = self._pool
@@ -40,8 +40,8 @@ class Pool:
         self._size += 1
         try:
             new_item = self.create_connection()
-        except Exception as e:
-            logging.error(f'error: {e}')
+        except Exception:
+            logging.exception(f'')
             self._size -= 1
             raise
         return new_item
@@ -59,8 +59,8 @@ class Pool:
 
         try:
             yield conn
-        except Exception as e:
-            logging.error(f'error: {e}')
+        except Exception:
+            logging.exception(f'')
             close_conn()
             raise
         else:

@@ -58,7 +58,7 @@ class ServicePools:
         while True:
             try:
                 self._clean_pools()
-            except Exception as e:
-                logging.error(f'error: {e}')
+            except Exception:
+                logging.exception(f'clean pool')
             finally:
                 gevent.sleep(self._INTERVAL)

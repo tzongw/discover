@@ -72,5 +72,5 @@ logger.addHandler(channel)
 class LogSuppress(contextlib.suppress):
     def __exit__(self, exctype, excinst, exctb):
         if excinst:
-            logging.error(f'{exctype} {excinst} {exctb}')
+            logging.exception(f'')
         return super().__exit__(exctype, excinst, exctb)
