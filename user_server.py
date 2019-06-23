@@ -20,17 +20,19 @@ define("port", 50001, int, "listen port")
 
 class Handler:
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
-        logging.info(f'{address} {conn_id}, {params}')
+        logging.info(f'{address} {conn_id} {params}')
         try:
             uid = int(params.pop(const.PARAM_UID))
             token = params.pop(const.PARAM_TOKEN)
             if token != "pass":
                 raise ValueError("token")
         except Exception as e:
-            logging.error(f'error: {e}')
+            if isinstance(e, (KeyError, ValueError)):
+                logging.warning(f'{address} {conn_id} {params}')
+            else:
+                logging.error(f'{address} {conn_id} {params} {e}')
             common.service_pools.send_text(conn_id, f'login fail {e}')
             common.service_pools.remove_conn(conn_id)
-            raise
         else:
             common.service_pools.set_context(conn_id, json.dumps({const.PARAM_UID: uid}))
             common.service_pools.send_text(conn_id, f'login success')

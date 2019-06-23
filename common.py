@@ -1,17 +1,18 @@
 import contextlib
+import logging
 import signal
 from functools import partial
 from typing import ContextManager, Union
 
+import gevent
 from redis import Redis
+from tornado.log import LogFormatter
 
 import const
 from generated.service import gate, user
 from service import Service
 from service_pools import ServicePools
-import gevent
-from tornado.log import LogFormatter
-import logging
+
 
 class _ServicePools(ServicePools):
     def __init__(self, service, **settings):
@@ -51,9 +52,12 @@ redis = Redis()
 service = Service(redis)
 service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface, gate.Iface]
 
+clean_ups = [service.stop]
+
 
 def sigusr1_handler(sig, frame):
-    gevent.spawn(service.stop)
+    for item in clean_ups:
+        gevent.spawn(item)
 
 
 signal.signal(signal.SIGUSR1, sigusr1_handler)
