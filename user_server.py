@@ -15,6 +15,7 @@ import json
 from typing import Dict
 from redis.client import Pipeline
 from utils import LogSuppress
+from redis import Redis
 
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
@@ -23,6 +24,9 @@ define("port", 50001, int, "listen port")
 class Handler:
     _PREFIX = 'online'
     _TTL = const.MISS_TIMES * const.PING_INTERVAL
+
+    def __init__(self, redis: Redis):
+        self._redis = redis
 
     @classmethod
     def _key(cls, uid):
@@ -60,13 +64,13 @@ class Handler:
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
 
-            common.redis.transaction(set_login_status, key)
+            self._redis.transaction(set_login_status, key)
 
     def ping(self, address: str, conn_id: str, context: str):
         logging.debug(f'{address} {conn_id}, {context}')
         d = json.loads(context)
         uid = d[const.CONTEXT_UID]
-        common.redis.expire(self._key(uid), self._TTL)
+        self._redis.expire(self._key(uid), self._TTL)
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id}, {context}')
@@ -82,7 +86,7 @@ class Handler:
                     pipe.multi()
                     pipe.delete(key)
 
-            common.redis.transaction(unset_login_status, key)
+            self._redis.transaction(unset_login_status, key)
 
 
 def main():
@@ -90,7 +94,7 @@ def main():
     common.service.register(const.SERVICE_USER, f'{options.host}:{options.port}')
     common.service.start()
 
-    handler = Handler()
+    handler = Handler(common.redis)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(options.host, options.port)
     tfactory = TTransport.TBufferedTransportFactory()
