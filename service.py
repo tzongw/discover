@@ -13,7 +13,7 @@ from contextlib import closing
 
 class Service:
     _PREFIX = 'service'
-    _INTERVAL = 3
+    REFRESH_INTERVAL = 3
 
     @classmethod
     def _key_prefix(cls, name):
@@ -79,7 +79,7 @@ class Service:
                     with self._redis.pipeline() as pipe:
                         for name, address in self._services:
                             key = self._full_key(name, address)
-                            pipe.set(key, '', const.MISS_TIMES * self._INTERVAL)
+                            pipe.set(key, '', const.MISS_TIMES * self.REFRESH_INTERVAL)
                         pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
@@ -88,7 +88,7 @@ class Service:
                 with closing(self._redis.pubsub()) as sub:
                     sub.subscribe(self._PREFIX)
                     self._refresh()
-                    timeout = self._INTERVAL
+                    timeout = self.REFRESH_INTERVAL
                     while timeout > 0:
                         before = time.time()
                         if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
@@ -96,4 +96,4 @@ class Service:
                         timeout -= time.time() - before
             except Exception:
                 logging.exception(f'')
-                gevent.sleep(self._INTERVAL)
+                gevent.sleep(self.REFRESH_INTERVAL)

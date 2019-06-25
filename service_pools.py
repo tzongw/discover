@@ -14,8 +14,6 @@ Pools = Dict[str, ThriftPool]
 
 
 class ServicePools:
-    _INTERVAL = 10
-
     def __init__(self, service: Service, **settings):
         self._service = service
         self._service_pools = defaultdict(dict)  # type: DefaultDict[str, Pools]
@@ -58,4 +56,4 @@ class ServicePools:
         while True:
             with LogSuppress(Exception):
                 self._clean_pools()
-            gevent.sleep(self._INTERVAL)
+            gevent.sleep(Service.REFRESH_INTERVAL)
