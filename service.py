@@ -1,18 +1,14 @@
 import logging
 import time
-import uuid
 from collections import defaultdict
-from collections import namedtuple
-from contextlib import closing
-from typing import Set, DefaultDict
+from typing import Set, DefaultDict, Tuple
 
 import gevent
 from redis import Redis
 
 import const
 from utils import LogSuppress
-
-Node = namedtuple('Node', ['name', 'address', 'node_id'])
+from contextlib import closing
 
 
 class Service:
@@ -20,24 +16,28 @@ class Service:
     _INTERVAL = 3
 
     @classmethod
-    def _key(cls, node: Node):
-        return f'{cls._PREFIX}:{node.name}:{node.node_id}'
+    def _key_prefix(cls, name):
+        return f'{cls._PREFIX}:{name}'
 
     @classmethod
-    def _name(cls, key: str):
+    def _full_key(cls, name, address):
+        return f'{cls._key_prefix(name)}:{address}'
+
+    @classmethod
+    def _unpack(cls, key: str):
         assert key.startswith(cls._PREFIX)
-        _, name, _ = key.split(sep=':', maxsplit=2)
-        return name
+        _, name, address = key.split(sep=':', maxsplit=2)
+        return name, address
 
     def __init__(self, redis: Redis):
         self._redis = redis
-        self._services = set()  # type: Set[Node]
+        self._services = set()  # type: Set[Tuple[str, str]]
         self._runner = None
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
 
     def register(self, service_name, address):
         assert self._runner is None
-        self._services.add(Node(service_name, address, str(uuid.uuid4())))
+        self._services.add((service_name, address))
 
     def start(self):
         logging.info(f'start')
@@ -51,8 +51,8 @@ class Service:
             gevent.kill(self._runner)
             self._runner = None
             keys = []
-            for node in self._services:
-                key = self._key(node)
+            for name, address in self._services:
+                key = self._full_key(name, address)
                 keys.append(key)
             self._redis.delete(*keys)
             self._redis.publish(self._PREFIX, 'unregister')
@@ -62,19 +62,12 @@ class Service:
 
     def _refresh(self):
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
-        with self._redis.pipeline() as pipe:
-            for key in keys:
-                pipe.get(key)
-            values = pipe.execute()
         before = self._addresses.copy()
         self._addresses.clear()
-        for key, value in zip(keys, values):
+        for key in keys:
             with LogSuppress(Exception):
-                name = self._name(key)
-                if value:
-                    self._addresses[name].add(value)
-                else:
-                    logging.warning(f'invalid {key} {value}')
+                name, address = self._unpack(key)
+                self._addresses[name].add(address)
         if before != self._addresses:
             logging.info(f'{before} -> {self._addresses}')
 
@@ -84,9 +77,9 @@ class Service:
             try:
                 if self._services:
                     with self._redis.pipeline() as pipe:
-                        for node in self._services:
-                            key = self._key(node)
-                            pipe.set(key, node.address, const.MISS_TIMES * self._INTERVAL)
+                        for name, address in self._services:
+                            key = self._full_key(name, address)
+                            pipe.set(key, '', const.MISS_TIMES * self._INTERVAL)
                         pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
