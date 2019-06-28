@@ -48,7 +48,7 @@ class Client:
     def __init__(self, ws: WebSocket, ping):
         self._context = {}
         self.ws = ws
-        ws.handler.socket.timeout = const.MISS_TIMES * const.PING_INTERVAL
+        ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
         params = parse.parse_qsl(ws.handler.environ['QUERY_STRING'])
         self.params = {}
         for k, v in params:
@@ -79,15 +79,15 @@ class Client:
         try:
             timeout = const.PING_INTERVAL
             while not self.stopping or not self.messages.empty():
-                if timeout < 0:
-                    timeout = const.PING_INTERVAL
-                    with LogSuppress(Exception):
-                        self.ping(self.context)
                 before = time.time()
                 with suppress(queue.Empty):
                     message = self.messages.get(timeout=1)
                     self.ws.send(message)
                 timeout -= time.time() - before
+                if not self.stopping and timeout < 0:
+                    timeout = const.PING_INTERVAL
+                    with LogSuppress(Exception):
+                        self.ping(self.context)
         except Exception:
             logging.exception(f'{self}')
             raise
