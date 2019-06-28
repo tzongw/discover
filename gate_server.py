@@ -63,7 +63,7 @@ class Client:
         return json.dumps(self._context)
 
     def __repr__(self):
-        return f'{self._context} {self.params}'
+        return f' {self.conn_id} {self._context}'
 
     def send(self, message):
         self.messages.put_nowait(message)
@@ -126,14 +126,14 @@ def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
     client = Client(ws, conn_id)
     clients[conn_id] = client
-    logging.info(f'new client {conn_id} {client}')
+    logging.info(f'new client {client}')
     common.service_pools.login(rpc_address, conn_id, client.params)
     try:
         client.serve()
     except Exception:
-        logging.exception(f'{conn_id} {client}')
+        logging.exception(f'{client}')
     finally:
-        logging.info(f'finish {conn_id} {client}')
+        logging.info(f'finish {client}')
         clients.pop(conn_id, None)
         client.stop()
         common.service_pools.disconnect(rpc_address, conn_id, client.context)
@@ -143,7 +143,7 @@ class Handler:
     def set_context(self, conn_id, context):
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client} {context}')
+            logging.debug(f'{client} {context}')
             client.set_context(context)
         else:
             logging.debug(f'not found {conn_id} {context}')
@@ -151,7 +151,7 @@ class Handler:
     def unset_context(self, conn_id, context):
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client} {context}')
+            logging.debug(f'{client} {context}')
             client.unset_context(context)
         else:
             logging.debug(f'not found {conn_id} {context}')
@@ -159,7 +159,7 @@ class Handler:
     def remove_conn(self, conn_id):
         client = clients.get(conn_id)
         if client:
-            logging.info(f'{conn_id} {client}')
+            logging.info(f'{client}')
             client.stop()
         else:
             logging.info(f'not found {conn_id}')
@@ -167,7 +167,7 @@ class Handler:
     def _send_message(self, conn_id, message):
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{conn_id} {client} {message}')
+            logging.debug(f'{client} {message}')
             client.send(message)
         else:
             logging.debug(f'not found {conn_id} {message}')
