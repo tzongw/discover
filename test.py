@@ -34,8 +34,9 @@ def on_open(ws):
     gevent.spawn(run)
 
 
-def worker(uid):
-    gevent.sleep(0.1 * uid)
+def worker(i):
+    uid = options.uid + i
+    gevent.sleep(0.1 * i)
     for _ in range(10):
         ws = websocket.WebSocketApp(f'ws://dev.xc:35010/ws?token=pass&uid={uid}',
                                     on_message=on_message,
@@ -51,7 +52,7 @@ def main():
     #websocket.enableTrace(True)
     workers = []
     for i in range(1000):
-        workers.append(gevent.spawn(worker, i + options.uid))
+        workers.append(gevent.spawn(worker, i))
     gevent.joinall(workers)
 
 
