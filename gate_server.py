@@ -42,7 +42,8 @@ def ws_serve():
 
 
 class Client:
-    def __init__(self, ws: WebSocket):
+    def __init__(self, ws: WebSocket, conn_id):
+        self.conn_id = conn_id
         self._context = {}
         self.ws = ws
         ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
@@ -51,7 +52,8 @@ class Client:
         for k, v in params:
             self.params[k] = v
         self.messages = queue.Queue()
-        self.writer = gevent.spawn(self._writer)
+        gevent.spawn(self._writer)
+        gevent.spawn(self._ping)
 
     def __del__(self):
         logging.debug(f'del {self}')
@@ -70,7 +72,18 @@ class Client:
         while not self.ws.closed:
             self.ws.receive()
 
+    def _ping(self):
+        logging.info(f'start {self}')
+        while True:
+            gevent.sleep(const.PING_INTERVAL)
+            if self.ws.closed:
+                break
+            with LogSuppress(Exception):
+                common.service_pools.ping(rpc_address, self.conn_id, self.context)
+        logging.info(f'exit {self}')
+
     def _writer(self):
+        logging.info(f'start {self}')
         try:
             while True:
                 message = self.messages.get()
@@ -111,7 +124,7 @@ common.clean_ups.append(clean_up)
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
-    client = Client(ws)
+    client = Client(ws, conn_id)
     clients[conn_id] = client
     logging.info(f'new client {conn_id} {client}')
     common.service_pools.login(rpc_address, conn_id, client.params)
