@@ -22,8 +22,6 @@ from typing import Dict
 import json
 from gevent import queue
 from urllib import parse
-import time
-from contextlib import suppress
 from utils import LogSuppress
 
 define("host", "127.0.0.1", str, "listen host")
@@ -44,19 +42,16 @@ def ws_serve():
 
 
 class Client:
-
-    def __init__(self, ws: WebSocket, ping):
+    def __init__(self, ws: WebSocket):
         self._context = {}
         self.ws = ws
         ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
-        params = parse.parse_qsl(ws.handler.environ['QUERY_STRING'])
+        params = parse.parse_qsl(ws.environ['QUERY_STRING'])
         self.params = {}
         for k, v in params:
             self.params[k] = v
         self.messages = queue.Queue()
         self.writer = gevent.spawn(self._writer)
-        self.stopping = False
-        self.ping = ping
 
     def __del__(self):
         logging.debug(f'del {self}')
@@ -77,26 +72,21 @@ class Client:
 
     def _writer(self):
         try:
-            timeout = const.PING_INTERVAL
-            while not self.stopping or not self.messages.empty():
-                before = time.time()
-                with suppress(queue.Empty):
-                    message = self.messages.get(timeout=1)
-                    self.ws.send(message)
-                timeout -= time.time() - before
-                if not self.stopping and timeout < 0:
-                    timeout = const.PING_INTERVAL
-                    with LogSuppress(Exception):
-                        self.ping(self.context)
+            while True:
+                message = self.messages.get()
+                if message is None:
+                    break
+                self.ws.send(message)
         except Exception:
             logging.exception(f'{self}')
             raise
-        finally:
+        else:
             logging.info(f'exit {self}')
+        finally:
             self.ws.close()
 
     def stop(self):
-        self.stopping = True
+        self.messages.put_nowait(None)
 
     def set_context(self, context):
         d = json.loads(context)
@@ -121,7 +111,7 @@ common.clean_ups.append(clean_up)
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
-    client = Client(ws, lambda context: common.service_pools.ping(rpc_address, conn_id, context))
+    client = Client(ws)
     clients[conn_id] = client
     logging.info(f'new client {conn_id} {client}')
     common.service_pools.login(rpc_address, conn_id, client.params)

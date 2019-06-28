@@ -44,11 +44,13 @@ class Handler:
                 logging.warning(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
-            common.service_pools.send_text(conn_id, f'login fail {e}')
-            common.service_pools.remove_conn(conn_id)
+            with common.service_pools.address_gate_client(address) as client:
+                client.send_text(conn_id, f'login fail {e}')
+                client.remove_conn(conn_id)
         else:
-            common.service_pools.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
-            common.service_pools.send_text(conn_id, f'login success')
+            with common.service_pools.address_gate_client(address) as client:
+                client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
+                client.send_text(conn_id, f'login success')
 
             key = self._key(uid)
 
@@ -58,8 +60,9 @@ class Handler:
                     logging.warning(f'kick conn {uid} {status}')
                     with LogSuppress(Exception):
                         old_conn_id = status[const.ONLINE_CONN_ID]
-                        common.service_pools.send_text(old_conn_id, f'login other device')
-                        common.service_pools.remove_conn(old_conn_id)
+                        with common.service_pools.address_gate_client(address) as client:
+                            client.send_text(old_conn_id, f'login other device')
+                            client.remove_conn(old_conn_id)
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
