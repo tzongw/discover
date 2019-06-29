@@ -20,6 +20,8 @@ from redis import Redis
 define("host", "127.0.0.1", str, "listen host")
 define("port", 50001, int, "listen port")
 
+parse_command_line()
+
 
 class Handler:
     _PREFIX = 'online'
@@ -119,7 +121,6 @@ class Handler:
 
 
 def main():
-    parse_command_line()
     common.service.register(const.SERVICE_USER, f'{options.host}:{options.port}')
     common.service.start()
 

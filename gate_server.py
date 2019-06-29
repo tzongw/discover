@@ -30,6 +30,8 @@ define("host", "127.0.0.1", str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
 define("ws_port", 40002, int, "ws port")
 
+parse_command_line()
+
 rpc_address = f'{options.host}:{options.rpc_port}'
 ws_address = f'{options.host}:{options.ws_port}'
 
@@ -237,7 +239,6 @@ def rpc_serve():
 
 
 def main():
-    parse_command_line()
     gevent.joinall([gevent.spawn(ws_serve), gevent.spawn(rpc_serve)])
 
 

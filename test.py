@@ -7,8 +7,10 @@ import websocket
 
 import time
 
-
 define("uid", 0, int, "uid start")
+
+parse_command_line()
+
 
 def on_message(ws, message):
     print(message, ws.__uid)
@@ -48,8 +50,7 @@ def worker(i):
 
 
 def main():
-    parse_command_line()
-    #websocket.enableTrace(True)
+    # websocket.enableTrace(True)
     workers = []
     for i in range(1000):
         workers.append(gevent.spawn(worker, i))
