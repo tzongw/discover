@@ -4,6 +4,10 @@ service gate {
     oneway void remove_conn(1: string conn_id)
     oneway void send_text(1: string conn_id, 2: string message)
     oneway void send_binary(1: string conn_id, 2: binary message)
+    oneway void join_group(1: string conn_id, 2: string group)
+    oneway void leave_group(1: string conn_id, 2: string group)
+    oneway void broadcast_binary(1: string group, 2: set<string> exclude, 3: binary message)
+    oneway void broadcast_text(1: string group, 2: set<string> exclude, 3: string message)
 }
 
 service user {

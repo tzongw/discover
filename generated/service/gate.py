@@ -63,6 +63,44 @@ class Iface(object):
         """
         pass
 
+    def join_group(self, conn_id, group):
+        """
+        Parameters:
+         - conn_id
+         - group
+
+        """
+        pass
+
+    def leave_group(self, conn_id, group):
+        """
+        Parameters:
+         - conn_id
+         - group
+
+        """
+        pass
+
+    def broadcast_binary(self, group, exclude, message):
+        """
+        Parameters:
+         - group
+         - exclude
+         - message
+
+        """
+        pass
+
+    def broadcast_text(self, group, exclude, message):
+        """
+        Parameters:
+         - group
+         - exclude
+         - message
+
+        """
+        pass
+
 
 class Client(Iface):
     def __init__(self, iprot, oprot=None):
@@ -159,6 +197,82 @@ class Client(Iface):
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
+    def join_group(self, conn_id, group):
+        """
+        Parameters:
+         - conn_id
+         - group
+
+        """
+        self.send_join_group(conn_id, group)
+
+    def send_join_group(self, conn_id, group):
+        self._oprot.writeMessageBegin('join_group', TMessageType.ONEWAY, self._seqid)
+        args = join_group_args()
+        args.conn_id = conn_id
+        args.group = group
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def leave_group(self, conn_id, group):
+        """
+        Parameters:
+         - conn_id
+         - group
+
+        """
+        self.send_leave_group(conn_id, group)
+
+    def send_leave_group(self, conn_id, group):
+        self._oprot.writeMessageBegin('leave_group', TMessageType.ONEWAY, self._seqid)
+        args = leave_group_args()
+        args.conn_id = conn_id
+        args.group = group
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def broadcast_binary(self, group, exclude, message):
+        """
+        Parameters:
+         - group
+         - exclude
+         - message
+
+        """
+        self.send_broadcast_binary(group, exclude, message)
+
+    def send_broadcast_binary(self, group, exclude, message):
+        self._oprot.writeMessageBegin('broadcast_binary', TMessageType.ONEWAY, self._seqid)
+        args = broadcast_binary_args()
+        args.group = group
+        args.exclude = exclude
+        args.message = message
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def broadcast_text(self, group, exclude, message):
+        """
+        Parameters:
+         - group
+         - exclude
+         - message
+
+        """
+        self.send_broadcast_text(group, exclude, message)
+
+    def send_broadcast_text(self, group, exclude, message):
+        self._oprot.writeMessageBegin('broadcast_text', TMessageType.ONEWAY, self._seqid)
+        args = broadcast_text_args()
+        args.group = group
+        args.exclude = exclude
+        args.message = message
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
@@ -169,6 +283,10 @@ class Processor(Iface, TProcessor):
         self._processMap["remove_conn"] = Processor.process_remove_conn
         self._processMap["send_text"] = Processor.process_send_text
         self._processMap["send_binary"] = Processor.process_send_binary
+        self._processMap["join_group"] = Processor.process_join_group
+        self._processMap["leave_group"] = Processor.process_leave_group
+        self._processMap["broadcast_binary"] = Processor.process_broadcast_binary
+        self._processMap["broadcast_text"] = Processor.process_broadcast_text
 
     def process(self, iprot, oprot):
         (name, type, seqid) = iprot.readMessageBegin()
@@ -235,6 +353,50 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         try:
             self._handler.send_binary(args.conn_id, args.message)
+        except TTransport.TTransportException:
+            raise
+        except Exception:
+            logging.exception('Exception in oneway handler')
+
+    def process_join_group(self, seqid, iprot, oprot):
+        args = join_group_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        try:
+            self._handler.join_group(args.conn_id, args.group)
+        except TTransport.TTransportException:
+            raise
+        except Exception:
+            logging.exception('Exception in oneway handler')
+
+    def process_leave_group(self, seqid, iprot, oprot):
+        args = leave_group_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        try:
+            self._handler.leave_group(args.conn_id, args.group)
+        except TTransport.TTransportException:
+            raise
+        except Exception:
+            logging.exception('Exception in oneway handler')
+
+    def process_broadcast_binary(self, seqid, iprot, oprot):
+        args = broadcast_binary_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        try:
+            self._handler.broadcast_binary(args.group, args.exclude, args.message)
+        except TTransport.TTransportException:
+            raise
+        except Exception:
+            logging.exception('Exception in oneway handler')
+
+    def process_broadcast_text(self, seqid, iprot, oprot):
+        args = broadcast_text_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        try:
+            self._handler.broadcast_text(args.group, args.exclude, args.message)
         except TTransport.TTransportException:
             raise
         except Exception:
@@ -606,6 +768,342 @@ send_binary_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'message', 'BINARY', None, ),  # 2
+)
+
+
+class join_group_args(object):
+    """
+    Attributes:
+     - conn_id
+     - group
+
+    """
+
+
+    def __init__(self, conn_id=None, group=None,):
+        self.conn_id = conn_id
+        self.group = group
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.conn_id = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.group = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('join_group_args')
+        if self.conn_id is not None:
+            oprot.writeFieldBegin('conn_id', TType.STRING, 1)
+            oprot.writeString(self.conn_id.encode('utf-8') if sys.version_info[0] == 2 else self.conn_id)
+            oprot.writeFieldEnd()
+        if self.group is not None:
+            oprot.writeFieldBegin('group', TType.STRING, 2)
+            oprot.writeString(self.group.encode('utf-8') if sys.version_info[0] == 2 else self.group)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(join_group_args)
+join_group_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'group', 'UTF8', None, ),  # 2
+)
+
+
+class leave_group_args(object):
+    """
+    Attributes:
+     - conn_id
+     - group
+
+    """
+
+
+    def __init__(self, conn_id=None, group=None,):
+        self.conn_id = conn_id
+        self.group = group
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.conn_id = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.group = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('leave_group_args')
+        if self.conn_id is not None:
+            oprot.writeFieldBegin('conn_id', TType.STRING, 1)
+            oprot.writeString(self.conn_id.encode('utf-8') if sys.version_info[0] == 2 else self.conn_id)
+            oprot.writeFieldEnd()
+        if self.group is not None:
+            oprot.writeFieldBegin('group', TType.STRING, 2)
+            oprot.writeString(self.group.encode('utf-8') if sys.version_info[0] == 2 else self.group)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(leave_group_args)
+leave_group_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'group', 'UTF8', None, ),  # 2
+)
+
+
+class broadcast_binary_args(object):
+    """
+    Attributes:
+     - group
+     - exclude
+     - message
+
+    """
+
+
+    def __init__(self, group=None, exclude=None, message=None,):
+        self.group = group
+        self.exclude = exclude
+        self.message = message
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.group = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.SET:
+                    self.exclude = set()
+                    (_etype10, _size7) = iprot.readSetBegin()
+                    for _i11 in range(_size7):
+                        _elem12 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem12)
+                    iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.message = iprot.readBinary()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('broadcast_binary_args')
+        if self.group is not None:
+            oprot.writeFieldBegin('group', TType.STRING, 1)
+            oprot.writeString(self.group.encode('utf-8') if sys.version_info[0] == 2 else self.group)
+            oprot.writeFieldEnd()
+        if self.exclude is not None:
+            oprot.writeFieldBegin('exclude', TType.SET, 2)
+            oprot.writeSetBegin(TType.STRING, len(self.exclude))
+            for iter13 in self.exclude:
+                oprot.writeString(iter13.encode('utf-8') if sys.version_info[0] == 2 else iter13)
+            oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        if self.message is not None:
+            oprot.writeFieldBegin('message', TType.STRING, 3)
+            oprot.writeBinary(self.message)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(broadcast_binary_args)
+broadcast_binary_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'group', 'UTF8', None, ),  # 1
+    (2, TType.SET, 'exclude', (TType.STRING, 'UTF8', False), None, ),  # 2
+    (3, TType.STRING, 'message', 'BINARY', None, ),  # 3
+)
+
+
+class broadcast_text_args(object):
+    """
+    Attributes:
+     - group
+     - exclude
+     - message
+
+    """
+
+
+    def __init__(self, group=None, exclude=None, message=None,):
+        self.group = group
+        self.exclude = exclude
+        self.message = message
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.group = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.SET:
+                    self.exclude = set()
+                    (_etype17, _size14) = iprot.readSetBegin()
+                    for _i18 in range(_size14):
+                        _elem19 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem19)
+                    iprot.readSetEnd()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.message = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('broadcast_text_args')
+        if self.group is not None:
+            oprot.writeFieldBegin('group', TType.STRING, 1)
+            oprot.writeString(self.group.encode('utf-8') if sys.version_info[0] == 2 else self.group)
+            oprot.writeFieldEnd()
+        if self.exclude is not None:
+            oprot.writeFieldBegin('exclude', TType.SET, 2)
+            oprot.writeSetBegin(TType.STRING, len(self.exclude))
+            for iter20 in self.exclude:
+                oprot.writeString(iter20.encode('utf-8') if sys.version_info[0] == 2 else iter20)
+            oprot.writeSetEnd()
+            oprot.writeFieldEnd()
+        if self.message is not None:
+            oprot.writeFieldBegin('message', TType.STRING, 3)
+            oprot.writeString(self.message.encode('utf-8') if sys.version_info[0] == 2 else self.message)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(broadcast_text_args)
+broadcast_text_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'group', 'UTF8', None, ),  # 1
+    (2, TType.SET, 'exclude', (TType.STRING, 'UTF8', False), None, ),  # 2
+    (3, TType.STRING, 'message', 'UTF8', None, ),  # 3
 )
 fix_spec(all_structs)
 del all_structs

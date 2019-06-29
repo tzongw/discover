@@ -214,11 +214,11 @@ class login_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.params = {}
-                    (_ktype8, _vtype9, _size7) = iprot.readMapBegin()
-                    for _i11 in range(_size7):
-                        _key12 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val13 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.params[_key12] = _val13
+                    (_ktype22, _vtype23, _size21) = iprot.readMapBegin()
+                    for _i25 in range(_size21):
+                        _key26 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val27 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.params[_key26] = _val27
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -243,9 +243,9 @@ class login_args(object):
         if self.params is not None:
             oprot.writeFieldBegin('params', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.params))
-            for kiter14, viter15 in self.params.items():
-                oprot.writeString(kiter14.encode('utf-8') if sys.version_info[0] == 2 else kiter14)
-                oprot.writeString(viter15.encode('utf-8') if sys.version_info[0] == 2 else viter15)
+            for kiter28, viter29 in self.params.items():
+                oprot.writeString(kiter28.encode('utf-8') if sys.version_info[0] == 2 else kiter28)
+                oprot.writeString(viter29.encode('utf-8') if sys.version_info[0] == 2 else viter29)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
