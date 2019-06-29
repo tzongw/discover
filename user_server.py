@@ -48,19 +48,14 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            with common.service_pools.address_gate_client(address) as client:
-                client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
-                client.send_text(conn_id, f'login success')
-
             key = self._key(uid)
 
             def set_login_status(pipe: Pipeline):
-                status = pipe.hgetall(key)
-                if status:
-                    logging.warning(f'kick conn {uid} {status}')
+                old_conn_id, old_address = pipe.hmget(key, const.ONLINE_CONN_ID, const.ONLINE_ADDRESS)
+                if old_conn_id and old_address:
+                    logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
                     with LogSuppress(Exception):
-                        old_conn_id = status[const.ONLINE_CONN_ID]
-                        with common.service_pools.address_gate_client(address) as client:
+                        with common.service_pools.address_gate_client(old_address) as client:
                             client.send_text(old_conn_id, f'login other device')
                             client.remove_conn(old_conn_id)
                 pipe.multi()
@@ -68,6 +63,9 @@ class Handler:
                 pipe.expire(key, self._TTL)
 
             self._redis.transaction(set_login_status, key)
+            with common.service_pools.address_gate_client(address) as client:
+                client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
+                client.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: str):
         d = json.loads(context)
@@ -79,20 +77,47 @@ class Handler:
             logging.warning(f'{address} {conn_id} {context}')
 
     def disconnect(self, address: str, conn_id: str, context: str):
-        logging.info(f'{address} {conn_id}, {context}')
+        logging.info(f'{address} {conn_id} {context}')
         d = json.loads(context)
-        if d:
-            uid = d[const.CONTEXT_UID]
-            key = self._key(uid)
+        if not d:
+            return
+        uid = d[const.CONTEXT_UID]
+        key = self._key(uid)
 
-            def unset_login_status(pipe: Pipeline):
-                status = pipe.hgetall(key)
-                if status.get(const.ONLINE_CONN_ID) == conn_id:
-                    logging.info(f'clear {uid} {status}')
-                    pipe.multi()
-                    pipe.delete(key)
+        def unset_login_status(pipe: Pipeline):
+            old_conn_id = pipe.hget(key, const.ONLINE_CONN_ID)
+            if old_conn_id == conn_id:
+                logging.info(f'clear {uid} {old_conn_id}')
+                pipe.multi()
+                pipe.delete(key)
 
-            self._redis.transaction(unset_login_status, key)
+        self._redis.transaction(unset_login_status, key)
+
+    def recv_binary(self, address: str, conn_id: str, context: str, message: bytes):
+        logging.debug(f'{address} {conn_id} {context} {message}')
+        with common.service_pools.address_gate_client(address) as client:
+            client.send_text(conn_id, f'can not read binary')
+
+    def recv_text(self, address: str, conn_id: str, context: str, message: str):
+        logging.debug(f'{address} {conn_id} {context} {message}')
+        d = json.loads(context)
+        if not d:
+            logging.warning(f'not logined {address} {conn_id} {context} {message}')
+            with common.service_pools.address_gate_client(address) as client:
+                client.send_text(conn_id, f'login first')
+                client.remove_conn(conn_id)
+            return
+        uid = d[const.CONTEXT_UID]
+        if message == 'join':
+            with common.service_pools.address_gate_client(address) as client:
+                client.join_group(conn_id, const.CHAT_ROOM)
+            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
+        elif message == 'leave':
+            with common.service_pools.address_gate_client(address) as client:
+                client.leave_group(conn_id, const.CHAT_ROOM)
+            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
+        else:
+            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
 
 def main():

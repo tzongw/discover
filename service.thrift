@@ -14,4 +14,6 @@ service user {
     oneway void login(1: string address, 2: string conn_id, 3: map<string, string> params)
     oneway void ping(1: string address, 2: string conn_id, 3: string context)
     oneway void disconnect(1: string address, 2: string conn_id, 3: string context)
+    oneway void recv_binary(1: string address, 2: string conn_id, 3: string context, 4: binary message)
+    oneway void recv_text(1: string address, 2: string conn_id, 3: string context, 4: string message)
 }

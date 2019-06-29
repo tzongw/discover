@@ -9,3 +9,5 @@ CONTEXT_TOKEN = 'token'
 
 ONLINE_ADDRESS = 'address'
 ONLINE_CONN_ID = 'conn_id'
+
+CHAT_ROOM = 'chat_room'

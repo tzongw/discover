@@ -73,7 +73,11 @@ class Client:
 
     def serve(self):
         while not self.ws.closed:
-            self.ws.receive()
+            message = self.ws.receive()
+            if isinstance(message, bytes):
+                common.service_pools.recv_binary(rpc_address, self.conn_id, self.context, message)
+            elif isinstance(message, str):
+                common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
 
     def _ping(self):
         logging.info(f'start {self}')
