@@ -17,6 +17,7 @@ from gevent import pywsgi
 import gevent
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
+from geventwebsocket.exceptions import WebSocketError
 import uuid
 from typing import Dict
 import json
@@ -90,9 +91,10 @@ class Client:
                 if message is None:
                     break
                 self.ws.send(message)
+        except (WebSocketError, OSError) as e:
+            logging.info(f'peer closed {self} {e}')
         except Exception:
             logging.exception(f'{self}')
-            raise
         else:
             logging.info(f'exit {self}')
         finally:

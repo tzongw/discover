@@ -70,10 +70,13 @@ class Handler:
             self._redis.transaction(set_login_status, key)
 
     def ping(self, address: str, conn_id: str, context: str):
-        logging.debug(f'{address} {conn_id}, {context}')
         d = json.loads(context)
-        uid = d[const.CONTEXT_UID]
-        self._redis.expire(self._key(uid), self._TTL)
+        if d:
+            logging.debug(f'{address} {conn_id} {context}')
+            uid = d[const.CONTEXT_UID]
+            self._redis.expire(self._key(uid), self._TTL)
+        else:
+            logging.warning(f'{address} {conn_id} {context}')
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id}, {context}')
