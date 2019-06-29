@@ -48,7 +48,7 @@ def worker(i):
 
 
 def main():
-    options.parse_command_line()
+    parse_command_line()
     #websocket.enableTrace(True)
     workers = []
     for i in range(1000):
