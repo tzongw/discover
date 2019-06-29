@@ -51,18 +51,19 @@ class Handler:
             key = self._key(uid)
 
             def set_login_status(pipe: Pipeline):
-                old_conn_id, old_address = pipe.hmget(key, const.ONLINE_CONN_ID, const.ONLINE_ADDRESS)
-                if old_conn_id and old_address:
-                    logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
-                    with LogSuppress(Exception):
-                        with common.service_pools.address_gate_client(old_address) as client:
-                            client.send_text(old_conn_id, f'login other device')
-                            client.remove_conn(old_conn_id)
+                values = pipe.hmget(key, const.ONLINE_CONN_ID, const.ONLINE_ADDRESS)
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
+                return values
 
-            self._redis.transaction(set_login_status, key)
+            old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
+            if old_conn_id and old_address:
+                logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
+                with LogSuppress(Exception):
+                    with common.service_pools.address_gate_client(old_address) as client:
+                        client.send_text(old_conn_id, f'login other device')
+                        client.remove_conn(old_conn_id)
             with common.service_pools.address_gate_client(address) as client:
                 client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
                 client.send_text(conn_id, f'login success')
@@ -74,7 +75,7 @@ class Handler:
             uid = d[const.CONTEXT_UID]
             self._redis.expire(self._key(uid), self._TTL)
         else:
-            logging.warning(f'{address} {conn_id} {context}')
+            logging.warning(f'not logined {address} {conn_id} {context}')
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id} {context}')
@@ -103,9 +104,6 @@ class Handler:
         d = json.loads(context)
         if not d:
             logging.warning(f'not logined {address} {conn_id} {context} {message}')
-            with common.service_pools.address_gate_client(address) as client:
-                client.send_text(conn_id, f'login first')
-                client.remove_conn(conn_id)
             return
         uid = d[const.CONTEXT_UID]
         if message == 'join':
