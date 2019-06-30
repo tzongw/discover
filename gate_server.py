@@ -138,8 +138,8 @@ def client_serve(ws: WebSocket):
     client = Client(ws, conn_id)
     clients[conn_id] = client
     logging.info(f'new client {client}')
-    common.service_pools.login(rpc_address, conn_id, client.params)
     try:
+        common.service_pools.login(rpc_address, conn_id, client.params)
         client.serve()
     except Exception:
         logging.exception(f'{client}')

@@ -41,15 +41,6 @@ class Handler:
             token = params.pop(const.CONTEXT_TOKEN)
             if token != "pass":
                 raise ValueError("token")
-        except Exception as e:
-            if isinstance(e, (KeyError, ValueError)):
-                logging.warning(f'login fail {address} {conn_id} {params}')
-            else:
-                logging.exception(f'login error {address} {conn_id} {params}')
-            with common.service_pools.address_gate_client(address) as client:
-                client.send_text(conn_id, f'login fail {e}')
-                client.remove_conn(conn_id)
-        else:
             key = self._key(uid)
 
             def set_login_status(pipe: Pipeline):
@@ -66,6 +57,15 @@ class Handler:
                     with common.service_pools.address_gate_client(old_address) as client:
                         client.send_text(old_conn_id, f'login other device')
                         client.remove_conn(old_conn_id)
+        except Exception as e:
+            if isinstance(e, (KeyError, ValueError)):
+                logging.warning(f'login fail {address} {conn_id} {params}')
+            else:
+                logging.exception(f'login error {address} {conn_id} {params}')
+            with common.service_pools.address_gate_client(address) as client:
+                client.send_text(conn_id, f'login fail {e}')
+                client.remove_conn(conn_id)
+        else:
             with common.service_pools.address_gate_client(address) as client:
                 client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
                 client.send_text(conn_id, f'login success')
