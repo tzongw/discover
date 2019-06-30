@@ -9,6 +9,7 @@ from thrift.protocol.TProtocol import TProtocolBase
 from service import Service
 from thrift_pool import ThriftPool
 from utils import LogSuppress
+import logging
 
 Pools = Dict[str, ThriftPool]
 
@@ -18,10 +19,7 @@ class ServicePools:
         self._service = service
         self._service_pools = defaultdict(dict)  # type: DefaultDict[str, Pools]
         self._settings = settings
-        self._runner = gevent.spawn(self._run)
-
-    def __del__(self):
-        gevent.kill(self._runner)
+        service.refresh_callback = self._clean_pools
 
     @contextlib.contextmanager
     def connection(self, service_name) -> ContextManager[TProtocolBase]:
@@ -45,15 +43,13 @@ class ServicePools:
             yield conn
 
     def _clean_pools(self):
-        for service_name, pools in self._service_pools.items():
-            available_addresses = self._service.addresses(service_name)
-            holding_addresses = set(pools.keys())
-            for removed_address in (holding_addresses - available_addresses):
-                pool = pools.pop(removed_address)
-                pool.close_all()
+        logging.info(f'{self._service_pools}')
+        with LogSuppress(Exception):
+            for service_name, pools in self._service_pools.items():
+                available_addresses = self._service.addresses(service_name)
+                holding_addresses = set(pools.keys())
+                for removed_address in (holding_addresses - available_addresses):
+                    logging.warning(f'clean {removed_address}')
+                    pool = pools.pop(removed_address)
+                    pool.close_all()
 
-    def _run(self):
-        while True:
-            with LogSuppress(Exception):
-                self._clean_pools()
-            gevent.sleep(Service.REFRESH_INTERVAL)

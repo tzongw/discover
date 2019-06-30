@@ -13,7 +13,7 @@ from contextlib import closing
 
 class Service:
     _PREFIX = 'service'
-    REFRESH_INTERVAL = 3
+    _REFRESH_INTERVAL = 3
 
     @classmethod
     def _key_prefix(cls, name):
@@ -34,6 +34,7 @@ class Service:
         self._services = set()  # type: Set[Tuple[str, str]]
         self._runner = None
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
+        self.refresh_callback = None
 
     def register(self, service_name, address):
         assert self._runner is None
@@ -42,6 +43,7 @@ class Service:
     def start(self):
         logging.info(f'start')
         if not self._runner:
+            self._unregister()  # in case process restart
             self._refresh()
             self._runner = gevent.spawn(self._run)
 
@@ -50,12 +52,15 @@ class Service:
         if self._runner:
             gevent.kill(self._runner)
             self._runner = None
-            keys = []
-            for name, address in self._services:
-                key = self._full_key(name, address)
-                keys.append(key)
-            self._redis.delete(*keys)
-            self._redis.publish(self._PREFIX, 'unregister')
+            self._unregister()
+
+    def _unregister(self):
+        keys = []
+        for name, address in self._services:
+            key = self._full_key(name, address)
+            keys.append(key)
+        self._redis.delete(*keys)
+        self._redis.publish(self._PREFIX, 'unregister')
 
     def addresses(self, name) -> Set[str]:
         return self._addresses.get(name) or set()
@@ -70,16 +75,19 @@ class Service:
                 self._addresses[name].add(address)
         if before != self._addresses:
             logging.info(f'{before} -> {self._addresses}')
+            if self.refresh_callback:
+                self.refresh_callback()
 
     def _run(self):
         published = False
+        gevent.sleep(1)  # wait unregister publish & socket listen
         while True:
             try:
                 if self._services:
                     with self._redis.pipeline() as pipe:
                         for name, address in self._services:
                             key = self._full_key(name, address)
-                            pipe.set(key, '', const.MISS_TIMES * self.REFRESH_INTERVAL)
+                            pipe.set(key, '', const.MISS_TIMES * self._REFRESH_INTERVAL)
                         pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
@@ -88,12 +96,12 @@ class Service:
                 with closing(self._redis.pubsub()) as sub:
                     sub.subscribe(self._PREFIX)
                     self._refresh()
-                    timeout = self.REFRESH_INTERVAL
-                    while timeout > 0:
+                    timeout = self._REFRESH_INTERVAL
+                    while timeout > 0.1:
                         before = time.time()
                         if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
                             break
                         timeout -= time.time() - before
             except Exception:
                 logging.exception(f'')
-                gevent.sleep(self.REFRESH_INTERVAL)
+                gevent.sleep(self._REFRESH_INTERVAL)
