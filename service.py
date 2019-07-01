@@ -13,7 +13,8 @@ from contextlib import closing
 
 class Service:
     _PREFIX = 'service'
-    _REFRESH_INTERVAL = 3
+    _REFRESH_INTERVAL = 1
+    _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
 
     @classmethod
     def _key_prefix(cls, name):
@@ -87,7 +88,7 @@ class Service:
                     with self._redis.pipeline() as pipe:
                         for name, address in self._services:
                             key = self._full_key(name, address)
-                            pipe.set(key, '', const.MISS_TIMES * self._REFRESH_INTERVAL)
+                            pipe.set(key, '', self._TTL)
                         pipe.execute()
                     if not published:
                         logging.info(f'publish {self._services}')
