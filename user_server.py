@@ -77,7 +77,10 @@ class Handler:
             uid = d[const.CONTEXT_UID]
             self._redis.expire(self._key(uid), self._TTL)
         else:
-            logging.warning(f'not logined {address} {conn_id} {context}')
+            logging.warning(f'not login {address} {conn_id} {context}')
+            with common.service_pools.address_gate_client(address) as client:
+                client.send_text(conn_id, f'not login')
+                client.remove_conn(conn_id)
 
     def disconnect(self, address: str, conn_id: str, context: str):
         logging.info(f'{address} {conn_id} {context}')
@@ -105,7 +108,7 @@ class Handler:
         logging.debug(f'{address} {conn_id} {context} {message}')
         d = json.loads(context)
         if not d:
-            logging.warning(f'not logined {address} {conn_id} {context} {message}')
+            logging.warning(f'not login {address} {conn_id} {context} {message}')
             return
         uid = d[const.CONTEXT_UID]
         group = d.get(const.CONTEXT_GROUP)
