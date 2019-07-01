@@ -6,6 +6,7 @@ SERVICE_GATE = 'gate'
 
 CONTEXT_UID = 'uid'
 CONTEXT_TOKEN = 'token'
+CONTEXT_GROUP = 'group'
 
 ONLINE_ADDRESS = 'address'
 ONLINE_CONN_ID = 'conn_id'

@@ -166,7 +166,7 @@ class Handler:
             logging.debug(f'{client} {context}')
             client.set_context(context)
         else:
-            logging.debug(f'not found {conn_id} {context}')
+            logging.warning(f'not found {conn_id} {context}')
 
     def unset_context(self, conn_id, context):
         client = clients.get(conn_id)
@@ -174,7 +174,7 @@ class Handler:
             logging.debug(f'{client} {context}')
             client.unset_context(context)
         else:
-            logging.debug(f'not found {conn_id} {context}')
+            logging.warning(f'not found {conn_id} {context}')
 
     def remove_conn(self, conn_id):
         client = clients.get(conn_id)
@@ -182,7 +182,7 @@ class Handler:
             logging.info(f'{client}')
             client.stop()
         else:
-            logging.debug(f'not found {conn_id}')
+            logging.warning(f'not found {conn_id}')
 
     def _send_message(self, conn_id, message):
         client = clients.get(conn_id)
@@ -190,7 +190,7 @@ class Handler:
             logging.debug(f'{client} {message}')
             client.send(message)
         else:
-            logging.debug(f'not found {conn_id} {message}')
+            logging.warning(f'not found {conn_id} {message}')
 
     send_text = _send_message
     send_binary = _send_message
@@ -202,7 +202,7 @@ class Handler:
             client.groups.add(group)
             groups[group].add(client)
         else:
-            logging.debug(f'not found {conn_id} {group}')
+            logging.warning(f'not found {conn_id} {group}')
 
     def leave_group(self, conn_id, group):
         client = clients.get(conn_id)
@@ -211,7 +211,7 @@ class Handler:
             client.groups.discard(group)
             remove_from_group(client, group)
         else:
-            logging.debug(f'not found {conn_id} {group}')
+            logging.warning(f'not found {conn_id} {group}')
 
     def _broadcast_message(self, group, exclude, message):
         logging.debug(f'{group} {exclude} {message} {groups}')

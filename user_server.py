@@ -108,16 +108,23 @@ class Handler:
             logging.warning(f'not logined {address} {conn_id} {context} {message}')
             return
         uid = d[const.CONTEXT_UID]
+        group = d.get(const.CONTEXT_GROUP)
         if message == 'join':
             with common.service_pools.address_gate_client(address) as client:
                 client.join_group(conn_id, const.CHAT_ROOM)
+                client.set_context(conn_id, json.dumps({const.CONTEXT_GROUP: const.CHAT_ROOM}))
             common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
             with common.service_pools.address_gate_client(address) as client:
                 client.leave_group(conn_id, const.CHAT_ROOM)
+                client.unset_context(conn_id, {const.CONTEXT_GROUP})
             common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
         else:
-            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
+            if not group:
+                with common.service_pools.address_gate_client(address) as client:
+                    client.send_text(conn_id, f'not in group')
+            else:
+                common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
 
 def main():
