@@ -71,13 +71,17 @@ class Handler:
                 client.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: str):
-        d = json.loads(context)
-        if d:
+        try:
             logging.debug(f'{address} {conn_id} {context}')
+            d = json.loads(context)
             uid = d[const.CONTEXT_UID]
+            key = self._key(uid)
+            old_conn_id = self._redis.hget(key, const.ONLINE_CONN_ID)
+            if old_conn_id != conn_id:
+                raise ValueError(f'{old_conn_id}')
             self._redis.expire(self._key(uid), self._TTL)
-        else:
-            logging.warning(f'not login {address} {conn_id} {context}')
+        except Exception:
+            logging.exception(f'{address} {conn_id} {context}')
             with common.service_pools.address_gate_client(address) as client:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
