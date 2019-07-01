@@ -80,8 +80,8 @@ class Handler:
             if old_conn_id != conn_id:
                 raise ValueError(f'{old_conn_id}')
             self._redis.expire(self._key(uid), self._TTL)
-        except Exception:
-            logging.exception(f'{address} {conn_id} {context}')
+        except Exception as e:
+            logging.warning(f'{address} {conn_id} {context} {e}')
             with common.service_pools.address_gate_client(address) as client:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
