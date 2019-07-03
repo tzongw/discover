@@ -48,32 +48,24 @@ def ws_serve():
 class Client:
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
-        self._context = {}
+        self.context = {}
         self.ws = ws
-        ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
-        params = parse.parse_qsl(ws.environ['QUERY_STRING'])
-        self.params = {}
-        for k, v in params:
-            self.params[k] = v
         self.messages = queue.Queue()
         self.groups = set()
-        gevent.spawn(self._writer)
-        gevent.spawn(self._ping)
 
     def __del__(self):
         logging.debug(f'del {self}')
 
-    @property
-    def context(self):
-        return self._context
-
     def __repr__(self):
-        return f' {self.conn_id} {self._context}'
+        return f' {self.conn_id} {self.context}'
 
     def send(self, message):
         self.messages.put_nowait(message)
 
     def serve(self):
+        self.ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
+        gevent.spawn(self._writer)
+        gevent.spawn(self._ping)
         while not self.ws.closed:
             message = self.ws.receive()
             if isinstance(message, bytes):
@@ -112,11 +104,11 @@ class Client:
         self.messages.put_nowait(None)
 
     def set_context(self, context):
-        self._context.update(context)
+        self.context.update(context)
 
     def unset_context(self, context):
         for key in context:
-            self._context.pop(key, None)
+            self.context.pop(key, None)
 
 
 clients = {}  # type: Dict[str, Client]
@@ -138,7 +130,10 @@ def client_serve(ws: WebSocket):
     clients[conn_id] = client
     logging.info(f'new client {client}')
     try:
-        common.service_pools.login(rpc_address, conn_id, client.params)
+        params = {}
+        for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
+            params[k] = v
+        common.service_pools.login(rpc_address, conn_id, params)
         client.serve()
     except Exception:
         logging.exception(f'{client}')

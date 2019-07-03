@@ -11,7 +11,6 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from generated.service import user
 import common
-import json
 from typing import Dict
 from redis.client import Pipeline
 from utils import LogSuppress
@@ -67,7 +66,7 @@ class Handler:
                 client.remove_conn(conn_id)
         else:
             with common.service_pools.address_gate_client(address) as client:
-                client.set_context(conn_id, {const.CONTEXT_UID: uid})
+                client.set_context(conn_id, {const.CONTEXT_UID: str(uid)})
                 client.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: Dict[str, str]):
