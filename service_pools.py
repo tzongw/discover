@@ -26,7 +26,7 @@ class ServicePools:
     def connection(self, service_name) -> ContextManager[TProtocolBase]:
         addresses = self._service.addresses(service_name)
         good_ones = [addr for addr in addresses if self._cool_down[addr] < time.time()]
-        address = choice(good_ones) if good_ones else choice(tuple(addresses))  # type: str
+        address = choice(good_ones or tuple(addresses))  # type: str
         with self.address_connection(service_name, address) as conn:
             yield conn
 
