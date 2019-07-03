@@ -65,7 +65,7 @@ class Client:
 
     @property
     def context(self):
-        return json.dumps(self._context)
+        return self._context
 
     def __repr__(self):
         return f' {self.conn_id} {self._context}'
@@ -112,8 +112,7 @@ class Client:
         self.messages.put_nowait(None)
 
     def set_context(self, context):
-        d = json.loads(context)
-        self._context.update(d)
+        self._context.update(context)
 
     def unset_context(self, context):
         for key in context:

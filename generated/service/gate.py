@@ -433,8 +433,14 @@ class set_context_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.STRING:
-                    self.context = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                if ftype == TType.MAP:
+                    self.context = {}
+                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
+                    for _i4 in range(_size0):
+                        _key5 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val6 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context[_key5] = _val6
+                    iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
             else:
@@ -452,8 +458,12 @@ class set_context_args(object):
             oprot.writeString(self.conn_id.encode('utf-8') if sys.version_info[0] == 2 else self.conn_id)
             oprot.writeFieldEnd()
         if self.context is not None:
-            oprot.writeFieldBegin('context', TType.STRING, 2)
-            oprot.writeString(self.context.encode('utf-8') if sys.version_info[0] == 2 else self.context)
+            oprot.writeFieldBegin('context', TType.MAP, 2)
+            oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
+            for kiter7, viter8 in self.context.items():
+                oprot.writeString(kiter7.encode('utf-8') if sys.version_info[0] == 2 else kiter7)
+                oprot.writeString(viter8.encode('utf-8') if sys.version_info[0] == 2 else viter8)
+            oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -475,7 +485,7 @@ all_structs.append(set_context_args)
 set_context_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'context', 'UTF8', None, ),  # 2
+    (2, TType.MAP, 'context', (TType.STRING, 'UTF8', TType.STRING, 'UTF8', False), None, ),  # 2
 )
 
 
@@ -509,10 +519,10 @@ class unset_context_args(object):
             elif fid == 2:
                 if ftype == TType.SET:
                     self.context = set()
-                    (_etype3, _size0) = iprot.readSetBegin()
-                    for _i4 in range(_size0):
-                        _elem5 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context.add(_elem5)
+                    (_etype12, _size9) = iprot.readSetBegin()
+                    for _i13 in range(_size9):
+                        _elem14 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context.add(_elem14)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -533,8 +543,8 @@ class unset_context_args(object):
         if self.context is not None:
             oprot.writeFieldBegin('context', TType.SET, 2)
             oprot.writeSetBegin(TType.STRING, len(self.context))
-            for iter6 in self.context:
-                oprot.writeString(iter6.encode('utf-8') if sys.version_info[0] == 2 else iter6)
+            for iter15 in self.context:
+                oprot.writeString(iter15.encode('utf-8') if sys.version_info[0] == 2 else iter15)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -951,10 +961,10 @@ class broadcast_binary_args(object):
             elif fid == 2:
                 if ftype == TType.SET:
                     self.exclude = set()
-                    (_etype10, _size7) = iprot.readSetBegin()
-                    for _i11 in range(_size7):
-                        _elem12 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.exclude.add(_elem12)
+                    (_etype19, _size16) = iprot.readSetBegin()
+                    for _i20 in range(_size16):
+                        _elem21 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem21)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -980,8 +990,8 @@ class broadcast_binary_args(object):
         if self.exclude is not None:
             oprot.writeFieldBegin('exclude', TType.SET, 2)
             oprot.writeSetBegin(TType.STRING, len(self.exclude))
-            for iter13 in self.exclude:
-                oprot.writeString(iter13.encode('utf-8') if sys.version_info[0] == 2 else iter13)
+            for iter22 in self.exclude:
+                oprot.writeString(iter22.encode('utf-8') if sys.version_info[0] == 2 else iter22)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.message is not None:
@@ -1045,10 +1055,10 @@ class broadcast_text_args(object):
             elif fid == 2:
                 if ftype == TType.SET:
                     self.exclude = set()
-                    (_etype17, _size14) = iprot.readSetBegin()
-                    for _i18 in range(_size14):
-                        _elem19 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.exclude.add(_elem19)
+                    (_etype26, _size23) = iprot.readSetBegin()
+                    for _i27 in range(_size23):
+                        _elem28 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem28)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -1074,8 +1084,8 @@ class broadcast_text_args(object):
         if self.exclude is not None:
             oprot.writeFieldBegin('exclude', TType.SET, 2)
             oprot.writeSetBegin(TType.STRING, len(self.exclude))
-            for iter20 in self.exclude:
-                oprot.writeString(iter20.encode('utf-8') if sys.version_info[0] == 2 else iter20)
+            for iter29 in self.exclude:
+                oprot.writeString(iter29.encode('utf-8') if sys.version_info[0] == 2 else iter29)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.message is not None:

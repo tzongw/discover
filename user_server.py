@@ -67,14 +67,13 @@ class Handler:
                 client.remove_conn(conn_id)
         else:
             with common.service_pools.address_gate_client(address) as client:
-                client.set_context(conn_id, json.dumps({const.CONTEXT_UID: uid}))
+                client.set_context(conn_id, {const.CONTEXT_UID: uid})
                 client.send_text(conn_id, f'login success')
 
-    def ping(self, address: str, conn_id: str, context: str):
+    def ping(self, address: str, conn_id: str, context: Dict[str, str]):
         try:
             logging.debug(f'{address} {conn_id} {context}')
-            d = json.loads(context)
-            uid = d[const.CONTEXT_UID]
+            uid = int(context[const.CONTEXT_UID])
             key = self._key(uid)
             old_conn_id = self._redis.hget(key, const.ONLINE_CONN_ID)
             if old_conn_id != conn_id:
@@ -86,12 +85,11 @@ class Handler:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
 
-    def disconnect(self, address: str, conn_id: str, context: str):
+    def disconnect(self, address: str, conn_id: str, context: Dict[str, str]):
         logging.info(f'{address} {conn_id} {context}')
-        d = json.loads(context)
-        if not d:
+        if not context:
             return
-        uid = d[const.CONTEXT_UID]
+        uid = int(context[const.CONTEXT_UID])
         key = self._key(uid)
 
         def unset_login_status(pipe: Pipeline):
@@ -103,23 +101,22 @@ class Handler:
 
         self._redis.transaction(unset_login_status, key)
 
-    def recv_binary(self, address: str, conn_id: str, context: str, message: bytes):
+    def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
         with common.service_pools.address_gate_client(address) as client:
             client.send_text(conn_id, f'can not read binary')
 
-    def recv_text(self, address: str, conn_id: str, context: str, message: str):
+    def recv_text(self, address: str, conn_id: str, context: Dict[str, str], message: str):
         logging.debug(f'{address} {conn_id} {context} {message}')
-        d = json.loads(context)
-        if not d:
+        if not context:
             logging.warning(f'not login {address} {conn_id} {context} {message}')
             return
-        uid = d[const.CONTEXT_UID]
-        group = d.get(const.CONTEXT_GROUP)
+        uid = int(context[const.CONTEXT_UID])
+        group = context.get(const.CONTEXT_GROUP)
         if message == 'join':
             with common.service_pools.address_gate_client(address) as client:
                 client.join_group(conn_id, const.CHAT_ROOM)
-                client.set_context(conn_id, json.dumps({const.CONTEXT_GROUP: const.CHAT_ROOM}))
+                client.set_context(conn_id, {const.CONTEXT_GROUP: const.CHAT_ROOM})
             common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
             with common.service_pools.address_gate_client(address) as client:
