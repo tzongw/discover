@@ -233,7 +233,8 @@ def rpc_serve():
 
 
 def main():
-    gevent.joinall([gevent.spawn(ws_serve), gevent.spawn(rpc_serve)])
+    gevent.spawn(ws_serve)
+    rpc_serve()
 
 
 if __name__ == '__main__':
