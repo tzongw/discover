@@ -20,7 +20,6 @@ from geventwebsocket.websocket import WebSocket
 from geventwebsocket.exceptions import WebSocketError
 import uuid
 from typing import Dict, DefaultDict, Set
-import json
 from gevent import queue
 from urllib import parse
 from utils import LogSuppress
