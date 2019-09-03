@@ -56,7 +56,7 @@ class Client:
         logging.debug(f'del {self}')
 
     def __repr__(self):
-        return f' {self.conn_id} {self.context}'
+        return f'{self.conn_id} {self.context}'
 
     def send(self, message):
         self.messages.put_nowait(message)
