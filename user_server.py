@@ -74,9 +74,9 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
             key = self._key(uid)
-            old_conn_id = self._redis.hget(key, const.ONLINE_CONN_ID)
-            if old_conn_id != conn_id:
-                raise ValueError(f'{old_conn_id}')
+            login_conn_id = self._redis.hget(key, const.ONLINE_CONN_ID)
+            if login_conn_id != conn_id:
+                raise ValueError(f'{login_conn_id}')
             self._redis.expire(key, self._TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
