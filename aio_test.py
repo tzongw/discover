@@ -23,7 +23,7 @@ async def worker(i):
         print(f"{resp} {uid}")
         while True:
             websocket.ping()
-            await asyncio.sleep(10)
+            await asyncio.sleep(20)
 
 
 
