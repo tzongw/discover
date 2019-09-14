@@ -13,7 +13,7 @@ from contextlib import closing
 
 class Service:
     _PREFIX = 'service'
-    _REFRESH_INTERVAL = 1
+    _REFRESH_INTERVAL = 10
     _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
     COOL_DOWN = _TTL + _REFRESH_INTERVAL
 
@@ -76,7 +76,7 @@ class Service:
                 name, address = self._unpack(key)
                 self._addresses[name].add(address)
         if before != self._addresses:
-            logging.info(f'{before} -> {self._addresses}')
+            logging.warning(f'{before} -> {self._addresses}')
             if self.refresh_callback:
                 self.refresh_callback()
 
