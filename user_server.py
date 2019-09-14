@@ -134,7 +134,8 @@ def main():
     common.service.register(const.SERVICE_USER, f'{options.host}:{options.port}')
     common.service.start()
 
-    handler = Handler(common.redis)
+    user_redis = Redis(port=6380, decode_responses=True)
+    handler = Handler(user_redis)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(options.host, options.port)
     tfactory = TTransport.TBufferedTransportFactory()
