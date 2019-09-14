@@ -3,7 +3,7 @@
 # WS client example
 
 import asyncio
-
+import const
 import websockets
 from tornado.options import options, define, parse_command_line
 
@@ -23,7 +23,7 @@ async def worker(i):
         print(f"{resp} {uid}")
         while True:
             websocket.ping()
-            await asyncio.sleep(20)
+            await asyncio.sleep(const.PING_INTERVAL)
 
 
 
