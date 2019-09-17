@@ -13,7 +13,7 @@ from contextlib import closing
 
 class Service:
     _PREFIX = 'service'
-    _REFRESH_INTERVAL = 10
+    _REFRESH_INTERVAL = 3
     _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
     COOL_DOWN = _TTL + _REFRESH_INTERVAL
 
