@@ -48,8 +48,8 @@ class _ServicePools(ServicePools):
         return super().__getattr__(item)
 
 
-redis = Redis(decode_responses=True)
-service = Service(redis)
+_redis = Redis(decode_responses=True)
+service = Service(_redis)
 service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface, gate.Iface]
 
 clean_ups = [service.stop]
