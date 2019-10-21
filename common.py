@@ -55,12 +55,12 @@ service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface,
 clean_ups = [service.stop]
 
 
-def sigusr1_handler(sig, frame):
+def sig_handler(sig, frame):
     for item in clean_ups:
         gevent.spawn(item)
 
 
-signal.signal(signal.SIGUSR1, sigusr1_handler)
+signal.signal(signal.SIGTERM, sig_handler)
 
 LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
 channel = logging.StreamHandler()
