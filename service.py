@@ -15,7 +15,7 @@ class Service:
     _PREFIX = 'service'
     _REFRESH_INTERVAL = 3
     _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
-    COOL_DOWN = _TTL + 1
+    COOL_DOWN = _TTL + _REFRESH_INTERVAL
 
     @classmethod
     def _key_prefix(cls, name):
