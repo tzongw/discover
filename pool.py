@@ -17,6 +17,9 @@ class Pool:
             idle = maxsize
         self._idle = idle
 
+    def __del__(self):
+        self.close_all()
+
     @abc.abstractmethod
     def create_connection(self):
         raise NotImplementedError()
