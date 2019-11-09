@@ -44,8 +44,10 @@ class ServicePools:
         with pool.connection() as conn:
             try:
                 yield conn
-            except Exception:
-                self._cool_down[address] = time.time() + Service.COOL_DOWN
+            except Exception as e:
+                logging.exception(f'')
+                if not ThriftPool.acceptable(e):
+                    self._cool_down[address] = time.time() + Service.COOL_DOWN
                 raise
 
     def _clean_pools(self):
