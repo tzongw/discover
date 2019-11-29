@@ -15,9 +15,10 @@ from typing import Dict
 from redis.client import Pipeline
 from utils import LogSuppress
 from redis import Redis
+import util
 
-define("host", "127.0.0.1", str, "listen host")
-define("port", 50001, int, "listen port")
+define("host", util.ip_address(), str, "listen host")
+define("rpc_port", 50001, int, "rpc port")
 
 parse_command_line()
 
@@ -131,18 +132,18 @@ class Handler:
 
 
 def main():
-    common.service.register(const.SERVICE_USER, f'{options.host}:{options.port}')
+    common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
     common.service.start()
 
     user_redis = Redis(port=6380, decode_responses=True)
     handler = Handler(user_redis)
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(options.host, options.port)
+    transport = TSocket.TServerSocket('0.0.0.0', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-    logging.info(f'Starting the server {options.host}:{options.port} ...')
+    logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
     server.serve()
 
 

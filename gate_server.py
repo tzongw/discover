@@ -24,8 +24,9 @@ from gevent import queue
 from urllib import parse
 from utils import LogSuppress
 from collections import defaultdict
+import util
 
-define("host", "127.0.0.1", str, "listen host")
+define("host", util.ip_address(), str, "listen host")
 define("rpc_port", 40001, int, "rpc port")
 define("ws_port", 40002, int, "ws port")
 
@@ -39,7 +40,7 @@ sockets = Sockets(app)
 
 
 def ws_serve():
-    server = pywsgi.WSGIServer((options.host, options.ws_port), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('0.0.0.0', options.ws_port), app, handler_class=WebSocketHandler)
     logging.info(f'Starting ws server {ws_address} ...')
     server.serve_forever()
 
@@ -222,7 +223,7 @@ def rpc_serve():
 
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket(options.host, options.rpc_port)
+    transport = TSocket.TServerSocket('0.0.0.0', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
