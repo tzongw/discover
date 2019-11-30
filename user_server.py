@@ -132,9 +132,6 @@ class Handler:
 
 
 def main():
-    common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
-    common.service.start()
-
     user_redis = Redis(port=6380, decode_responses=True)
     handler = Handler(user_redis)
     processor = user.Processor(handler)
@@ -144,6 +141,8 @@ def main():
 
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
+    common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
+    common.service.start()
     server.serve()
 
 

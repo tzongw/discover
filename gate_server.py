@@ -218,9 +218,6 @@ class Handler:
 
 
 def rpc_serve():
-    common.service.register(const.SERVICE_GATE, rpc_address)
-    common.service.start()
-
     handler = Handler()
     processor = gate.Processor(handler)
     transport = TSocket.TServerSocket('0.0.0.0', options.rpc_port)
@@ -229,6 +226,8 @@ def rpc_serve():
 
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     logging.info(f'Starting rpc server {rpc_address} ...')
+    common.service.register(const.SERVICE_GATE, rpc_address)
+    common.service.start()
     server.serve()
 
 
