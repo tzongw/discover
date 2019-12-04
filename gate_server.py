@@ -40,7 +40,7 @@ sockets = Sockets(app)
 
 
 def ws_serve():
-    server = pywsgi.WSGIServer(('0.0.0.0', options.ws_port), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
     logging.info(f'Starting ws server {ws_address} ...')
     server.serve_forever()
 
@@ -74,14 +74,14 @@ class Client:
                 common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
 
     def _ping(self):
-        logging.info(f'start {self}')
+        logging.debug(f'start {self}')
         while True:
             gevent.sleep(const.PING_INTERVAL)
             if self.ws.closed:
                 break
             with LogSuppress(Exception):
                 common.service_pools.ping(rpc_address, self.conn_id, self.context)
-        logging.info(f'exit {self}')
+        logging.debug(f'exit {self}')
 
     def _writer(self):
         logging.info(f'start {self}')
@@ -220,7 +220,7 @@ class Handler:
 def rpc_serve():
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket('0.0.0.0', options.rpc_port)
+    transport = TSocket.TServerSocket('', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
 
