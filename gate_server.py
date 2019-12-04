@@ -72,6 +72,8 @@ class Client:
                 common.service_pools.recv_binary(rpc_address, self.conn_id, self.context, message)
             elif isinstance(message, str):
                 common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
+            else:
+                logging.info(f'receive {message}')
 
     def _ping(self):
         logging.debug(f'start {self}')
