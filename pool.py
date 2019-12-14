@@ -8,13 +8,12 @@ from utils import LogSuppress
 
 
 class Pool:
-    def __init__(self, maxsize=64, timeout=5, idle=None, acceptable=None):
+    def __init__(self, maxsize=128, timeout=3, acceptable=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
         self._size = 0
-        self._idle = maxsize if idle is None else idle
-        self._acceptable = acceptable or (lambda e: False)
+        self._acceptable = acceptable
 
     def __del__(self):
         self.close_all()
@@ -28,7 +27,7 @@ class Pool:
         raise NotImplementedError()
 
     def close_all(self):
-        self._idle = 0
+        self._maxsize = 0
         while not self._pool.empty():
             conn = self._pool.get_nowait()
             self._size -= 1
@@ -61,7 +60,7 @@ class Pool:
             self._size -= 1
 
         def return_conn():
-            if self._pool.qsize() < self._idle:
+            if self._pool.qsize() < self._maxsize:
                 self.put(conn)
             else:
                 close_conn()
