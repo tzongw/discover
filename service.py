@@ -34,27 +34,23 @@ class Service:
     def __init__(self, redis: Redis):
         self._redis = redis
         self._services = set()  # type: Set[Tuple[str, str]]
-        self._runner = None
+        self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self.refresh_callback = None
 
     def register(self, service_name, address):
-        assert self._runner is None
         self._services.add((service_name, address))
 
     def start(self):
         logging.info(f'start')
-        if not self._runner:
-            self._unregister()  # in case process restart
-            self._refresh()
-            self._runner = gevent.spawn(self._run)
+        self._unregister()  # in case process restart
+        self._refresh()
+        gevent.spawn(self._run)
 
     def stop(self):
         logging.info(f'stop')
-        if self._runner:
-            gevent.kill(self._runner)
-            self._runner = None
-            self._unregister()
+        self._stopped = True
+        self._unregister()
 
     def _unregister(self):
         keys = []
@@ -83,7 +79,7 @@ class Service:
     def _run(self):
         published = False
         gevent.sleep(1)  # wait unregister publish & socket listen
-        while True:
+        while not self._stopped:
             try:
                 if self._services:
                     with self._redis.pipeline() as pipe:
