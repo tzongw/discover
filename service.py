@@ -45,7 +45,7 @@ class Service:
         logging.info(f'start')
         self._unregister()  # in case process restart
         self._refresh()
-        gevent.spawn(self._run)
+        gevent.spawn_later(1, self._run)  # wait unregister publish & socket listen
 
     def stop(self):
         logging.info(f'stop')
@@ -78,7 +78,6 @@ class Service:
 
     def _run(self):
         published = False
-        gevent.sleep(1)  # wait unregister publish & socket listen
         while not self._stopped:
             try:
                 if self._services:
