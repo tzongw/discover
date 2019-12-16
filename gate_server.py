@@ -27,8 +27,8 @@ from collections import defaultdict
 import util
 
 define("host", util.ip_address(), str, "listen host")
-define("rpc_port", 40001, int, "rpc port")
-define("ws_port", 40002, int, "ws port")
+define("ws_port", 40001, int, "ws port")
+define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
 
@@ -225,11 +225,17 @@ def rpc_serve():
     transport = TSocket.TServerSocket('', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-    logging.info(f'Starting rpc server {rpc_address} ...')
-    common.service.register(const.SERVICE_GATE, rpc_address)
-    common.service.start()
+
+    def register():
+        global rpc_address
+        options.rpc_port = transport.handle.getsockname()[1]
+        rpc_address = f'{options.host}:{options.rpc_port}'
+        logging.info(f'Starting rpc server {rpc_address} ...')
+        common.service.register(const.SERVICE_GATE, rpc_address)
+        common.service.start()
+
+    gevent.spawn_later(0.1, register)
     server.serve()
 
 

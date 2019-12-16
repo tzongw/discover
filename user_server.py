@@ -9,6 +9,7 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
+import gevent
 from generated.service import user
 import common
 from typing import Dict
@@ -18,7 +19,7 @@ from redis import Redis
 import util
 
 define("host", util.ip_address(), str, "listen host")
-define("rpc_port", 50001, int, "rpc port")
+define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
 
@@ -138,11 +139,15 @@ def main():
     transport = TSocket.TServerSocket('', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
-
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-    logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
-    common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
-    common.service.start()
+
+    def register():
+        options.rpc_port = transport.handle.getsockname()[1]
+        logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
+        common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
+        common.service.start()
+
+    gevent.spawn_later(0.1, register)
     server.serve()
 
 
