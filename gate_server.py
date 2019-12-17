@@ -25,9 +25,10 @@ from urllib import parse
 from utils import LogSuppress
 from collections import defaultdict
 import util
+from concurrent.futures import Future
 
 define("host", util.ip_address(), str, "listen host")
-define("ws_port", 40001, int, "ws port")
+define("ws_port", 0, int, "ws port")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
@@ -39,9 +40,17 @@ app = Flask(__name__)
 sockets = Sockets(app)
 
 
-def ws_serve():
+def ws_serve(fut: Future):
     server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
-    logging.info(f'Starting ws server {ws_address} ...')
+
+    def register():
+        global ws_address
+        options.ws_port = server.address[1]
+        ws_address = f'{options.host}:{options.ws_port}'
+        logging.info(f'Starting ws server {ws_address} ...')
+        fut.set_result(ws_address)
+
+    gevent.spawn_later(0.1, register)
     server.serve_forever()
 
 
@@ -219,7 +228,7 @@ class Handler:
     broadcast_text = _broadcast_message
 
 
-def rpc_serve():
+def rpc_serve(fut: Future):
     handler = Handler()
     processor = gate.Processor(handler)
     transport = TSocket.TServerSocket('', options.rpc_port)
@@ -232,16 +241,20 @@ def rpc_serve():
         options.rpc_port = transport.handle.getsockname()[1]
         rpc_address = f'{options.host}:{options.rpc_port}'
         logging.info(f'Starting rpc server {rpc_address} ...')
-        common.service.register(const.SERVICE_GATE, rpc_address)
-        common.service.start()
+        fut.set_result(rpc_address)
 
     gevent.spawn_later(0.1, register)
     server.serve()
 
 
 def main():
-    ws = gevent.spawn(ws_serve)
-    rpc = gevent.spawn(rpc_serve)
+    ws_future = Future()
+    rpc_future = Future()
+    ws = gevent.spawn(ws_serve, ws_future)
+    rpc = gevent.spawn(rpc_serve, rpc_future)
+    common.service.register(const.HTTP_GATE, ws_future.result(timeout=1))
+    common.service.register(const.RPC_GATE, rpc_future.result(timeout=1))
+    common.service.start()
     gevent.joinall([ws, rpc], raise_error=True)
 
 

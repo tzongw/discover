@@ -144,7 +144,7 @@ def main():
     def register():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
-        common.service.register(const.SERVICE_USER, f'{options.host}:{options.rpc_port}')
+        common.service.register(const.RPC_USER, f'{options.host}:{options.rpc_port}')
         common.service.start()
 
     gevent.spawn_later(0.1, register)

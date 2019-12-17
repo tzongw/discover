@@ -20,12 +20,12 @@ class _ServicePools(ServicePools):
 
     @contextlib.contextmanager
     def user_client(self) -> ContextManager[user.Iface]:
-        with self.connection(const.SERVICE_USER) as conn:
+        with self.connection(const.RPC_USER) as conn:
             yield user.Client(conn)
 
     @contextlib.contextmanager
     def address_gate_client(self, address) -> ContextManager[gate.Iface]:
-        with self.address_connection(const.SERVICE_GATE, address) as conn:
+        with self.address_connection(const.RPC_GATE, address) as conn:
             yield gate.Client(conn)
 
     @staticmethod
@@ -43,7 +43,7 @@ class _ServicePools(ServicePools):
         if hasattr(user.Iface, item):
             return partial(self._one_shot, self.user_client, item)
         if hasattr(gate.Iface, item):
-            addresses = self._service.addresses(const.SERVICE_GATE)
+            addresses = self._service.addresses(const.RPC_GATE)
             return partial(self._traverse, self.address_gate_client, addresses, item)
         return super().__getattr__(item)
 

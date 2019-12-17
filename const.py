@@ -1,8 +1,9 @@
 PING_INTERVAL = 20
 MISS_TIMES = 3
 
-SERVICE_USER = 'user'
-SERVICE_GATE = 'gate'
+RPC_USER = 'rpc_user'
+RPC_GATE = 'rpc_gate'
+HTTP_GATE = 'http_gate'
 
 CONTEXT_UID = 'uid'
 CONTEXT_TOKEN = 'token'
