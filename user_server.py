@@ -136,7 +136,7 @@ def main():
     user_redis = Redis(port=6380, decode_responses=True)
     handler = Handler(user_redis)
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket('', options.rpc_port)
+    transport = TSocket.TServerSocket(util.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
