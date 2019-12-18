@@ -26,6 +26,7 @@ from utils import LogSuppress
 from collections import defaultdict
 import util
 from concurrent.futures import Future
+import sys
 
 define("host", util.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
@@ -231,7 +232,7 @@ class Handler:
 def rpc_serve(fut: Future):
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket('', options.rpc_port)
+    transport = TSocket.TServerSocket('' if sys.platform == 'darwin' else '*', options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
