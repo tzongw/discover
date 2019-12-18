@@ -24,10 +24,10 @@ from gevent import queue
 from urllib import parse
 from utils import LogSuppress
 from collections import defaultdict
-import util
+import utils
 from concurrent.futures import Future
 
-define("host", util.ip_address(), str, "listen host")
+define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
 define("rpc_port", 0, int, "rpc port")
 
@@ -231,7 +231,7 @@ class Handler:
 def rpc_serve(fut: Future):
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket(util.addr_wildchar, options.rpc_port)
+    transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)

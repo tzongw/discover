@@ -16,9 +16,9 @@ from typing import Dict
 from redis.client import Pipeline
 from utils import LogSuppress
 from redis import Redis
-import util
+import utils
 
-define("host", util.ip_address(), str, "listen host")
+define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
@@ -136,7 +136,7 @@ def main():
     user_redis = Redis(port=6380, decode_responses=True)
     handler = Handler(user_redis)
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(util.addr_wildchar, options.rpc_port)
+    transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
