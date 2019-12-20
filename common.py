@@ -3,11 +3,9 @@ import logging
 import signal
 from functools import partial
 from typing import ContextManager, Union
-
 import gevent
 from redis import Redis
 from tornado.log import LogFormatter
-
 import const
 from generated.service import gate, user
 from service import Service
