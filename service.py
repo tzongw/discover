@@ -1,5 +1,4 @@
 import logging
-import time
 from collections import defaultdict
 from typing import Set, DefaultDict, Tuple
 
@@ -8,7 +7,6 @@ from redis import Redis
 
 import const
 from utils import LogSuppress
-from contextlib import closing
 
 
 class Service:
@@ -79,6 +77,7 @@ class Service:
 
     def _run(self):
         published = False
+        sub = None
         while not self._stopped:
             try:
                 if self._services:
@@ -91,15 +90,12 @@ class Service:
                         logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
-                with closing(self._redis.pubsub()) as sub:
+                if not sub:
+                    sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
-                    self._refresh()
-                    timeout = self._REFRESH_INTERVAL
-                    while timeout > 0.1:
-                        before = time.time()
-                        if sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
-                            break
-                        timeout -= time.time() - before
+                self._refresh()
+                sub.get_message(timeout=self._REFRESH_INTERVAL)
             except Exception:
                 logging.exception(f'')
+                sub = None
                 gevent.sleep(self._REFRESH_INTERVAL)
