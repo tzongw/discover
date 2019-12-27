@@ -10,6 +10,8 @@ import const
 from generated.service import gate, user
 from service import Service
 from service_pools import ServicePools
+from thrift_pool import ThriftPool
+from utils import LogSuppress
 
 
 class _ServicePools(ServicePools):
@@ -32,10 +34,21 @@ class _ServicePools(ServicePools):
             return getattr(client, item)(*args, **kwargs)
 
     @staticmethod
+    def _retry(client_factory, item, *args, **kwargs):
+        try:
+            return _ServicePools._one_shot(client_factory, item, *args, **kwargs)
+        except Exception as e:
+            if ThriftPool.acceptable(e):
+                raise
+        # will retry another node
+        return _ServicePools._one_shot(client_factory, item, *args, **kwargs)
+
+    @staticmethod
     def _traverse(address_client_factory, addresses, item, *args, **kwargs):
         for address in addresses:
-            with address_client_factory(address) as client:
-                getattr(client, item)(*args, **kwargs)
+            with LogSuppress(Exception):
+                with address_client_factory(address) as client:
+                    getattr(client, item)(*args, **kwargs)
 
     def __getattr__(self, item):
         if hasattr(user.Iface, item):
