@@ -13,7 +13,6 @@ class Handle:
         self.callback = callback
         self.when = when
         self.cancelled = False
-        self.delay = None
 
     def cancel(self):
         self.cancelled = True
@@ -23,18 +22,14 @@ class Handle:
 
 
 class Schedule:
-    def __init__(self, executor: Executor):
+    def __init__(self, executor=None):
         self._cond = threading.Condition()
-        self._executor = executor
+        self._executor = executor or Executor()
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
-    def call_later(self, callback, delay, repeat=False) -> Handle:
-        handle = self.call_at(callback, time.time() + delay)
-        if repeat:
-            assert delay > 0
-            handle.delay = delay
-        return handle
+    def call_later(self, callback, delay) -> Handle:
+        return self.call_at(callback, time.time() + delay)
 
     def call_at(self, callback, at) -> Handle:
         with self._cond:
@@ -60,6 +55,3 @@ class Schedule:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
                         self._executor.submit(handle.callback)
-                        if handle.delay:
-                            handle.when = now + handle.delay
-                            heapq.heappush(self._handles, handle)
