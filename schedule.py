@@ -23,9 +23,9 @@ class Handle:
 
 
 class Schedule:
-    def __init__(self, max_workers=128):
+    def __init__(self, executor: Executor):
         self._cond = threading.Condition()
-        self._executor = Executor(max_workers)
+        self._executor = executor
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
