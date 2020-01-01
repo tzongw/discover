@@ -26,6 +26,7 @@ from utils import LogSuppress
 from collections import defaultdict
 import utils
 from concurrent.futures import Future
+from schedule import Schedule
 
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
@@ -55,6 +56,8 @@ def ws_serve(fut: Future):
 
 
 class Client:
+    schedule = Schedule()
+
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
         self.context = {}
@@ -73,26 +76,23 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
+        handle = self.schedule.call_later(self._ping, const.PING_INTERVAL, repeat=True)
         gevent.spawn(self._writer)
-        gevent.spawn(self._ping)
-        while not self.ws.closed:
-            message = self.ws.receive()
-            if isinstance(message, bytes):
-                common.service_pools.recv_binary(rpc_address, self.conn_id, self.context, message)
-            elif isinstance(message, str):
-                common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
-            else:
-                logging.info(f'receive {message}')
+        try:
+            while not self.ws.closed:
+                message = self.ws.receive()
+                if isinstance(message, bytes):
+                    common.service_pools.recv_binary(rpc_address, self.conn_id, self.context, message)
+                elif isinstance(message, str):
+                    common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
+                else:
+                    logging.info(f'receive {message}')
+        finally:
+            handle.cancel()
 
     def _ping(self):
-        logging.debug(f'start {self}')
-        while True:
-            gevent.sleep(const.PING_INTERVAL)
-            if self.ws.closed:
-                break
-            with LogSuppress(Exception):
-                common.service_pools.ping(rpc_address, self.conn_id, self.context)
-        logging.debug(f'exit {self}')
+        with LogSuppress(Exception):
+            common.service_pools.ping(rpc_address, self.conn_id, self.context)
 
     def _writer(self):
         logging.info(f'start {self}')
