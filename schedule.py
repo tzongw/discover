@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import socket
 import time
 import threading
 from typing import List
 import gevent
-from utils import LogSuppress
 from executor import Executor
 import heapq
-
-MAXIMUM_TIMEOUT = 3600
 
 
 class Handle:
@@ -17,6 +13,7 @@ class Handle:
         self.callback = callback
         self.when = when
         self.cancelled = False
+        self.delay = None
 
     def cancel(self):
         self.cancelled = True
@@ -27,14 +24,17 @@ class Handle:
 
 class Schedule:
     def __init__(self):
-        self._stopped = False
         self._cond = threading.Condition()
         self._executor = Executor(max_workers=128)
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
-    def call_later(self, callback, delay) -> Handle:
-        return self.call_at(callback, time.time() + delay)
+    def call_later(self, callback, delay, repeat=False) -> Handle:
+        handle = self.call_at(callback, time.time() + delay)
+        if repeat:
+            assert delay > 0
+            handle.delay = delay
+        return handle
 
     def call_at(self, callback, at) -> Handle:
         with self._cond:
@@ -50,8 +50,7 @@ class Schedule:
                 timeout = None
                 if self._handles:
                     when = self._handles[0].when
-                    timeout = min(max(0, when - time.time()), MAXIMUM_TIMEOUT) + 0.01
-                    timeout += 0.01  # sleep a little more
+                    timeout = max(0, when - time.time())
                 self._cond.wait(timeout)
                 now = time.time()
                 while self._handles:
@@ -61,3 +60,6 @@ class Schedule:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
                         self._executor.submit(handle.callback)
+                        if handle.delay:
+                            handle.when = now + handle.delay
+                            heapq.heappush(self._handles, handle)
