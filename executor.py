@@ -35,6 +35,7 @@ class Executor:
 
     def submit(self, fn, *args, **kwargs) -> Future:
         self._unfinished += 1
+        logging.debug(f'+job {self}')
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
@@ -48,6 +49,10 @@ class Executor:
         if self._unfinished > self._workers and self._workers < self._max_workers:
             self._workers += 1
             gevent.spawn(self._worker)
+            logging.debug(f'+worker {self}')
+
+    def __str__(self):
+        return f'{self._unfinished}, {self._workers}'
 
     def _worker(self):
         try:
@@ -55,7 +60,9 @@ class Executor:
                 item = self._items.get(timeout=self._idle)
                 item.run()
                 self._unfinished -= 1
+                logging.debug(f'-job {self}')
         except queue.Empty:
-            logging.info(f'worker idle exit')
+            logging.debug(f'worker idle exit')
         finally:
             self._workers -= 1
+            logging.debug(f'-worker {self}')

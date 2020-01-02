@@ -54,11 +54,21 @@ def main():
     # websocket.enableTrace(True)
     workers = []
     for i in range(100):
-        workers.append(gevent.spawn(worker, i, 0.1*i))
+        workers.append(gevent.spawn(worker, i, 0.1 * i))
     for i in range(100):
-        workers.append(gevent.spawn(worker, i, 0.1*i+10))
+        workers.append(gevent.spawn(worker, i, 0.1 * i + 10))
     gevent.joinall(workers)
 
 
 if __name__ == '__main__':
-    main()
+    from executor import Executor
+
+    exe = Executor(idle=3, max_workers=2)
+    exe.submit(lambda: print('aaa'))
+    exe.submit(lambda: print('bbb'))
+    gevent.sleep(1)
+    exe.gather(lambda: print('ccc'), lambda: print('ddd'), lambda: print('eee'))
+    gevent.sleep(1)
+    exe.submit(lambda: print('fff'))
+    exe.submit(lambda: print('ggg'))
+    gevent.sleep(5)
