@@ -16,9 +16,9 @@ one_reader = False
 
 async def worker(i):
     uid = options.uid + i
-    await asyncio.sleep(0.1 * i)
+    await asyncio.sleep(0.01 * i)
     async with websockets.connect(
-            f'ws://dev.xc/ws?token=pass&uid={uid}') as websocket:  # type: websockets.WebSocketClientProtocol
+            f'ws://localhost:40001/ws?token=pass&uid={uid}') as websocket:  # type: websockets.WebSocketClientProtocol
         resp = await websocket.recv()  # login resp
         print(f"{resp} {uid}")
         while True:
