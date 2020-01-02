@@ -29,6 +29,7 @@ class Schedule:
         gevent.spawn(self._run)
 
     def call_later(self, callback, delay) -> Handle:
+        assert callable(callback)
         return self.call_at(callback, time.time() + delay)
 
     def call_at(self, callback, at) -> Handle:

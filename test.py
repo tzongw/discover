@@ -62,7 +62,10 @@ def main():
 
 if __name__ == '__main__':
     from executor import Executor
+    from schedule import Schedule
 
+    sch = Schedule()
+    sch.call_later(lambda: print('later'), 2)
     exe = Executor(idle=3, max_workers=2)
     exe.submit(lambda: print('aaa'))
     exe.submit(lambda: print('bbb'))

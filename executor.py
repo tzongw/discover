@@ -34,6 +34,7 @@ class Executor:
         self._idle = idle
 
     def submit(self, fn, *args, **kwargs) -> Future:
+        assert callable(fn)
         self._unfinished += 1
         logging.debug(f'+job {self}')
         self._adjust_workers()
