@@ -31,13 +31,13 @@ class Service:
 
     def __init__(self, redis: Redis):
         self._redis = redis
-        self._services = set()  # type: Set[Tuple[str, str]]
+        self._services = {}  # type: Map[str, str]
         self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self.refresh_callback = None
 
     def register(self, service_name, address):
-        self._services.add((service_name, address))
+        self._services[service_name] = address
 
     def start(self):
         logging.info(f'start')
@@ -53,7 +53,7 @@ class Service:
 
     def _unregister(self):
         keys = []
-        for name, address in self._services:
+        for name, address in self._services.items():
             key = self._full_key(name, address)
             keys.append(key)
         self._redis.delete(*keys)
@@ -82,7 +82,7 @@ class Service:
             try:
                 if self._services:
                     with self._redis.pipeline() as pipe:
-                        for name, address in self._services:
+                        for name, address in self._services.items():
                             key = self._full_key(name, address)
                             pipe.set(key, '', self._TTL)
                         pipe.execute()
