@@ -252,9 +252,8 @@ def main():
     rpc_future = Future()
     ws = gevent.spawn(ws_serve, ws_future)
     rpc = gevent.spawn(rpc_serve, rpc_future)
-    common.service.register(const.HTTP_GATE, ws_future.result(timeout=1))
-    common.service.register(const.RPC_GATE, rpc_future.result(timeout=1))
-    common.service.start()
+    http_addr, rpc_addr = ws_future.result(timeout=1), rpc_future.result(timeout=1)
+    common.service.start({const.HTTP_GATE: http_addr, const.RPC_GATE: rpc_addr})
     gevent.joinall([ws, rpc], raise_error=True)
 
 

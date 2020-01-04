@@ -36,13 +36,10 @@ class Service:
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self.refresh_callback = None
 
-    def register(self, service_name, address):
-        self._services[service_name] = address
-
-    def start(self):
+    def start(self, services):
         logging.info(f'start')
-        if self._services:
-            self._unregister()  # in case process restart
+        self._services.update(services)
+        self._unregister()  # in case process restart
         self._refresh()
         gevent.spawn_later(1, self._run)  # wait unregister publish & socket listen
 
@@ -52,6 +49,8 @@ class Service:
         self._unregister()
 
     def _unregister(self):
+        if not self._services:
+            return
         keys = []
         for name, address in self._services.items():
             key = self._full_key(name, address)
