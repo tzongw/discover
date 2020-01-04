@@ -72,6 +72,8 @@ def sig_handler(sig, frame):
 
 
 signal.signal(signal.SIGTERM, sig_handler)
+signal.signal(signal.SIGINT, sig_handler)
+signal.signal(signal.SIGQUIT, sig_handler)
 
 LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
 channel = logging.StreamHandler()
