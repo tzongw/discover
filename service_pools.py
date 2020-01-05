@@ -38,7 +38,7 @@ class ServicePools:
         pools = self._service_pools[service_name]
         pool = pools.get(address)
         if not pool:
-            host, port = address.split(':')
+            host, port = address.rsplit(':', maxsplit=1)
             pool = ThriftPool(host, int(port), **self._settings)
             pools[address] = pool
         with pool.connection() as conn:
