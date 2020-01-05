@@ -3,7 +3,7 @@ MISS_TIMES = 3
 
 RPC_USER = 'rpc_user'
 RPC_GATE = 'rpc_gate'
-HTTP_GATE = 'http_gate'
+WS_GATE = 'ws_gate'
 
 CONTEXT_UID = 'uid'
 CONTEXT_TOKEN = 'token'
