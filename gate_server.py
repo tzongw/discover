@@ -85,7 +85,7 @@ class Client:
             elif isinstance(message, str):
                 common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
             else:
-                logging.info(f'receive {message}')
+                logging.warning(f'receive {message}')
 
     def _ping(self):
         if self.ws.closed:

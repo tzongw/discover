@@ -58,19 +58,19 @@ class Service:
         self._redis.delete(*keys)
         self._redis.publish(self._PREFIX, 'unregister')
 
-    def addresses(self, name) -> Set[str]:
+    def addresses(self, name) -> Set[str]:  # constant
         return self._addresses.get(name) or set()
 
     def _refresh(self):
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
-        before = self._addresses.copy()
-        self._addresses.clear()
+        addresses = defaultdict(set)
         for key in keys:
             with LogSuppress(Exception):
                 name, address = self._unpack(key)
-                self._addresses[name].add(address)
-        if before != self._addresses:
-            logging.warning(f'{before} -> {self._addresses}')
+                addresses[name].add(address)
+        if addresses != self._addresses:
+            logging.warning(f'{self._addresses} -> {addresses}')
+            self._addresses = addresses
             if self.refresh_callback:
                 self.refresh_callback()
 
@@ -80,7 +80,7 @@ class Service:
         while not self._stopped:
             try:
                 if self._services:
-                    with self._redis.pipeline() as pipe:
+                    with self._redis.pipeline(transaction=False) as pipe:
                         for name, address in self._services.items():
                             key = self._full_key(name, address)
                             pipe.set(key, '', self._TTL)
