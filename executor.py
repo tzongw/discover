@@ -26,7 +26,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=None, idle=3600):
+    def __init__(self, max_workers=None, idle=600):
         self._max_workers = max_workers or sys.maxsize
         self._workers = 0
         self._unfinished = 0
