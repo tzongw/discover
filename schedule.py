@@ -9,6 +9,8 @@ import heapq
 
 
 class Handle:
+    __slots__ = ["when", "callback", "cancelled"]
+
     def __init__(self, callback, when):
         self.callback = callback
         self.when = when
