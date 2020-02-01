@@ -15,9 +15,6 @@ from utils import LogSuppress
 
 
 class _ServicePools(ServicePools):
-    def __init__(self, service, **settings):
-        super().__init__(service, **settings)
-
     @contextlib.contextmanager
     def user_client(self) -> ContextManager[user.Iface]:
         with self.connection(const.RPC_USER) as conn:

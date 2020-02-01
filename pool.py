@@ -36,7 +36,7 @@ class Pool:
 
     def get(self):
         pool = self._pool
-        if self._size >= self._maxsize or pool.qsize():
+        if not pool.empty() or self._size >= self._maxsize:
             return pool.get(self._timeout)
 
         self._size += 1
