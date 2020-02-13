@@ -14,7 +14,8 @@ class Pool:
         self._pool = Queue()
         self._size = 0
         self._acceptable = acceptable
-        gevent.spawn(self.idle_check)
+        if idle > 0:
+            gevent.spawn(self.idle_check)
 
     def __del__(self):
         self.close_all()
@@ -54,8 +55,9 @@ class Pool:
 
     def idle_check(self):
         logging.debug(f'idle check start')
+        t = min(10.0, self._idle / 10)
         while self._maxsize > 0:
-            gevent.sleep(60)
+            gevent.sleep(t)
             while not self._pool.empty():
                 oldest = self._pool.peek_nowait()
                 if time.time() - oldest.__last_used > self._idle:
