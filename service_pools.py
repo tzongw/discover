@@ -5,19 +5,17 @@ from typing import Dict, DefaultDict, ContextManager
 
 from thrift.protocol.TProtocol import TProtocolBase
 
-from service import Service
+from registry import Registry
 from thrift_pool import ThriftPool
 import logging
 import time
 
-Pools = Dict[str, ThriftPool]
-
 
 class ServicePools:
-    def __init__(self, service: Service, name, **settings):
+    def __init__(self, service: Registry, name, **settings):
         self._name = name
         self._service = service
-        self._pools = {}  # type: Pools
+        self._pools = {}  # type: Dict[str, ThriftPool]
         self._cool_down = {}  # type: Dict[str, float]
         self._settings = settings
         service.add_callback(self._clean_pools)
@@ -47,7 +45,7 @@ class ServicePools:
             except Exception as e:
                 logging.exception(f'')
                 if not ThriftPool.acceptable(e):
-                    self._cool_down[address] = time.time() + Service.COOL_DOWN
+                    self._cool_down[address] = time.time() + Registry.COOL_DOWN
                 raise
 
     def _clean_pools(self):

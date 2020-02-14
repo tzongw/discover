@@ -8,7 +8,7 @@ from redis import Redis
 from tornado.log import LogFormatter
 import const
 from generated.service import gate, user
-from service import Service
+from registry import Registry
 from service_pools import ServicePools
 from thrift_pool import ThriftPool
 from utils import LogSuppress
@@ -64,11 +64,11 @@ class GateService(ServicePools, Selector):
 
 
 _redis = Redis(decode_responses=True)
-service = Service(_redis)
-user_service = UserService(service, const.RPC_USER)  # type: Union[UserService, user.Iface]
-gate_service = GateService(service, const.RPC_GATE)  # type: Union[GateService, gate.Iface]
+registry = Registry(_redis)
+user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, user.Iface]
+gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, gate.Iface]
 
-clean_ups = [service.stop]
+clean_ups = [registry.stop]
 
 
 def sig_handler(sig, frame):

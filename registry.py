@@ -9,7 +9,7 @@ import const
 from utils import LogSuppress
 
 
-class Service:
+class Registry:
     _PREFIX = 'service'
     _REFRESH_INTERVAL = 3
     _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
