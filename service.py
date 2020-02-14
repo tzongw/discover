@@ -53,6 +53,6 @@ class GateService(ServicePools, Selector):
 
     def __getattr__(self, item):
         if hasattr(gate.Iface, item):
-            addresses = self._service.addresses(const.RPC_GATE)
+            addresses = self.addresses()
             return partial(self._traverse, self.client, addresses, item)
         return super().__getattr__(item)

@@ -20,9 +20,12 @@ class ServicePools:
         self._settings = settings
         service.add_callback(self._clean_pools)
 
+    def addresses(self):
+        return self._service.addresses(self._name)
+
     @contextlib.contextmanager
     def connection(self) -> ContextManager[TProtocolBase]:
-        addresses = self._service.addresses(self._name)
+        addresses = self.addresses()
         now = time.time()
         good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
         address = choice(good_ones or tuple(addresses))  # type: str
@@ -31,7 +34,7 @@ class ServicePools:
 
     @contextlib.contextmanager
     def address_connection(self, address) -> ContextManager[TProtocolBase]:
-        addresses = self._service.addresses(self._name)
+        addresses = self.addresses()
         if address not in addresses:
             raise ValueError(f"{self._name} {address} {addresses}")
         pool = self._pools.get(address)
@@ -49,7 +52,7 @@ class ServicePools:
                 raise
 
     def _clean_pools(self):
-        available_addresses = self._service.addresses(self._name)
+        available_addresses = self.addresses()
         holding_addresses = set(self._pools.keys())
         for removed_address in (holding_addresses - available_addresses):
             logging.warning(f'clean {self._name} {removed_address}')
