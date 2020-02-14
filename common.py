@@ -14,17 +14,7 @@ from thrift_pool import ThriftPool
 from utils import LogSuppress
 
 
-class _ServicePools(ServicePools):
-    @contextlib.contextmanager
-    def user_client(self) -> ContextManager[user.Iface]:
-        with self.connection(const.RPC_USER) as conn:
-            yield user.Client(conn)
-
-    @contextlib.contextmanager
-    def address_gate_client(self, address) -> ContextManager[gate.Iface]:
-        with self.address_connection(const.RPC_GATE, address) as conn:
-            yield gate.Client(conn)
-
+class Selector:
     @staticmethod
     def _one_shot(client_factory, item, *args, **kwargs):
         with client_factory() as client:
@@ -33,12 +23,12 @@ class _ServicePools(ServicePools):
     @staticmethod
     def _retry(client_factory, item, *args, **kwargs):
         try:
-            return _ServicePools._one_shot(client_factory, item, *args, **kwargs)
+            return Selector._one_shot(client_factory, item, *args, **kwargs)
         except Exception as e:
             if ThriftPool.acceptable(e):
                 raise
         # will retry another node
-        return _ServicePools._one_shot(client_factory, item, *args, **kwargs)
+        return Selector._one_shot(client_factory, item, *args, **kwargs)
 
     @staticmethod
     def _traverse(address_client_factory, addresses, item, *args, **kwargs):
@@ -47,18 +37,36 @@ class _ServicePools(ServicePools):
                 with address_client_factory(address) as client:
                     getattr(client, item)(*args, **kwargs)
 
+
+class UserService(ServicePools, Selector):
+    @contextlib.contextmanager
+    def client(self) -> ContextManager[user.Iface]:
+        with self.connection() as conn:
+            yield user.Client(conn)
+
     def __getattr__(self, item):
         if hasattr(user.Iface, item):
-            return partial(self._one_shot, self.user_client, item)
+            return partial(self._one_shot, self.client, item)
+        return super().__getattr__(item)
+
+
+class GateService(ServicePools, Selector):
+    @contextlib.contextmanager
+    def client(self, address) -> ContextManager[gate.Iface]:
+        with self.address_connection(address) as conn:
+            yield gate.Client(conn)
+
+    def __getattr__(self, item):
         if hasattr(gate.Iface, item):
             addresses = self._service.addresses(const.RPC_GATE)
-            return partial(self._traverse, self.address_gate_client, addresses, item)
+            return partial(self._traverse, self.client, addresses, item)
         return super().__getattr__(item)
 
 
 _redis = Redis(decode_responses=True)
 service = Service(_redis)
-service_pools = _ServicePools(service)  # type: Union[_ServicePools, user.Iface, gate.Iface]
+user_service = UserService(service, const.RPC_USER)  # type: Union[UserService, user.Iface]
+gate_service = GateService(service, const.RPC_GATE)  # type: Union[GateService, gate.Iface]
 
 clean_ups = [service.stop]
 

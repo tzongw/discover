@@ -55,7 +55,7 @@ class Handler:
             if old_conn_id and old_address:
                 logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
                 with LogSuppress(Exception):
-                    with common.service_pools.address_gate_client(old_address) as client:
+                    with common.gate_service.client(old_address) as client:
                         client.send_text(old_conn_id, f'login other device')
                         client.remove_conn(old_conn_id)
         except Exception as e:
@@ -63,11 +63,11 @@ class Handler:
                 logging.warning(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
-            with common.service_pools.address_gate_client(address) as client:
+            with common.gate_service.client(address) as client:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            with common.service_pools.address_gate_client(address) as client:
+            with common.gate_service.client(address) as client:
                 client.set_context(conn_id, {const.CONTEXT_UID: str(uid)})
                 client.send_text(conn_id, f'login success')
 
@@ -82,7 +82,7 @@ class Handler:
             self._redis.expire(key, self._TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
-            with common.service_pools.address_gate_client(address) as client:
+            with common.gate_service.client(address) as client:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
 
@@ -104,7 +104,7 @@ class Handler:
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
-        with common.service_pools.address_gate_client(address) as client:
+        with common.gate_service.client(address) as client:
             client.send_text(conn_id, f'can not read binary')
 
     def recv_text(self, address: str, conn_id: str, context: Dict[str, str], message: str):
@@ -115,21 +115,21 @@ class Handler:
         uid = int(context[const.CONTEXT_UID])
         group = context.get(const.CONTEXT_GROUP)
         if message == 'join':
-            with common.service_pools.address_gate_client(address) as client:
+            with common.gate_service.client(address) as client:
                 client.join_group(conn_id, const.CHAT_ROOM)
                 client.set_context(conn_id, {const.CONTEXT_GROUP: const.CHAT_ROOM})
-            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
+            common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
-            with common.service_pools.address_gate_client(address) as client:
+            with common.gate_service.client(address) as client:
                 client.leave_group(conn_id, const.CHAT_ROOM)
                 client.unset_context(conn_id, {const.CONTEXT_GROUP})
-            common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
+            common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
         else:
             if not group:
-                with common.service_pools.address_gate_client(address) as client:
+                with common.gate_service.client(address) as client:
                     client.send_text(conn_id, f'not in group')
             else:
-                common.service_pools.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
+                common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
 
 def main():

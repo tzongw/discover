@@ -81,9 +81,9 @@ class Client:
         while not self.ws.closed:
             message = self.ws.receive()
             if isinstance(message, bytes):
-                common.service_pools.recv_binary(rpc_address, self.conn_id, self.context, message)
+                common.user_service.recv_binary(rpc_address, self.conn_id, self.context, message)
             elif isinstance(message, str):
-                common.service_pools.recv_text(rpc_address, self.conn_id, self.context, message)
+                common.user_service.recv_text(rpc_address, self.conn_id, self.context, message)
             else:
                 logging.warning(f'receive {message}')
 
@@ -91,7 +91,7 @@ class Client:
         if self.ws.closed:
             return
         with LogSuppress(Exception):
-            common.service_pools.ping(rpc_address, self.conn_id, self.context)
+            common.user_service.ping(rpc_address, self.conn_id, self.context)
         self.schedule.call_later(self._ping, const.PING_INTERVAL)
 
     def _writer(self):
@@ -144,7 +144,7 @@ def client_serve(ws: WebSocket):
         params = {}
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
-        common.service_pools.login(rpc_address, conn_id, params)
+        common.user_service.login(rpc_address, conn_id, params)
         client.serve()
     except Exception:
         logging.exception(f'{client}')
@@ -154,7 +154,7 @@ def client_serve(ws: WebSocket):
             remove_from_group(client, group)
         clients.pop(conn_id, None)
         client.stop()
-        common.service_pools.disconnect(rpc_address, conn_id, client.context)
+        common.user_service.disconnect(rpc_address, conn_id, client.context)
 
 
 def remove_from_group(client: Client, group):

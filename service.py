@@ -34,7 +34,10 @@ class Service:
         self._services = {}  # type: Map[str, str]
         self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
-        self.refresh_callback = None
+        self._callbacks = []
+
+    def add_callback(self, cb):
+        self._callbacks.append(cb)
 
     def start(self, services):
         logging.info(f'start')
@@ -71,8 +74,8 @@ class Service:
         if addresses != self._addresses:
             logging.warning(f'{self._addresses} -> {addresses}')
             self._addresses = addresses
-            if self.refresh_callback:
-                self.refresh_callback()
+            for cb in self._callbacks:
+                cb()
 
     def _run(self):
         published = False

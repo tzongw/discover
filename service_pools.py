@@ -14,33 +14,33 @@ Pools = Dict[str, ThriftPool]
 
 
 class ServicePools:
-    def __init__(self, service: Service, **settings):
+    def __init__(self, service: Service, name, **settings):
+        self._name = name
         self._service = service
-        self._service_pools = defaultdict(dict)  # type: DefaultDict[str, Pools]
+        self._pools = {}  # type: Pools
         self._cool_down = {}  # type: Dict[str, float]
         self._settings = settings
-        service.refresh_callback = self._clean_pools
+        service.add_callback(self._clean_pools)
 
     @contextlib.contextmanager
-    def connection(self, service_name) -> ContextManager[TProtocolBase]:
-        addresses = self._service.addresses(service_name)
+    def connection(self) -> ContextManager[TProtocolBase]:
+        addresses = self._service.addresses(self._name)
         now = time.time()
         good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
         address = choice(good_ones or tuple(addresses))  # type: str
-        with self.address_connection(service_name, address) as conn:
+        with self.address_connection(address) as conn:
             yield conn
 
     @contextlib.contextmanager
-    def address_connection(self, service_name, address) -> ContextManager[TProtocolBase]:
-        addresses = self._service.addresses(service_name)
+    def address_connection(self, address) -> ContextManager[TProtocolBase]:
+        addresses = self._service.addresses(self._name)
         if address not in addresses:
-            raise ValueError(f"{service_name} {address} {addresses}")
-        pools = self._service_pools[service_name]
-        pool = pools.get(address)
+            raise ValueError(f"{self._name} {address} {addresses}")
+        pool = self._pools.get(address)
         if not pool:
             host, port = address.rsplit(':', maxsplit=1)
             pool = ThriftPool(host, int(port), **self._settings)
-            pools[address] = pool
+            self._pools[address] = pool
         with pool.connection() as conn:
             try:
                 yield conn
@@ -51,12 +51,10 @@ class ServicePools:
                 raise
 
     def _clean_pools(self):
-        logging.info(f'{self._service_pools}')
-        for service_name, pools in self._service_pools.items():
-            available_addresses = self._service.addresses(service_name)
-            holding_addresses = set(pools.keys())
-            for removed_address in (holding_addresses - available_addresses):
-                logging.warning(f'clean {service_name} {removed_address}')
-                self._cool_down.pop(removed_address, None)
-                pool = pools.pop(removed_address)
-                pool.close_all()
+        available_addresses = self._service.addresses(self._name)
+        holding_addresses = set(self._pools.keys())
+        for removed_address in (holding_addresses - available_addresses):
+            logging.warning(f'clean {self._name} {removed_address}')
+            self._cool_down.pop(removed_address, None)
+            pool = self._pools.pop(removed_address)
+            pool.close_all()
