@@ -32,7 +32,6 @@ class Registry:
     def __init__(self, redis: Redis):
         self._redis = redis
         self._services = {}  # type: Map[str, str]
-        self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self._callbacks = []
 
@@ -48,7 +47,6 @@ class Registry:
 
     def stop(self):
         logging.info(f'stop')
-        self._stopped = True
         self._unregister()
 
     def _unregister(self):
@@ -80,7 +78,7 @@ class Registry:
     def _run(self):
         published = False
         sub = None
-        while not self._stopped:
+        while True:
             try:
                 if self._services:
                     with self._redis.pipeline(transaction=False) as pipe:
