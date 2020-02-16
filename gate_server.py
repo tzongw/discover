@@ -126,14 +126,6 @@ clients = {}  # type: Dict[str, Client]
 groups = defaultdict(set)  # type: DefaultDict[str, Set[Client]]
 
 
-def clean_up():
-    for client in clients.values():
-        client.stop()
-
-
-common.clean_ups.append(clean_up)
-
-
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())

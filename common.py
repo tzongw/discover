@@ -9,18 +9,21 @@ import const
 from generated.service import gate, user
 from registry import Registry
 from service import UserService, GateService
+import sys
 
 _redis = Redis(decode_responses=True)
 registry = Registry(_redis)
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, gate.Iface]
 
-clean_ups = [registry.stop]
-
 
 def sig_handler(sig, frame):
-    for item in clean_ups:
-        gevent.spawn(item)
+    def grace_exit():
+        registry.stop()
+        gevent.sleep(1)
+        sys.exit(0)
+
+    gevent.spawn(grace_exit)
 
 
 signal.signal(signal.SIGTERM, sig_handler)
