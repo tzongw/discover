@@ -1,7 +1,6 @@
 import contextlib
-from collections import defaultdict
 from random import choice
-from typing import Dict, DefaultDict, ContextManager
+from typing import Dict, ContextManager
 
 from thrift.protocol.TProtocol import TProtocolBase
 

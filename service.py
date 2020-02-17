@@ -6,7 +6,6 @@ from service_pools import ServicePools
 from thrift_pool import ThriftPool
 from utils import LogSuppress
 from generated.service import gate, user
-import const
 
 
 class Selector:

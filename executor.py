@@ -7,6 +7,8 @@ import gevent
 
 
 class _WorkItem:
+    __slots__ = ["future", "fn", "args", "kwargs"]
+
     def __init__(self, fut: Future, fn, *args, **kwargs):
         self.future = fut
         self.fn = fn
@@ -26,8 +28,8 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=None, idle=600):
-        self._max_workers = max_workers or sys.maxsize
+    def __init__(self, max_workers=sys.maxsize, idle=600):
+        self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
         self._items = queue.Queue()
@@ -58,7 +60,7 @@ class Executor:
     def _worker(self):
         try:
             while True:
-                item = self._items.get(timeout=self._idle)
+                item = self._items.get(timeout=self._idle)  # type: _WorkItem
                 item.run()
                 self._unfinished -= 1
                 logging.debug(f'-job {self}')

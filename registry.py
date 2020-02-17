@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import Set, DefaultDict, Tuple
+from typing import Set, DefaultDict
 
 import gevent
 from redis import Redis

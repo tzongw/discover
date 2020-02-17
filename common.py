@@ -1,4 +1,3 @@
-import contextlib
 import logging
 import signal
 from typing import Union
