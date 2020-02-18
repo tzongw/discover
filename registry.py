@@ -32,6 +32,7 @@ class Registry:
     def __init__(self, redis: Redis):
         self._redis = redis
         self._services = {}  # type: Map[str, str]
+        self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self._callbacks = []
 
@@ -47,6 +48,7 @@ class Registry:
 
     def stop(self):
         logging.info(f'stop')
+        self._stopped = True
         self._unregister()
 
     def _unregister(self):
@@ -78,7 +80,7 @@ class Registry:
     def _run(self):
         published = False
         sub = None
-        while True:
+        while not self._stopped:
             try:
                 if self._services:
                     with self._redis.pipeline(transaction=False) as pipe:
@@ -86,6 +88,9 @@ class Registry:
                             key = self._full_key(name, address)
                             pipe.set(key, '', self._TTL)
                         pipe.execute()
+                    if self._stopped:  # race
+                        self._unregister()
+                        return
                     if not published:
                         logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')
@@ -94,7 +99,7 @@ class Registry:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
                 self._refresh()
-                msg = sub.get_message(timeout=self._REFRESH_INTERVAL)
+                msg = sub.get_message(ignore_subscribe_messages=True, timeout=self._REFRESH_INTERVAL)
                 if msg is not None:
                     logging.info(f'got {msg}')
             except Exception:
