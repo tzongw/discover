@@ -15,7 +15,7 @@ class Pool:
         self._size = 0
         self._acceptable = acceptable
         if idle > 0:
-            gevent.spawn(self.idle_check)
+            gevent.spawn(self._idle_check)
 
     def __del__(self):
         self.close_all()
@@ -35,7 +35,7 @@ class Pool:
             self._size -= 1
             self.close_connection(conn)
 
-    def get(self):
+    def _get(self):
         pool = self._pool
         if not pool.empty() or self._size >= self._maxsize:
             return pool.get(self._timeout)
@@ -49,11 +49,11 @@ class Pool:
             raise
         return new_item
 
-    def put(self, item):
+    def _put(self, item):
         item.__last_used = time.time()
         self._pool.put(item)
 
-    def idle_check(self):
+    def _idle_check(self):
         logging.debug(f'idle check start')
         t = min(10.0, self._idle / 10)
         while self._maxsize > 0:
@@ -71,7 +71,7 @@ class Pool:
 
     @contextlib.contextmanager
     def connection(self):
-        conn = self.get()
+        conn = self._get()
 
         def close_conn():
             self.close_connection(conn)
@@ -79,7 +79,7 @@ class Pool:
 
         def return_conn():
             if self._pool.qsize() < self._maxsize:
-                self.put(conn)
+                self._put(conn)
             else:
                 close_conn()
 

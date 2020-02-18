@@ -94,7 +94,9 @@ class Registry:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
                 self._refresh()
-                sub.get_message(timeout=self._REFRESH_INTERVAL)
+                msg = sub.get_message(timeout=self._REFRESH_INTERVAL)
+                if msg is not None:
+                    logging.info(f'got {msg}')
             except Exception:
                 logging.exception(f'')
                 sub = None
