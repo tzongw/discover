@@ -57,6 +57,7 @@ def ws_serve(fut: Future):
 
 class Client:
     schedule = Schedule()
+    ping_message = object()
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -90,6 +91,7 @@ class Client:
     def _ping(self):
         if self.ws.closed:
             return
+        self.send(self.ping_message)
         with LogSuppress(Exception):
             common.user_service.ping(rpc_address, self.conn_id, self.context)
         self.schedule.call_later(self._ping, const.PING_INTERVAL)
@@ -101,7 +103,10 @@ class Client:
                 message = self.messages.get()
                 if message is None:
                     break
-                self.ws.send(message)
+                if message is self.ping_message:
+                    self.ws.send_frame('', WebSocket.OPCODE_PING)
+                else:
+                    self.ws.send(message)
         except (WebSocketError, OSError) as e:
             logging.info(f'peer closed {self} {e}')
         except Exception:
