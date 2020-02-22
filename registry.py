@@ -4,9 +4,10 @@ from typing import Set, DefaultDict
 
 import gevent
 from redis import Redis
-
+import os
 import const
 from utils import LogSuppress
+from tornado.options import options, define, parse_command_line
 
 
 class Registry:
@@ -73,6 +74,11 @@ class Registry:
                 addresses[name].add(address)
         if addresses != self._addresses:
             logging.warning(f'{self._addresses} -> {addresses}')
+            for name in [const.WS_GATE]:
+                addr = addresses.get(name)
+                if addr != self._addresses.get(name):
+                    with open(os.path.join(options.conf_d, name + '_upstream'), 'w') as f:
+                        f.writelines([f'server {l};' for l in addr])
             self._addresses = addresses
             for cb in self._callbacks:
                 cb()
