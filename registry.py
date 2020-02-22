@@ -74,12 +74,15 @@ class Registry:
                 addresses[name].add(address)
         if addresses != self._addresses:
             logging.warning(f'{self._addresses} -> {addresses}')
+            updated = False
             for name in [const.WS_GATE]:
                 addr = addresses.get(name)
                 if addr != self._addresses.get(name):
-                    with open(os.path.join(options.conf_d, name + '_upstream'), 'w') as f:
+                    with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
                         f.writelines([f'server {l};' for l in addr])
-                    os.system("nginx -t && nginx -s reload")
+                    updated = True
+            if updated:
+                os.system("nginx -t && nginx -s reload")
             self._addresses = addresses
             for cb in self._callbacks:
                 cb()
