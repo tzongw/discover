@@ -79,6 +79,7 @@ class Registry:
                 if addr != self._addresses.get(name):
                     with open(os.path.join(options.conf_d, name + '_upstream'), 'w') as f:
                         f.writelines([f'server {l};' for l in addr])
+                    os.system("nginx -t && nginx -s reload")
             self._addresses = addresses
             for cb in self._callbacks:
                 cb()
