@@ -133,6 +133,7 @@ class Handler:
 
 
 def main():
+    logging.warning(f'worker id: {common.unique_id.generate()}')
     handler = Handler(common.redis)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)

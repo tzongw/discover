@@ -11,6 +11,7 @@ from service import UserService, GateService
 import sys
 from executor import Executor
 from schedule import Schedule
+from unique import UniqueId
 
 redis = Redis(decode_responses=True)
 registry = Registry(redis)
@@ -19,10 +20,12 @@ gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService,
 
 executor = Executor()
 schedule = Schedule(executor)
+unique_id = UniqueId(schedule, redis, "worker", range(1024))
 
 
 def sig_handler(sig, frame):
     def grace_exit():
+        unique_id.stop()
         registry.stop()
         gevent.sleep(1)
         sys.exit(0)
