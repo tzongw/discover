@@ -133,8 +133,7 @@ class Handler:
 
 
 def main():
-    user_redis = Redis(port=6380, decode_responses=True)
-    handler = Handler(user_redis)
+    handler = Handler(common.redis)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()

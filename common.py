@@ -9,11 +9,16 @@ from generated.service import gate, user
 from registry import Registry
 from service import UserService, GateService
 import sys
+from executor import Executor
+from schedule import Schedule
 
-_redis = Redis(decode_responses=True)
-registry = Registry(_redis)
+redis = Redis(decode_responses=True)
+registry = Registry(redis)
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, gate.Iface]
+
+executor = Executor()
+schedule = Schedule(executor)
 
 
 def sig_handler(sig, frame):

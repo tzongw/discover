@@ -56,7 +56,7 @@ def ws_serve(fut: Future):
 
 
 class Client:
-    schedule = Schedule()
+    schedule = common.schedule
     ping_message = object()
 
     def __init__(self, ws: WebSocket, conn_id):
