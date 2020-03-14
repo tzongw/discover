@@ -37,6 +37,10 @@ class UniqueId:
 
     def stop(self):
         logging.info(f'stop')
+        if not self._ids:
+            return
+        keys = [self._key(id) for id in self._ids]
+        self._redis.delete(*keys)
         self._ids.clear()
 
     def _refresh(self):

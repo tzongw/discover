@@ -25,8 +25,8 @@ unique_id = UniqueId(schedule, redis, "worker", range(1024))
 
 def sig_handler(sig, frame):
     def grace_exit():
-        unique_id.stop()
         registry.stop()
+        unique_id.stop()
         gevent.sleep(1)
         sys.exit(0)
 

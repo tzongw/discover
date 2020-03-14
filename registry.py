@@ -54,10 +54,7 @@ class Registry:
     def _unregister(self):
         if not self._services:
             return
-        keys = []
-        for name, address in self._services.items():
-            key = self._full_key(name, address)
-            keys.append(key)
+        keys = [self._full_key(name, address) for name, address in self._services.items()]
         self._redis.delete(*keys)
         self._redis.publish(self._PREFIX, 'unregister')
 
