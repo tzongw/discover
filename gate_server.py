@@ -26,7 +26,6 @@ from utils import LogSuppress
 from collections import defaultdict
 import utils
 from concurrent.futures import Future
-from schedule import Schedule
 
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
