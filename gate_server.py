@@ -148,7 +148,7 @@ def client_serve(ws: WebSocket):
         logging.info(f'finish {client}')
         for group in client.groups:
             remove_from_group(client, group)
-        clients.pop(conn_id, None)
+        clients.pop(conn_id)
         client.stop()
         common.user_service.disconnect(rpc_address, conn_id, client.context)
 
@@ -214,9 +214,11 @@ class Handler:
         else:
             logging.warning(f'not found {conn_id} {group}')
 
+    empty_set = set()
+
     def _broadcast_message(self, group, exclude, message):
         logging.debug(f'{group} {exclude} {message} {groups}')
-        for client in groups.get(group, set()):  # type: Client
+        for client in groups.get(group, self.empty_set):  # type: Client
             if client.conn_id not in exclude:
                 client.send(message)
 
