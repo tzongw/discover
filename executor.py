@@ -4,6 +4,7 @@ import sys
 from concurrent.futures import Future
 from gevent import queue
 import gevent
+from typing import Callable
 
 
 class _WorkItem:
@@ -35,7 +36,7 @@ class Executor:
         self._items = queue.Queue()
         self._idle = idle
 
-    def submit(self, fn, *args, **kwargs) -> Future:
+    def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
         self._unfinished += 1
         logging.debug(f'+job {self}')

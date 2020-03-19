@@ -6,7 +6,7 @@ from typing import List
 import gevent
 from executor import Executor
 import heapq
-from typing import Optional
+from typing import Optional, Callable
 from utils import LogSuppress
 
 
@@ -33,11 +33,11 @@ class Schedule:
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
-    def call_later(self, callback, delay) -> Handle:
+    def call_later(self, callback: Callable, delay) -> Handle:
         assert callable(callback)
         return self.call_at(callback, time.time() + delay)
 
-    def call_at(self, callback, at) -> Handle:
+    def call_at(self, callback: Callable, at) -> Handle:
         with self._cond:
             handle = Handle(callback, at)
             heapq.heappush(self._handles, handle)
@@ -64,15 +64,14 @@ class Schedule:
 
 
 class PeriodicCallback:
-    def __init__(self, schedule: Schedule, callback, period):
+    def __init__(self, schedule: Schedule, callback: Callable, period):
+        assert callable(callback)
         self._schedule = schedule
         self._callback = callback
         self._period = period
         self._handle = None  # type: Optional[Handle]
 
     def _run(self):
-        if self._handle is None:
-            return
         with LogSuppress(Exception):
             self._callback()
         self._schedule_next()
