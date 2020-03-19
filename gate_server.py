@@ -22,10 +22,10 @@ import uuid
 from typing import Dict, DefaultDict, Set
 from gevent import queue
 from urllib import parse
-from utils import LogSuppress
 from collections import defaultdict
 import utils
 from concurrent.futures import Future
+from schedule import PeriodicCallback
 
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
@@ -78,24 +78,24 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
-        self.schedule.call_later(self._ping, 5)  # will kick if not login
         gevent.spawn(self._writer)
-        while not self.ws.closed:
-            message = self.ws.receive()
-            if isinstance(message, bytes):
-                common.user_service.recv_binary(rpc_address, self.conn_id, self.context, message)
-            elif isinstance(message, str):
-                common.user_service.recv_text(rpc_address, self.conn_id, self.context, message)
-            else:
-                logging.warning(f'receive {message}')
+        pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL)
+        pc.start()
+        try:
+            while not self.ws.closed:
+                message = self.ws.receive()
+                if isinstance(message, bytes):
+                    common.user_service.recv_binary(rpc_address, self.conn_id, self.context, message)
+                elif isinstance(message, str):
+                    common.user_service.recv_text(rpc_address, self.conn_id, self.context, message)
+                else:
+                    logging.warning(f'receive {message}')
+        finally:
+            pc.stop()
 
     def _ping(self):
-        if self.ws.closed:
-            return
         self.send(self.ping_message)
-        with LogSuppress(Exception):
-            common.user_service.ping(rpc_address, self.conn_id, self.context)
-        self.schedule.call_later(self._ping, const.PING_INTERVAL)
+        common.user_service.ping(rpc_address, self.conn_id, self.context)
 
     def _writer(self):
         logging.info(f'start {self}')
