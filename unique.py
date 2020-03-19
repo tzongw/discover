@@ -2,14 +2,15 @@
 from random import randrange
 from itertools import chain
 from redis import Redis
-from schedule import Schedule
+from schedule import Schedule, PeriodicCallback
 import logging
+from typing import Optional
 
 
 class UniqueId:
     _PREFIX = 'unique'
-    _REFRESH_INTERVAL = 60
-    _TTL = 3600
+    _REFRESH_INTERVAL = 10
+    _TTL = 1800
 
     def __init__(self, schedule: Schedule, redis: Redis, name: str, range: range):
         self._schedule = schedule
@@ -17,6 +18,7 @@ class UniqueId:
         self._name = name
         self._range = range
         self._ids = set()
+        self._pc = None  # type: Optional[PeriodicCallback]
 
     def _key(self, id):
         return f'{self._PREFIX}:{self._name}:{id}'
@@ -28,32 +30,26 @@ class UniqueId:
             key = self._key(id)
             if not self._redis.set(key, '', self._TTL, nx=True):
                 continue
-            if not self._ids:
-                logging.info(f'start')
-                self._schedule.call_later(self._refresh, self._REFRESH_INTERVAL)
             self._ids.add(id)
+            if not self._pc:
+                logging.info(f'start')
+                self._pc = PeriodicCallback(self._schedule, self._refresh, self._REFRESH_INTERVAL).start()
             return id
         raise ValueError('no id')
 
     def stop(self):
         logging.info(f'stop')
-        if not self._ids:
-            return
-        keys = [self._key(id) for id in self._ids]
-        self._redis.delete(*keys)
-        self._ids.clear()
+        if self._pc:
+            self._pc.stop()
+            self._pc = None
+        if self._ids:
+            keys = [self._key(id) for id in self._ids]
+            self._redis.delete(*keys)
+            self._ids.clear()
 
     def _refresh(self):
-        if not self._ids:
-            logging.info(f'exit')
-            return
-        try:
-            with self._redis.pipeline(transaction=False) as pipe:
-                for id in self._ids:
-                    key = self._key(id)
-                    pipe.set(key, '', self._TTL)
-                pipe.execute()
-        except Exception:
-            logging.exception(f'')
-        finally:
-            self._schedule.call_later(self._refresh, self._REFRESH_INTERVAL)
+        with self._redis.pipeline(transaction=False) as pipe:
+            for id in self._ids:
+                key = self._key(id)
+                pipe.set(key, '', self._TTL)
+            pipe.execute()

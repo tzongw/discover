@@ -83,6 +83,7 @@ class PeriodicCallback:
     def start(self):
         if self._handle is None:
             self._schedule_next()
+        return self
 
     def stop(self):
         if self._handle:
