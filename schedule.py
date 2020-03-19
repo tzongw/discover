@@ -6,6 +6,8 @@ from typing import List
 import gevent
 from executor import Executor
 import heapq
+from typing import Optional
+from utils import LogSuppress
 
 
 class Handle:
@@ -18,6 +20,7 @@ class Handle:
 
     def cancel(self):
         self.cancelled = True
+        self.callback = None
 
     def __lt__(self, other: Handle):
         return self.when < other.when
@@ -58,3 +61,30 @@ class Schedule:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
                         self._executor.submit(handle.callback)
+
+
+class PeriodicCallback:
+    def __init__(self, schedule: Schedule, callback, period):
+        self._schedule = schedule
+        self._callback = callback
+        self._period = period
+        self._handle = None  # type: Optional[Handle]
+
+    def _run(self):
+        if self._handle is None:
+            return
+        with LogSuppress(Exception):
+            self._callback()
+        self._schedule_next()
+
+    def _schedule_next(self):
+        self._handle = self._schedule.call_later(self._run, self._period)
+
+    def start(self):
+        if self._handle is None:
+            self._schedule_next()
+
+    def stop(self):
+        if self._handle:
+            self._handle.cancel()
+            self._handle = None

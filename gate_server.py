@@ -58,6 +58,8 @@ class Client:
     schedule = common.schedule
     ping_message = object()
 
+    __slots__ = ["conn_id", "context", "ws", "messages", "groups"]
+
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
         self.context = {}
