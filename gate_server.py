@@ -41,7 +41,7 @@ sockets = Sockets(app)
 
 
 def ws_serve(fut: Future):
-    server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('', options.ws_port), app, spawn=common.executor.submit, handler_class=WebSocketHandler)
 
     def register():
         global ws_address
