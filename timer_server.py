@@ -13,11 +13,12 @@ import gevent
 from generated.service import timer
 import common
 from typing import Dict
-from redis.client import Pipeline
-from utils import LogSuppress
+from registry import Registry
 from redis import Redis
 import utils
 from schedule import Handle, PeriodicCallback, Schedule
+from service_pools import ServicePools
+from generated.service import timeout
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
@@ -34,17 +35,25 @@ class Handler:
     _INTERVAL = 'interval'  # repeat
     _HANDLE = 'handle'
 
-    def __init__(self, redis: Redis, schedule: Schedule):
+    def __init__(self, redis: Redis, schedule: Schedule, registry: Registry):
         self._redis = redis
         self._schedule = schedule
+        self._registry = registry
         self._timers = {}  # type: Dict[str, dict]
+        self._services = {}  # type: Dict[str, ServicePools]
 
     @classmethod
     def key(cls, key):
         return f'{cls._PREFIX}:{key}'
 
     def _fire_timer(self, key, service_name, data):
-        pass
+        service = self._services.get(service_name)
+        if not service:
+            service = ServicePools(self._registry, service_name)
+            self._services[service_name] = service
+        with service.connection() as conn:
+            client = timeout.Client(conn)
+            client.timeout(key, data)
 
     def call_at(self, key, service_name, data, deadline):
         self.remove_timer(key)  # remove first
@@ -90,7 +99,7 @@ class Handler:
 
 
 def main():
-    handler = Handler(common.redis, common.schedule)
+    handler = Handler(common.redis, common.schedule, common.registry)
     processor = timer.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()

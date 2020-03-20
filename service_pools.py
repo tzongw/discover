@@ -11,16 +11,16 @@ import time
 
 
 class ServicePools:
-    def __init__(self, service: Registry, name, **settings):
+    def __init__(self, registry: Registry, name, **settings):
         self._name = name
-        self._service = service
+        self._registry = registry
         self._pools = {}  # type: Dict[str, ThriftPool]
         self._cool_down = {}  # type: Dict[str, float]
         self._settings = settings
-        service.add_callback(self._clean_pools)
+        registry.add_callback(self._clean_pools)
 
     def addresses(self):
-        return self._service.addresses(self._name)
+        return self._registry.addresses(self._name)
 
     @contextlib.contextmanager
     def connection(self) -> ContextManager[TProtocolBase]:
