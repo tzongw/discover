@@ -24,7 +24,8 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] [-novalidate] [-ca_certs certs] [-keyfile keyfile] [-certfile certfile] function [arg1 [arg2...]]')
     print('')
     print('Functions:')
-    print('  void call_later(string key, string service_name, string data, double delay, bool repeat)')
+    print('  void call_at(string key, string service_name, string data, double deadline)')
+    print('  void call_repeat(string key, string service_name, string data, double interval)')
     print('  void remove_timer(string key)')
     print('')
     sys.exit(0)
@@ -105,11 +106,17 @@ protocol = TBinaryProtocol(transport)
 client = timer.Client(protocol)
 transport.open()
 
-if cmd == 'call_later':
-    if len(args) != 5:
-        print('call_later requires 5 args')
+if cmd == 'call_at':
+    if len(args) != 4:
+        print('call_at requires 4 args')
         sys.exit(1)
-    pp.pprint(client.call_later(args[0], args[1], args[2], eval(args[3]), eval(args[4]),))
+    pp.pprint(client.call_at(args[0], args[1], args[2], eval(args[3]),))
+
+elif cmd == 'call_repeat':
+    if len(args) != 4:
+        print('call_repeat requires 4 args')
+        sys.exit(1)
+    pp.pprint(client.call_repeat(args[0], args[1], args[2], eval(args[3]),))
 
 elif cmd == 'remove_timer':
     if len(args) != 1:

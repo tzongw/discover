@@ -5,7 +5,7 @@ from typing import ContextManager
 from service_pools import ServicePools
 from thrift_pool import ThriftPool
 from utils import LogSuppress
-from generated.service import gate, user
+from generated.service import gate, user, timer
 
 
 class Selector:
@@ -54,4 +54,16 @@ class GateService(ServicePools, Selector):
         if hasattr(gate.Iface, item):
             addresses = self.addresses()
             return partial(self._traverse, self.client, addresses, item)
+        return super().__getattr__(item)
+
+
+class TimerService(ServicePools, Selector):
+    @contextlib.contextmanager
+    def client(self) -> ContextManager[timer.Iface]:
+        with self.connection() as conn:
+            yield timer.Client(conn)
+
+    def __getattr__(self, item):
+        if hasattr(timer.Iface, item):
+            return partial(self._one_shot, self.client, item)
         return super().__getattr__(item)
