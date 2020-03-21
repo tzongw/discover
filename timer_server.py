@@ -42,8 +42,18 @@ class Handler:
         self._timers = {}  # type: Dict[str, dict]
         self._services = {}  # type: Dict[str, ServicePools]
 
+    def load_timers(self):
+        full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
+        for full_key in full_keys:
+            key, service_name, data, deadline, interval = self._redis.hmget(full_key, self._KEY, self._SERVICE,
+                                                                            self._DATA, self._DEADLINE, self._INTERVAL)
+            if deadline:
+                self.call_at(key, service_name, data, float(deadline))
+            elif interval:
+                self.call_repeat(key, service_name, data, float(interval))
+
     @classmethod
-    def full_key(cls, key, service_name):
+    def _full_key(cls, key, service_name):
         return f'{cls._PREFIX}:{service_name}:{key}'
 
     def _fire_timer(self, key, service_name, data):
@@ -59,7 +69,7 @@ class Handler:
     def call_at(self, key, service_name, data, deadline):
         logging.info(f'{key} {service_name} {data} {deadline}')
         self.remove_timer(key, service_name)  # remove first
-        full_key = self.full_key(key, service_name)
+        full_key = self._full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
@@ -75,9 +85,10 @@ class Handler:
         timer[self._HANDLE] = self._schedule.call_at(callback, deadline)
 
     def call_repeat(self, key, service_name, data, interval):
+        assert interval > 0
         logging.info(f'{key} {service_name} {data} {interval}')
         self.remove_timer(key, service_name)  # remove first
-        full_key = self.full_key(key, service_name)
+        full_key = self._full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
@@ -93,7 +104,7 @@ class Handler:
 
     def remove_timer(self, key, service_name):
         logging.info(f'{key} {service_name}')
-        full_key = self.full_key(key, service_name)
+        full_key = self._full_key(key, service_name)
         self._redis.delete(full_key)
         timer = self._timers.pop(full_key, None)
         if timer:
@@ -106,7 +117,11 @@ class Handler:
 
 
 def main():
+    if common.registry.addresses(const.RPC_TIMER):
+        logging.fatal(f'another timer server is running')
+        return
     handler = Handler(common.redis, common.schedule, common.registry)
+    handler.load_timers()
     processor = timer.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()

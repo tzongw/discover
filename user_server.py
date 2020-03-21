@@ -149,8 +149,8 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
-        common.timer_service.call_repeat('room welcome', const.RPC_USER, 'welcome', 3)
-        common.timer_service.call_at('room notice', const.RPC_USER, 'notice', time.time() + 10)
+        common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
+        common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
 
     gevent.spawn_later(0.1, register)
     server.serve()
