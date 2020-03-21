@@ -7,7 +7,7 @@ from tornado.log import LogFormatter
 import const
 from generated.service import gate, user, timer
 from registry import Registry
-from service import UserService, GateService, TimerService
+from rpc_service import UserService, GateService, TimerService
 import sys
 from executor import Executor
 from schedule import Schedule
