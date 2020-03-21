@@ -41,10 +41,11 @@ class Iface(object):
         """
         pass
 
-    def remove_timer(self, key):
+    def remove_timer(self, key, service_name):
         """
         Parameters:
          - key
+         - service_name
 
         """
         pass
@@ -129,19 +130,21 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def remove_timer(self, key):
+    def remove_timer(self, key, service_name):
         """
         Parameters:
          - key
+         - service_name
 
         """
-        self.send_remove_timer(key)
+        self.send_remove_timer(key, service_name)
         self.recv_remove_timer()
 
-    def send_remove_timer(self, key):
+    def send_remove_timer(self, key, service_name):
         self._oprot.writeMessageBegin('remove_timer', TMessageType.CALL, self._seqid)
         args = remove_timer_args()
         args.key = key
+        args.service_name = service_name
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -241,7 +244,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = remove_timer_result()
         try:
-            self._handler.remove_timer(args.key)
+            self._handler.remove_timer(args.key, args.service_name)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -547,12 +550,14 @@ class remove_timer_args(object):
     """
     Attributes:
      - key
+     - service_name
 
     """
 
 
-    def __init__(self, key=None,):
+    def __init__(self, key=None, service_name=None,):
         self.key = key
+        self.service_name = service_name
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -568,6 +573,11 @@ class remove_timer_args(object):
                     self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.service_name = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -581,6 +591,10 @@ class remove_timer_args(object):
         if self.key is not None:
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+            oprot.writeFieldEnd()
+        if self.service_name is not None:
+            oprot.writeFieldBegin('service_name', TType.STRING, 2)
+            oprot.writeString(self.service_name.encode('utf-8') if sys.version_info[0] == 2 else self.service_name)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -602,6 +616,7 @@ all_structs.append(remove_timer_args)
 remove_timer_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
 )
 
 

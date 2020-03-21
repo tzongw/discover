@@ -43,10 +43,11 @@ class Handler:
         self._services = {}  # type: Dict[str, ServicePools]
 
     @classmethod
-    def key(cls, key):
-        return f'{cls._PREFIX}:{key}'
+    def key(cls, key, service_name):
+        return f'{cls._PREFIX}:{service_name}:{key}'
 
     def _fire_timer(self, key, service_name, data):
+        logging.INFO(f'{key} {service_name} {data}')
         service = self._services.get(service_name)
         if not service:
             service = ServicePools(self._registry, service_name)
@@ -56,8 +57,9 @@ class Handler:
             client.timeout(key, data)
 
     def call_at(self, key, service_name, data, deadline):
-        self.remove_timer(key)  # remove first
-        redis_key = self.key(key)
+        logging.INFO(f'{key} {service_name} {data} {deadline}')
+        self.remove_timer(key, service_name)  # remove first
+        redis_key = self.key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
@@ -67,13 +69,14 @@ class Handler:
 
         def callback():
             self._fire_timer(key, service_name, data)
-            self.remove_timer(key)
+            self.remove_timer(key, service_name)
 
         timer[self._HANDLE] = self._schedule.call_at(callback, deadline)
 
     def call_repeat(self, key, service_name, data, interval):
-        self.remove_timer(key)  # remove first
-        redis_key = self.key(key)
+        logging.INFO(f'{key} {service_name} {data} {interval}')
+        self.remove_timer(key, service_name)  # remove first
+        redis_key = self.key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
@@ -86,8 +89,9 @@ class Handler:
 
         timer[self._HANDLE] = PeriodicCallback(self._schedule, callback, interval).start()
 
-    def remove_timer(self, key):
-        redis_key = self.key(key)
+    def remove_timer(self, key, service_name):
+        logging.INFO(f'{key} {service_name}')
+        redis_key = self.key(key, service_name)
         self._redis.delete(redis_key)
         timer = self._timers.pop(key, None)
         if timer:
