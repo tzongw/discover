@@ -10,7 +10,7 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import gevent
-from generated.service import user
+from service import user
 import common
 from typing import Dict
 from redis.client import Pipeline

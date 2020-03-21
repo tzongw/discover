@@ -5,7 +5,7 @@ import gevent
 from redis import Redis
 from tornado.log import LogFormatter
 import const
-from generated.service import gate, user, timer
+from service import gate, user, timer
 from registry import Registry
 from rpc_service import UserService, GateService, TimerService
 import sys

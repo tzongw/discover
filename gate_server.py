@@ -10,7 +10,7 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
-from generated.service import gate
+from service import gate
 from flask import Flask
 from flask_sockets import Sockets
 from gevent import pywsgi

@@ -10,7 +10,7 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import gevent
-from generated.service import timer
+from service import timer
 import common
 from typing import Dict
 from registry import Registry
@@ -18,7 +18,7 @@ from redis import Redis
 import utils
 from schedule import Handle, PeriodicCallback, Schedule
 from service_pools import ServicePools
-from generated.service import timeout
+from service import timeout
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
