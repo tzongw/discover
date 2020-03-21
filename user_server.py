@@ -2,6 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
+import time
 import const
 from tornado.options import options, define, parse_command_line
 import logging
@@ -131,6 +132,9 @@ class Handler:
             else:
                 common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
+    def timeout(self, key, data):
+        logging.info(f'{key} {data}')
+
 
 def main():
     logging.warning(f'worker id: {common.unique_id.generate()}')
@@ -145,6 +149,8 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
+        common.timer_service.call_repeat('room welcome', const.RPC_USER, 'welcome', 3)
+        common.timer_service.call_at('room notice', const.RPC_USER, 'notice', time.time() + 10)
 
     gevent.spawn_later(0.1, register)
     server.serve()

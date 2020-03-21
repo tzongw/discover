@@ -43,11 +43,11 @@ class Handler:
         self._services = {}  # type: Dict[str, ServicePools]
 
     @classmethod
-    def key(cls, key, service_name):
+    def full_key(cls, key, service_name):
         return f'{cls._PREFIX}:{service_name}:{key}'
 
     def _fire_timer(self, key, service_name, data):
-        logging.INFO(f'{key} {service_name} {data}')
+        logging.info(f'{key} {service_name} {data}')
         service = self._services.get(service_name)
         if not service:
             service = ServicePools(self._registry, service_name)
@@ -57,15 +57,16 @@ class Handler:
             client.timeout(key, data)
 
     def call_at(self, key, service_name, data, deadline):
-        logging.INFO(f'{key} {service_name} {data} {deadline}')
+        logging.info(f'{key} {service_name} {data} {deadline}')
         self.remove_timer(key, service_name)  # remove first
-        redis_key = self.key(key, service_name)
+        full_key = self.full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
                  self._DEADLINE: deadline,
                  }
-        self._redis.hmset(redis_key, timer)
+        self._redis.hmset(full_key, timer)
+        self._timers[full_key] = timer
 
         def callback():
             self._fire_timer(key, service_name, data)
@@ -74,15 +75,16 @@ class Handler:
         timer[self._HANDLE] = self._schedule.call_at(callback, deadline)
 
     def call_repeat(self, key, service_name, data, interval):
-        logging.INFO(f'{key} {service_name} {data} {interval}')
+        logging.info(f'{key} {service_name} {data} {interval}')
         self.remove_timer(key, service_name)  # remove first
-        redis_key = self.key(key, service_name)
+        full_key = self.full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
                  self._DATA: data,
                  self._INTERVAL: interval,
                  }
-        self._redis.hmset(redis_key, timer)
+        self._redis.hmset(full_key, timer)
+        self._timers[full_key] = timer
 
         def callback():
             self._fire_timer(key, service_name, data)
@@ -90,11 +92,12 @@ class Handler:
         timer[self._HANDLE] = PeriodicCallback(self._schedule, callback, interval).start()
 
     def remove_timer(self, key, service_name):
-        logging.INFO(f'{key} {service_name}')
-        redis_key = self.key(key, service_name)
-        self._redis.delete(redis_key)
-        timer = self._timers.pop(key, None)
+        logging.info(f'{key} {service_name}')
+        full_key = self.full_key(key, service_name)
+        self._redis.delete(full_key)
+        timer = self._timers.pop(full_key, None)
         if timer:
+            logging.warning(f'delete {key} {service_name}')
             handle = timer[self._HANDLE]
             if isinstance(handle, Handle):
                 handle.cancel()
