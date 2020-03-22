@@ -2,6 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
+import sys
 import const
 from tornado.options import options, define, parse_command_line
 import logging
@@ -117,11 +118,7 @@ class Handler:
 
 
 def main():
-    if common.registry.addresses(const.RPC_TIMER):
-        logging.fatal(f'another timer server is running')
-        return
     handler = Handler(common.redis, common.schedule, common.registry)
-    handler.load_timers()
     processor = timer.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
@@ -132,6 +129,10 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
+        if common.registry.addresses(const.RPC_TIMER):
+            logging.fatal(f'another timer server is running')
+            sys.exit(1)
+        handler.load_timers()
 
     gevent.spawn_later(0.1, register)
     server.serve()
