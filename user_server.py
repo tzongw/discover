@@ -13,6 +13,7 @@ from thrift.server import TServer
 import gevent
 from service import user
 import common
+from common import timer_dispatcher as dispatcher
 from typing import Dict
 from redis.client import Pipeline
 from utils import LogSuppress
@@ -29,8 +30,9 @@ class Handler:
     _PREFIX = 'online'
     _TTL = const.MISS_TIMES * const.PING_INTERVAL
 
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
+        self._dispatcher = dispatcher
 
     @classmethod
     def _key(cls, uid):
@@ -133,12 +135,25 @@ class Handler:
                 common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        logging.info(f'{key} {data}')
+        self._dispatcher.dispatch(key, data)
+
+
+def init_timers():
+    @dispatcher.handler('welcome')
+    def welcome(data):
+        logging.info(f'got timer {data}')
+
+    @dispatcher.handler('notice')
+    def notice(data):
+        logging.info(f'got timer {data}')
+
+    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
+    common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
 
 
 def main():
     logging.warning(f'worker id: {common.unique_id.generate()}')
-    handler = Handler(common.redis)
+    handler = Handler(common.redis, dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
@@ -149,8 +164,7 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
-        common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
-        common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
+        init_timers()
 
     gevent.spawn_later(0.1, register)
     server.serve()

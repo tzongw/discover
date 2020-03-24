@@ -12,6 +12,7 @@ import sys
 from executor import Executor
 from schedule import Schedule
 from unique import UniqueId
+from utils import Dispatcher
 
 LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
 channel = logging.StreamHandler()
@@ -28,6 +29,7 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 executor = Executor()
 schedule = Schedule(executor)
 unique_id = UniqueId(schedule, redis, "worker", range(1024))
+timer_dispatcher = Dispatcher()
 
 
 def sig_handler(sig, frame):

@@ -64,6 +64,8 @@ class Schedule:
 
 
 class PeriodicCallback:
+    __slots__ = ["_schedule", "_callback", "_period", "_handle"]
+
     def __init__(self, schedule: Schedule, callback: Callable, period):
         assert callable(callback) and period > 0
         self._schedule = schedule

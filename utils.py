@@ -21,3 +21,21 @@ def ip_address():
 
 
 addr_wildchar = '' if sys.platform == 'darwin' else '*'
+
+
+class Dispatcher:
+    def __init__(self):
+        self._handlers = {}
+
+    def dispatch(self, key: str, *args, **kwargs):
+        for pattern, handler in self._handlers.items():
+            if key.startswith(pattern):
+                return handler(*args, **kwargs)
+        logging.warning(f'not handle {args} {kwargs}')
+
+    def handler(self, pattern):
+        def wrapper(f):
+            assert pattern not in self._handlers
+            self._handlers[pattern] = f
+            return f
+        return wrapper
