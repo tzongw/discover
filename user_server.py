@@ -155,7 +155,7 @@ def main():
     logging.warning(f'worker id: {common.unique_id.generate()}')
     handler = Handler(common.redis, dispatcher)
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
+    transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)

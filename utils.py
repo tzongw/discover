@@ -20,7 +20,7 @@ def ip_address():
         return sock.getsockname()[0]
 
 
-addr_wildchar = '' if sys.platform == 'darwin' else '*'
+wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:

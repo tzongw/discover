@@ -123,7 +123,7 @@ def main():
     handler = Handler(common.redis, common.schedule, common.registry)
     handler.load_timers()
     processor = timer.Processor(handler)
-    transport = TSocket.TServerSocket(utils.addr_wildchar, options.rpc_port)
+    transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
