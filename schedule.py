@@ -76,7 +76,8 @@ class PeriodicCallback:
     def _run(self):
         with LogSuppress(Exception):
             self._callback()
-        self._schedule_next()
+        if self._handle:
+            self._schedule_next()
 
     def _schedule_next(self):
         self._handle = self._schedule.call_later(self._run, self._period)
