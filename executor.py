@@ -56,7 +56,7 @@ class Executor:
             logging.debug(f'+worker {self}')
 
     def __str__(self):
-        return f'{self._unfinished}, {self._workers}'
+        return f'unfinished: {self._unfinished}, workers: {self._workers}'
 
     def _worker(self):
         try:

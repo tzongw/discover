@@ -50,7 +50,7 @@ class Pool:
         return new_item
 
     def _put(self, item):
-        if self.idle > 0:
+        if self._idle > 0:
             item.__last_used = time.time()
         self._pool.put(item)
 
