@@ -35,7 +35,6 @@ class Registry:
         self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self._callbacks = []
-        self._refresh()
 
     def add_callback(self, cb):
         self._callbacks.append(cb)
@@ -44,7 +43,7 @@ class Registry:
         logging.info(f'start')
         self._services.update(services)
         self._unregister()  # in case process restart
-        self._refresh()
+        self.refresh()
         gevent.spawn_later(1, self._run)  # wait unregister publish & socket listen
 
     def stop(self):
@@ -62,7 +61,7 @@ class Registry:
     def addresses(self, name) -> Set[str]:  # constant
         return self._addresses.get(name) or set()
 
-    def _refresh(self):
+    def refresh(self):
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}*'))
         addresses = defaultdict(set)
         for key in keys:
@@ -96,7 +95,7 @@ class Registry:
                 if not sub:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
-                self._refresh()
+                self.refresh()
                 msg = sub.get_message(ignore_subscribe_messages=True, timeout=self._REFRESH_INTERVAL)
                 if msg is not None:
                     logging.info(f'got {msg}')
