@@ -117,7 +117,6 @@ class Handler:
 
 
 def main():
-    common.registry.refresh()
     if common.registry.addresses(const.RPC_TIMER):
         logging.fatal(f'another timer server is running')
         return
