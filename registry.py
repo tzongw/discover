@@ -45,7 +45,7 @@ class Registry:
         self._services.update(services)
         self._unregister()  # in case process restart
         self._refresh()
-        gevent.spawn_later(1, self._run)  # wait unregister publish & socket listen
+        gevent.spawn_later(0.5, self._run)  # wait unregister publish & socket listen
 
     def stop(self):
         logging.info(f'stop')

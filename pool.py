@@ -7,7 +7,7 @@ import gevent
 
 
 class Pool:
-    def __init__(self, maxsize=128, timeout=3, idle=0, acceptable=lambda e: False):
+    def __init__(self, maxsize=128, timeout=1, idle=0, acceptable=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
         self._idle = idle
