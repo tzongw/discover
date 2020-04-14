@@ -68,7 +68,7 @@ class Handler:
 
     def call_at(self, key, service_name, data, deadline):
         logging.info(f'{key} {service_name} {data} {deadline}')
-        self.remove_timer(key, service_name)  # remove first
+        self._delete_timer(key, service_name)  # delete previous
         full_key = self._full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
@@ -87,7 +87,7 @@ class Handler:
     def call_repeat(self, key, service_name, data, interval):
         assert interval > 0
         logging.info(f'{key} {service_name} {data} {interval}')
-        self.remove_timer(key, service_name)  # remove first
+        self._delete_timer(key, service_name)  # delete previous
         full_key = self._full_key(key, service_name)
         timer = {self._KEY: key,
                  self._SERVICE: service_name,
@@ -106,6 +106,10 @@ class Handler:
         logging.info(f'{key} {service_name}')
         full_key = self._full_key(key, service_name)
         self._redis.delete(full_key)
+        self._delete_timer(key, service_name)
+
+    def _delete_timer(self, key, service_name):
+        full_key = self._full_key(key, service_name)
         timer = self._timers.pop(full_key, None)
         if timer:
             logging.warning(f'delete {key} {service_name}')
