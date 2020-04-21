@@ -79,8 +79,8 @@ class Handler:
         self._timers[full_key] = timer
 
         def callback():
-            self._fire_timer(key, service_name, data)
             self.remove_timer(key, service_name)
+            self._fire_timer(key, service_name, data)
 
         timer[self._HANDLE] = self._schedule.call_at(callback, deadline)
 
