@@ -5,7 +5,7 @@ service timer {
 }
 
 service timeout {
-    oneway void timeout(1: string key, 2: string data)
+    void timeout(1: string key, 2: string data)
 }
 
 service gate {
