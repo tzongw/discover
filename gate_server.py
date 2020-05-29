@@ -41,7 +41,7 @@ sockets = Sockets(app)
 
 
 def ws_serve(fut: Future):
-    server = pywsgi.WSGIServer(('', options.ws_port), app, spawn=common.executor.submit, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
 
     def register():
         global ws_address
@@ -55,7 +55,6 @@ def ws_serve(fut: Future):
 
 
 class Client:
-    executor = common.executor
     schedule = common.schedule
     ping_message = object()
 
@@ -79,7 +78,7 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
-        self.executor.submit(self._writer)
+        gevent.spawn(self._writer)
         pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL).start()
         try:
             while not self.ws.closed:
