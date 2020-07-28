@@ -2,7 +2,6 @@ import contextlib
 import logging
 import socket
 from functools import lru_cache
-from contextlib import closing
 import sys
 
 
@@ -15,7 +14,7 @@ class LogSuppress(contextlib.suppress):
 
 @lru_cache()
 def ip_address():
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)) as sock:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect(('8.8.8.8', 9))
         return sock.getsockname()[0]
 
@@ -38,4 +37,5 @@ class Dispatcher:
             assert pattern not in self._handlers
             self._handlers[pattern] = f
             return f
+
         return wrapper
