@@ -7,15 +7,12 @@ import gevent
 
 
 class Pool:
-    def __init__(self, maxsize=128, timeout=1, idle=0, acceptable=lambda e: False):
+    def __init__(self, maxsize=128, timeout=1, acceptable=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
-        self._idle = idle
         self._pool = Queue()
         self._size = 0
         self._acceptable = acceptable
-        if idle > 0:
-            gevent.spawn(self._idle_check)
 
     def __del__(self):
         self.close_all()
@@ -50,25 +47,7 @@ class Pool:
         return new_item
 
     def _put(self, item):
-        if self._idle > 0:
-            item.__last_used = time.time()
         self._pool.put(item)
-
-    def _idle_check(self):
-        logging.debug(f'idle check start')
-        t = min(10.0, self._idle / 10)
-        while self._maxsize > 0:
-            gevent.sleep(t)
-            while not self._pool.empty():
-                oldest = self._pool.peek_nowait()
-                if time.time() - oldest.__last_used > self._idle:
-                    conn = self._pool.get_nowait()
-                    self._size -= 1
-                    self.close_connection(conn)
-                    logging.debug(f'close idle {self._size}')
-                else:
-                    break
-        logging.debug(f'idle check end')
 
     @contextlib.contextmanager
     def connection(self):
