@@ -247,7 +247,8 @@ def rpc_serve(fut: Future):
 
 
 def main():
-    logging.warning(f'worker id: {common.unique_id.generate()}')
+    id = common.unique_id.generate(const.RPC_GATE, range(1024))
+    logging.warning(f'unique id: {id}')
     ws_future = Future()
     rpc_future = Future()
     ws = gevent.spawn(ws_serve, ws_future)

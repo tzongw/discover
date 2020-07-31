@@ -12,27 +12,25 @@ class UniqueId:
     _REFRESH_INTERVAL = 10
     _TTL = 1800
 
-    def __init__(self, schedule: Schedule, redis: Redis, name: str, range: range):
+    def __init__(self, schedule: Schedule, redis: Redis):
         self._schedule = schedule
         self._redis = redis
-        self._name = name
-        self._range = range
-        self._ids = set()
+        self._keys = set()
         self._pc = None  # type: Optional[PeriodicCallback]
 
-    def _key(self, id):
-        return f'{self._PREFIX}:{self._name}:{id}'
+    def _key(self, biz: str, id: int):
+        return f'{self._PREFIX}:{biz}:{id}'
 
-    def generate(self):
-        partition = randrange(self._range.start, self._range.stop)
-        range_chain = chain(range(partition, self._range.stop), range(partition))
+    def generate(self, biz: str, r: range):
+        partition = randrange(r.start, r.stop)
+        range_chain = chain(range(partition, r.stop), range(r.start, partition))
         for id in range_chain:
-            key = self._key(id)
+            key = self._key(biz, id)
             if not self._redis.set(key, '', self._TTL, nx=True):
-                logging.debug(f'conflict id {id}, retry next')
+                logging.debug(f'{biz} conflict id {id}, retry next')
                 continue
-            logging.debug(f'got unique id {id}')
-            self._ids.add(id)
+            logging.info(f'{biz} got unique id {id}')
+            self._keys.add(key)
             if not self._pc:
                 logging.info(f'start')
                 self._pc = PeriodicCallback(self._schedule, self._refresh, self._REFRESH_INTERVAL).start()
@@ -44,14 +42,12 @@ class UniqueId:
         if self._pc:
             self._pc.stop()
             self._pc = None
-        if self._ids:
-            keys = [self._key(id) for id in self._ids]
-            self._redis.delete(*keys)
-            self._ids.clear()
+        if self._keys:
+            self._redis.delete(*self._keys)
+            self._keys.clear()
 
     def _refresh(self):
         with self._redis.pipeline(transaction=False) as pipe:
-            for id in self._ids:
-                key = self._key(id)
+            for key in self._keys:
                 pipe.set(key, '', self._TTL)
             pipe.execute()

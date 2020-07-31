@@ -152,7 +152,8 @@ def init_timers():
 
 
 def main():
-    logging.warning(f'worker id: {common.unique_id.generate()}')
+    id = common.unique_id.generate(const.RPC_USER, range(1024))
+    logging.warning(f'unique id: {id}')
     handler = Handler(common.redis, dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
