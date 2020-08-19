@@ -1,9 +1,7 @@
 import abc
 import contextlib
 import logging
-import time
 from gevent.queue import Queue
-import gevent
 
 
 class Pool:

@@ -27,9 +27,9 @@ class Dispatcher:
         self._handlers = {}
 
     def dispatch(self, key: str, *args, **kwargs):
-        for pattern, handler in self._handlers.items():
-            if key.startswith(pattern):
-                return handler(*args, **kwargs)
+        handler = self._handlers.get(key)
+        if handler:
+            return handler(*args, **kwargs)
         logging.warning(f'not handle {args} {kwargs}')
 
     def handler(self, pattern):
