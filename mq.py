@@ -34,7 +34,7 @@ class MQ(Dispatcher):
         streams = {stream: '>' for stream in self._handlers}
         while not self._stopped:
             try:
-                result = self._redis.xreadgroup(self._group, self._consumer, streams, noack=True)
+                result = self._redis.xreadgroup(self._group, self._consumer, streams, block=60, noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self.dispatch(stream, *message)
