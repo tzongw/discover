@@ -149,9 +149,9 @@ def init_timers():
     def notice(data):
         logging.info(f'got timer {data}')
 
-    common.timer_service.call_repeat('welcome', options.app_name, 'welcome', 3)
-    common.timer_service.call_at('notice', options.app_name, 'notice', time.time() + 10)
-    common.at_exit(lambda: common.timer_service.remove_timer('welcome', options.app_name))
+    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
+    common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
+    common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
 
 
 def init_mq(app_id: str):
