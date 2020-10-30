@@ -35,7 +35,6 @@ class Registry:
         self._stopped = False
         self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
         self._callbacks = []
-        self._refresh()
 
     def add_callback(self, cb):
         self._callbacks.append(cb)

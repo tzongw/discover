@@ -121,9 +121,6 @@ class Handler:
 
 
 def main():
-    if common.registry.addresses(const.RPC_TIMER):
-        logging.fatal(f'another timer server is running')
-        return
     handler = Handler(common.redis, common.schedule, common.registry)
     handler.load_timers()
     processor = timer.Processor(handler)

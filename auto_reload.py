@@ -32,7 +32,6 @@ def update_upstreams():
 
 def main():
     common.registry.add_callback(update_upstreams)
-    update_upstreams()
     common.registry.start({})
     while True:
         gevent.sleep(3600)
