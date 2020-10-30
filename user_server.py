@@ -42,8 +42,8 @@ class Handler:
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
-            uid = int(params.pop(const.CONTEXT_UID))
-            token = params.pop(const.CONTEXT_TOKEN)
+            uid = int(params[const.CONTEXT_UID])
+            token = params[const.CONTEXT_TOKEN]
             if token != "pass":
                 raise ValueError("token")
             key = self._key(uid)

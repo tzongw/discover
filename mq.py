@@ -43,4 +43,4 @@ class MQ(Dispatcher):
                 logging.exception(f'')
                 gevent.sleep(1)
         self._redis.delete(self._waker)
-        logging.info(f'stopped successfully')
+        logging.info(f'delete {self._waker}')
