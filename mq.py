@@ -41,5 +41,9 @@ class MQ(Dispatcher):
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        self._redis.delete(self._waker)
+        with self._redis.pipeline(transaction=False) as pipe:
+            for stream in self._handlers:
+                pipe.xgroup_delconsumer(stream, self._group, self._consumer)
+            pipe.delete(self._waker)
+            pipe.execute()
         logging.info(f'delete {self._waker}')

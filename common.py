@@ -12,7 +12,7 @@ import sys
 from executor import Executor
 from schedule import Schedule
 from unique import UniqueId
-from utils import Dispatcher
+from utils import Dispatcher, LogSuppress
 
 LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
 channel = logging.StreamHandler()
@@ -31,7 +31,7 @@ schedule = Schedule(executor)
 unique_id = UniqueId(schedule, redis)
 timer_dispatcher = Dispatcher()
 
-_exits = []
+_exits = [registry.stop, unique_id.stop]
 
 
 def at_exit(fun):
@@ -40,10 +40,9 @@ def at_exit(fun):
 
 def _sig_handler(sig, frame):
     def grace_exit():
-        registry.stop()
-        unique_id.stop()
         for fun in _exits:
-            fun()
+            with LogSuppress(Exception):
+                fun()
         gevent.sleep(1)
         sys.exit(0)
 
