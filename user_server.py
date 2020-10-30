@@ -53,7 +53,7 @@ class Handler:
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
-                pipe.xadd('login', params, maxlen=4096)
+                pipe.xadd(f'{options.app_name}:login', params, maxlen=4096)
                 return values
 
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
@@ -103,7 +103,7 @@ class Handler:
                 logging.info(f'clear {uid} {old_conn_id}')
                 pipe.multi()
                 pipe.delete(key)
-                pipe.xadd('logout', context, maxlen=4096)
+                pipe.xadd(f'{options.app_name}:logout', context, maxlen=4096)
 
         self._redis.transaction(unset_login_status, key)
 
@@ -157,11 +157,11 @@ def init_timers():
 def init_mq(app_id: str):
     mq = MQ(common.redis, options.app_name, app_id)
 
-    @mq.handler('login')
+    @mq.handler(f'{options.app_name}:login')
     def on_login(id, data):
         logging.info(f'{id} {data}')
 
-    @mq.handler('logout')
+    @mq.handler(f'{options.app_name}:logout')
     def on_logout(id, data):
         logging.info(f'{id} {data}')
 
