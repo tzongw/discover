@@ -53,15 +53,15 @@ class Handler:
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
+                pipe.xadd('login', params, maxlen=4096)
                 return values
 
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
             if old_conn_id and old_address:
                 logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
-                with LogSuppress(Exception):
-                    with common.gate_service.client(old_address) as client:
-                        client.send_text(old_conn_id, f'login other device')
-                        client.remove_conn(old_conn_id)
+                with common.gate_service.client(old_address) as client:
+                    client.send_text(old_conn_id, f'login other device')
+                    client.remove_conn(old_conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
                 logging.warning(f'login fail {address} {conn_id} {params}')
@@ -103,6 +103,7 @@ class Handler:
                 logging.info(f'clear {uid} {old_conn_id}')
                 pipe.multi()
                 pipe.delete(key)
+                pipe.xadd('logout', context, maxlen=4096)
 
         self._redis.transaction(unset_login_status, key)
 
