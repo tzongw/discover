@@ -34,6 +34,7 @@ define("app_name", "gate", str, "app name")
 
 parse_command_line()
 
+app_name = const.APP_GATE
 rpc_address = f'{options.host}:{options.rpc_port}'
 ws_address = f'{options.host}:{options.ws_port}'
 
@@ -248,7 +249,7 @@ def rpc_serve(fut: Future):
 
 
 def main():
-    app_id = common.unique_id.generate(options.app_name, range(1024))
+    app_id = common.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     ws_future = Future()
     rpc_future = Future()

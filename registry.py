@@ -5,14 +5,13 @@ from typing import Set, DefaultDict
 import gevent
 from redis import Redis
 
-import const
 from utils import LogSuppress
 
 
 class Registry:
     _PREFIX = 'service'
     _REFRESH_INTERVAL = 3
-    _TTL = const.MISS_TIMES * _REFRESH_INTERVAL
+    _TTL = 3 * _REFRESH_INTERVAL
     COOL_DOWN = _TTL + _REFRESH_INTERVAL
 
     @classmethod

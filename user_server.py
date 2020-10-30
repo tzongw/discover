@@ -26,6 +26,8 @@ define("app_name", "user", str, "app name")
 
 parse_command_line()
 
+app_name = const.APP_USER
+
 
 class Handler:
     _PREFIX = 'online'
@@ -53,7 +55,7 @@ class Handler:
                 pipe.multi()
                 pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
-                pipe.xadd(f'{options.app_name}:login', params, maxlen=4096)
+                pipe.xadd(f'{app_name}:login', params, maxlen=4096)
                 return values
 
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
@@ -103,7 +105,7 @@ class Handler:
                 logging.info(f'clear {uid} {old_conn_id}')
                 pipe.multi()
                 pipe.delete(key)
-                pipe.xadd(f'{options.app_name}:logout', context, maxlen=4096)
+                pipe.xadd(f'{app_name}:logout', context, maxlen=4096)
 
         self._redis.transaction(unset_login_status, key)
 
@@ -154,14 +156,14 @@ def init_timers():
     common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
 
 
-def init_mq(app_id: str):
-    mq = MQ(common.redis, options.app_name, app_id)
+def init_mq(consumer: str):
+    mq = MQ(common.redis, app_name, consumer)
 
-    @mq.handler(f'{options.app_name}:login')
+    @mq.handler(f'{app_name}:login')
     def on_login(id, data):
         logging.info(f'{id} {data}')
 
-    @mq.handler(f'{options.app_name}:logout')
+    @mq.handler(f'{app_name}:logout')
     def on_logout(id, data):
         logging.info(f'{id} {data}')
 
@@ -170,7 +172,7 @@ def init_mq(app_id: str):
 
 
 def main():
-    app_id = common.unique_id.generate(options.app_name, range(1024))
+    app_id = common.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     handler = Handler(common.redis, dispatcher)
     processor = user.Processor(handler)
