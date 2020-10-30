@@ -31,17 +31,25 @@ schedule = Schedule(executor)
 unique_id = UniqueId(schedule, redis)
 timer_dispatcher = Dispatcher()
 
+_exits = []
 
-def sig_handler(sig, frame):
+
+def at_exit(fun):
+    _exits.append(fun)
+
+
+def _sig_handler(sig, frame):
     def grace_exit():
         registry.stop()
         unique_id.stop()
+        for fun in _exits:
+            fun()
         gevent.sleep(1)
         sys.exit(0)
 
     gevent.spawn(grace_exit)
 
 
-signal.signal(signal.SIGTERM, sig_handler)
-signal.signal(signal.SIGINT, sig_handler)
-signal.signal(signal.SIGQUIT, sig_handler)
+signal.signal(signal.SIGTERM, _sig_handler)
+signal.signal(signal.SIGINT, _sig_handler)
+signal.signal(signal.SIGQUIT, _sig_handler)

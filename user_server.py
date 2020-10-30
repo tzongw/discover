@@ -19,6 +19,7 @@ from redis.client import Pipeline
 from utils import LogSuppress
 from redis import Redis
 import utils
+from mq import MQ
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
@@ -149,6 +150,22 @@ def init_timers():
 
     common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
     common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
+    common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
+
+
+def init_mq():
+    mq = MQ(common.redis, const.RPC_USER)
+
+    @mq.handler('login')
+    def on_login(id, data):
+        logging.info(f'{id} {data}')
+
+    @mq.handler('logout')
+    def on_logout(id, data):
+        logging.info(f'{id} {data}')
+
+    mq.start()
+    common.at_exit(lambda: mq.stop())
 
 
 def main():
@@ -165,7 +182,8 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
-        # init_timers()
+        init_timers()
+        init_mq()
 
     gevent.spawn_later(0.1, register)
     server.serve()
