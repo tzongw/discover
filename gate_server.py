@@ -30,6 +30,7 @@ from schedule import PeriodicCallback
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
 define("rpc_port", 0, int, "rpc port")
+define("app_name", "gate", str, "app name")
 
 parse_command_line()
 
@@ -247,8 +248,8 @@ def rpc_serve(fut: Future):
 
 
 def main():
-    id = common.unique_id.generate(const.RPC_GATE, range(1024))
-    logging.warning(f'unique id: {id}')
+    app_id = common.unique_id.generate(options.app_name, range(1024))
+    logging.warning(f'app id: {app_id}')
     ws_future = Future()
     rpc_future = Future()
     ws = gevent.spawn(ws_serve, ws_future)

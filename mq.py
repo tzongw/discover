@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 import gevent
 import logging
-import uuid
 from redis import Redis, ResponseError
 from utils import Dispatcher
 
 
 class MQ(Dispatcher):
-    def __init__(self, redis: Redis, group: str, consumer: str = ''):
+    def __init__(self, redis: Redis, group: str, consumer: str):
         super().__init__()
         self._redis = redis
         self._group = group
-        self._consumer = consumer or str(uuid.uuid4())
-        self._waker = f'waker:{group}:{consumer}'
+        self._consumer = consumer
+        self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
 
     def start(self):

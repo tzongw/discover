@@ -16,13 +16,13 @@ import common
 from common import timer_dispatcher as dispatcher
 from typing import Dict
 from redis.client import Pipeline
-from utils import LogSuppress
 from redis import Redis
 import utils
 from mq import MQ
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
+define("app_name", "user", str, "app name")
 
 parse_command_line()
 
@@ -149,13 +149,13 @@ def init_timers():
     def notice(data):
         logging.info(f'got timer {data}')
 
-    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
-    common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
-    common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
+    common.timer_service.call_repeat('welcome', options.app_name, 'welcome', 3)
+    common.timer_service.call_at('notice', options.app_name, 'notice', time.time() + 10)
+    common.at_exit(lambda: common.timer_service.remove_timer('welcome', options.app_name))
 
 
-def init_mq():
-    mq = MQ(common.redis, const.RPC_USER)
+def init_mq(app_id: str):
+    mq = MQ(common.redis, options.app_name, app_id)
 
     @mq.handler('login')
     def on_login(id, data):
@@ -170,8 +170,8 @@ def init_mq():
 
 
 def main():
-    id = common.unique_id.generate(const.RPC_USER, range(1024))
-    logging.warning(f'unique id: {id}')
+    app_id = common.unique_id.generate(options.app_name, range(1024))
+    logging.warning(f'app id: {app_id}')
     handler = Handler(common.redis, dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
@@ -184,7 +184,7 @@ def main():
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
         init_timers()
-        init_mq()
+        init_mq(str(app_id))
 
     gevent.spawn_later(0.1, register)
     server.serve()
