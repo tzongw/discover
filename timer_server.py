@@ -19,11 +19,14 @@ import utils
 from schedule import Handle, PeriodicCallback, Schedule
 from service_pools import ServicePools
 from service import timeout
+from setproctitle import setproctitle
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
+
+app_name = const.APP_TIMER
 
 
 class Handler:
@@ -133,6 +136,7 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
+        setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
 
     gevent.spawn_later(0.1, register)
     server.serve()

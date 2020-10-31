@@ -26,6 +26,7 @@ from collections import defaultdict
 import utils
 from concurrent.futures import Future
 from schedule import PeriodicCallback
+from setproctitle import setproctitle
 
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
@@ -256,6 +257,7 @@ def main():
     ws = gevent.spawn(ws_serve, ws_future)
     rpc = gevent.spawn(rpc_serve, rpc_future)
     http_addr, rpc_addr = ws_future.result(timeout=1), rpc_future.result(timeout=1)
+    setproctitle(f'{app_name}-{app_id}-{http_addr}-{rpc_addr}')
     common.registry.start({const.WS_GATE: http_addr, const.RPC_GATE: rpc_addr})
     gevent.joinall([ws, rpc], raise_error=True)
 

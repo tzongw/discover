@@ -17,6 +17,7 @@ from common import timer_dispatcher as dispatcher
 from typing import Dict
 from redis.client import Pipeline
 from redis import Redis
+from setproctitle import setproctitle
 import utils
 from mq import MQ
 
@@ -185,6 +186,7 @@ def main():
         options.rpc_port = transport.handle.getsockname()[1]
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
+        setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
         init_timers()
         init_mq(str(app_id))
 
