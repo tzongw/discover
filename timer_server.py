@@ -78,7 +78,7 @@ class Handler:
                  self._DATA: data,
                  self._DEADLINE: deadline,
                  }
-        self._redis.hmset(full_key, timer)
+        self._redis.hset(full_key, mapping=timer)
         self._timers[full_key] = timer
 
         def callback():
@@ -97,7 +97,7 @@ class Handler:
                  self._DATA: data,
                  self._INTERVAL: interval,
                  }
-        self._redis.hmset(full_key, timer)
+        self._redis.hset(full_key, mapping=timer)
         self._timers[full_key] = timer
 
         def callback():

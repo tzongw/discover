@@ -54,7 +54,7 @@ class Handler:
             def set_login_status(pipe: Pipeline):
                 values = pipe.hmget(key, const.ONLINE_CONN_ID, const.ONLINE_ADDRESS)
                 pipe.multi()
-                pipe.hmset(key, {const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
+                pipe.hset(key, mapping={const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
                 pipe.xadd(f'{app_name}:login', params, maxlen=4096)
                 return values
