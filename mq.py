@@ -31,7 +31,7 @@ class MQ:
             try:
                 self._redis.xgroup_create(stream, self._group, mkstream=True)
             except ResponseError as e:
-                logging.info(f'group already exists: {e}')
+                logging.info(f'{stream} already exists: {e}')
         gevent.spawn(self._group_run)
         gevent.spawn(self._fanout_run)
 
@@ -43,7 +43,7 @@ class MQ:
         streams = {stream: '>' for stream in self._group_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self._redis.xreadgroup(self._group, self._consumer, streams, block=60*1000, noack=True)
+                result = self._redis.xreadgroup(self._group, self._consumer, streams, count=10, block=0, noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self._group_dispatcher.dispatch(stream, *message)
@@ -58,10 +58,19 @@ class MQ:
         logging.info(f'delete {self._waker}')
 
     def _fanout_run(self):
-        streams = {stream: '$' for stream in self._fanout_dispatcher.handlers}
+        with self._redis.pipeline(transaction=False) as pipe:
+            stream_names = self._fanout_dispatcher.handlers.keys()
+            for stream in stream_names:
+                pipe.xinfo_stream(stream)
+            last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
+        # race happen if use $ as last id
+        # 1. xread stream1 stream2 $ $
+        # 2. while handling stream1 message1 id1, xadd stream2 message2 id2
+        # 3. xread stream1 id1 stream2 $, message2 is missing
+        streams = dict(zip(stream_names, last_ids))
         while not self._stopped:
             try:
-                result = self._redis.xread(streams, block=60*1000)
+                result = self._redis.xread(streams, count=10, block=0)
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)

@@ -29,7 +29,8 @@ class Dispatcher:
     def dispatch(self, key: str, *args, **kwargs):
         handler = self._handlers.get(key)
         if handler:
-            return handler(*args, **kwargs)
+            with LogSuppress(Exception):
+                return handler(*args, **kwargs)
         logging.warning(f'not handle {args} {kwargs}')
 
     def handler(self, pattern):
