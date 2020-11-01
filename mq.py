@@ -33,6 +33,7 @@ class MQ:
             except ResponseError as e:
                 logging.info(f'group already exists: {e}')
         gevent.spawn(self._group_run)
+        gevent.spawn(self._fanout_run)
 
     def stop(self):
         self._stopped = True
@@ -42,7 +43,7 @@ class MQ:
         streams = {stream: '>' for stream in self._group_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self._redis.xreadgroup(self._group, self._consumer, streams, block=60, noack=True)
+                result = self._redis.xreadgroup(self._group, self._consumer, streams, block=60*1000, noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self._group_dispatcher.dispatch(stream, *message)
@@ -60,7 +61,7 @@ class MQ:
         streams = {stream: '$' for stream in self._fanout_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self._redis.xread(streams, block=60)
+                result = self._redis.xread(streams, block=60*1000)
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)

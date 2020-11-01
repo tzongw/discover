@@ -152,7 +152,7 @@ def init_timers():
     def notice(data):
         logging.info(f'got timer {data}')
 
-    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 3)
+    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 30)
     common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
     common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
 
