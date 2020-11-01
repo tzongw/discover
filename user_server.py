@@ -160,11 +160,11 @@ def init_timers():
 def init_mq(consumer: str):
     mq = MQ(common.redis, app_name, consumer)
 
-    @mq.handler(f'{app_name}:login')
+    @mq.group_handler(f'{app_name}:login')
     def on_login(id, data):
         logging.info(f'{id} {data}')
 
-    @mq.handler(f'{app_name}:logout')
+    @mq.fanout_handler(f'{app_name}:logout')
     def on_logout(id, data):
         logging.info(f'{id} {data}')
 

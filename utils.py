@@ -39,3 +39,7 @@ class Dispatcher:
             return f
 
         return wrapper
+
+    @property
+    def handlers(self):
+        return self._handlers
