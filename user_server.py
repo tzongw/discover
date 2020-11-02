@@ -144,11 +144,11 @@ class Handler:
 
 def init_timers():
     @timer_dispatcher.handler('welcome')
-    def welcome(data):
+    def on_welcome(data):
         logging.info(f'got timer {data}')
 
     @timer_dispatcher.handler('notice')
-    def notice(data):
+    def on_notice(data):
         logging.info(f'got timer {data}')
 
     common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 30)
