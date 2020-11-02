@@ -23,7 +23,6 @@ from mq import MQ
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
-define("app_name", "user", str, "app name")
 
 parse_command_line()
 

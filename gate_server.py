@@ -31,7 +31,6 @@ from setproctitle import setproctitle
 define("host", utils.ip_address(), str, "listen host")
 define("ws_port", 0, int, "ws port")
 define("rpc_port", 0, int, "rpc port")
-define("app_name", "gate", str, "app name")
 
 parse_command_line()
 
