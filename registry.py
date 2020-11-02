@@ -71,7 +71,8 @@ class Registry:
             logging.warning(f'{self._addresses} -> {addresses}')
             self._addresses = addresses
             for cb in self._callbacks:
-                cb()
+                with LogSuppress(Exception):
+                    cb()
 
     def _run(self):
         published = False
