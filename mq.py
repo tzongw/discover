@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import gevent
 import logging
-from redis import Redis, ResponseError
+import uuid
+from redis import Redis
 from utils import Dispatcher
 
 
@@ -27,11 +28,15 @@ class MQ:
         def fanout_wakeup(id, data):
             logging.info(f'{id} {data}')
 
-        for stream in self._group_dispatcher.handlers:
-            try:
-                self._redis.xgroup_create(stream, self._group, mkstream=True)
-            except ResponseError as e:
-                logging.info(f'{stream} already exists: {e}')
+        with self._redis.pipeline(transaction=True) as pipe:
+            for stream in self._group_dispatcher.handlers:
+                pipe.xgroup_create(stream, self._group, mkstream=True)
+            unique_group = str(uuid.uuid4())
+            for stream in self._fanout_dispatcher.handlers:
+                # create empty stream if not exist
+                pipe.xgroup_create(stream, unique_group, mkstream=True)
+                pipe.xgroup_destroy(stream, unique_group)
+            pipe.execute(raise_on_error=False)
         gevent.spawn(self._group_run)
         gevent.spawn(self._fanout_run)
 
