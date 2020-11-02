@@ -13,7 +13,7 @@ from thrift.server import TServer
 import gevent
 from service import user
 import common
-from common import timer_dispatcher as dispatcher
+from common import timer_dispatcher
 from typing import Dict
 from redis.client import Pipeline
 from redis import Redis
@@ -35,7 +35,7 @@ class Handler:
 
     def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
-        self._dispatcher = dispatcher
+        self._timer_dispatcher = dispatcher
 
     @classmethod
     def _key(cls, uid):
@@ -139,15 +139,15 @@ class Handler:
                 common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        self._dispatcher.dispatch(key, data)
+        self._timer_dispatcher.dispatch(key, data)
 
 
 def init_timers():
-    @dispatcher.handler('welcome')
+    @timer_dispatcher.handler('welcome')
     def welcome(data):
         logging.info(f'got timer {data}')
 
-    @dispatcher.handler('notice')
+    @timer_dispatcher.handler('notice')
     def notice(data):
         logging.info(f'got timer {data}')
 
@@ -174,7 +174,7 @@ def init_mq(consumer: str):
 def main():
     app_id = common.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
-    handler = Handler(common.redis, dispatcher)
+    handler = Handler(common.redis, timer_dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
