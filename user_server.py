@@ -19,7 +19,8 @@ from redis.client import Pipeline
 from redis import Redis
 from setproctitle import setproctitle
 import utils
-from mq import MQ
+from mq import Receiver, Publisher
+import mq_pb2
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
@@ -55,7 +56,7 @@ class Handler:
                 pipe.multi()
                 pipe.hset(key, mapping={const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
-                pipe.xadd(f'{app_name}:login', params, maxlen=4096)
+                Publisher(pipe, 4096).publish(mq_pb2.Login(uid=uid))
                 return values
 
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
@@ -157,18 +158,18 @@ def init_timers():
 
 
 def init_mq(consumer: str):
-    mq = MQ(common.redis, app_name, consumer)
+    receiver = Receiver(common.redis, app_name, consumer)
 
-    @mq.group_handler(f'{app_name}:login')
+    @receiver.group_handler(mq_pb2.Login)
     def on_login(id, data):
         logging.info(f'{id} {data}')
 
-    @mq.fanout_handler(f'{app_name}:logout')
+    @receiver.fanout_handler(f'{app_name}:logout')
     def on_logout(id, data):
         logging.info(f'{id} {data}')
 
-    mq.start()
-    common.at_exit(lambda: mq.stop())
+    receiver.start()
+    common.at_exit(lambda: receiver.stop())
 
 
 def main():

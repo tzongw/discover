@@ -1,0 +1,5 @@
+message Login {
+    optional string stream = 1 [default="user:login"];
+    required int64 uid = 2;
+}
+

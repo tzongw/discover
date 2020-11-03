@@ -2,11 +2,46 @@
 import gevent
 import logging
 import uuid
+from typing import Type
 from redis import Redis
 from utils import Dispatcher
+from google.protobuf.message import Message
+from google.protobuf.json_format import ParseDict, MessageToDict
 
 
-class MQ:
+class Publisher:
+    def __init__(self, redis: Redis, maxlen=None):
+        self._redis = redis
+        self._maxlen = maxlen
+
+    def publish(self, message: Message):
+        stream = message.stream
+        fields = MessageToDict(message)
+        self._redis.xadd(stream, fields, maxlen=self._maxlen)
+
+
+class ProtoDispatcher(Dispatcher):
+    def handler(self, key_or_cls):
+        if isinstance(key_or_cls, str):
+            return super().handler(key_or_cls)
+
+        assert issubclass(key_or_cls, Message)
+        message_cls = key_or_cls  # type: Type[Message]
+        key = message_cls().stream
+        super_handler = super().handler
+
+        def decorator(f):
+            @super_handler(key)
+            def wrapper(id, data):
+                proto = ParseDict(data, message_cls(), ignore_unknown_fields=True)
+                f(id, proto)
+
+            return f
+
+        return decorator
+
+
+class Receiver:
     def __init__(self, redis: Redis, group: str, consumer: str):
         super().__init__()
         self._redis = redis
@@ -14,8 +49,8 @@ class MQ:
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = Dispatcher()
-        self._fanout_dispatcher = Dispatcher()
+        self._group_dispatcher = ProtoDispatcher()
+        self._fanout_dispatcher = ProtoDispatcher()
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
 

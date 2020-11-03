@@ -33,13 +33,13 @@ class Dispatcher:
                 return handler(*args, **kwargs)
         logging.warning(f'not handle {args} {kwargs}')
 
-    def handler(self, pattern):
-        def wrapper(f):
-            assert pattern not in self._handlers
-            self._handlers[pattern] = f
+    def handler(self, key: str):
+        def decorator(f):
+            assert key not in self._handlers
+            self._handlers[key] = f
             return f
 
-        return wrapper
+        return decorator
 
     @property
     def handlers(self):
