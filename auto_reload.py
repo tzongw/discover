@@ -25,6 +25,7 @@ def update_upstreams():
             addr_map[name] = addrs
             with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
                 f.write('\n'.join([f'server {l};' for l in addrs]))
+                f.write('\n')
             updated = True
     if updated:
         os.system("nginx -t && nginx -s reload")
