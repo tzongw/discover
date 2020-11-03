@@ -20,6 +20,7 @@ from schedule import Handle, PeriodicCallback, Schedule
 from service_pools import ServicePools
 from service import timeout
 from setproctitle import setproctitle
+from utils import LogSuppress
 
 define("host", utils.ip_address(), str, "listen host")
 define("rpc_port", 0, int, "rpc port")
@@ -48,12 +49,16 @@ class Handler:
     def load_timers(self):
         full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*'))
         for full_key in full_keys:
-            key, service_name, data, deadline, interval = self._redis.hmget(full_key, self._KEY, self._SERVICE,
-                                                                            self._DATA, self._DEADLINE, self._INTERVAL)
-            if deadline:
-                self.call_at(key, service_name, data, float(deadline))
-            elif interval:
-                self.call_repeat(key, service_name, data, float(interval))
+            with LogSuppress(Exception):
+                key, service_name, data, deadline, interval = self._redis.hmget(full_key, self._KEY, self._SERVICE,
+                                                                                self._DATA, self._DEADLINE,
+                                                                                self._INTERVAL)
+                if deadline:
+                    self.call_at(key, service_name, data, float(deadline))
+                elif interval:
+                    self.call_repeat(key, service_name, data, float(interval))
+                else:
+                    logging.error(f'invalid timer: {key} {service_name} {data}')
 
     @classmethod
     def _full_key(cls, key, service_name):
@@ -125,7 +130,6 @@ class Handler:
 
 def main():
     handler = Handler(common.redis, common.schedule, common.registry)
-    handler.load_timers()
     processor = timer.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
@@ -137,6 +141,7 @@ def main():
         logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
         common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
         setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
+        handler.load_timers()
 
     gevent.spawn_later(0.1, register)
     server.serve()
