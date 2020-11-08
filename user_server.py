@@ -22,7 +22,7 @@ import utils
 from mq import Receiver, Publisher
 import mq_pb2
 
-define("host", utils.ip_address(), str, "listen host")
+define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()

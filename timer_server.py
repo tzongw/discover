@@ -22,7 +22,7 @@ from service import timeout
 from setproctitle import setproctitle
 from utils import LogSuppress
 
-define("host", utils.ip_address(), str, "listen host")
+define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()

@@ -28,7 +28,7 @@ from concurrent.futures import Future
 from schedule import PeriodicCallback
 from setproctitle import setproctitle
 
-define("host", utils.ip_address(), str, "listen host")
+define("host", utils.ip_address(), str, "public host")
 define("ws_port", 0, int, "ws port")
 define("rpc_port", 0, int, "rpc port")
 
