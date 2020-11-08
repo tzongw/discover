@@ -44,6 +44,7 @@ sockets = Sockets(app)
 def ws_serve():
     server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
     g = gevent.spawn(server.serve_forever)
+    gevent.sleep(0.1)
     options.ws_port = server.address[1]
     global ws_address
     ws_address = f'{options.host}:{options.ws_port}'
