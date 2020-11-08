@@ -56,7 +56,7 @@ class Handler:
                 pipe.multi()
                 pipe.hset(key, mapping={const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
                 pipe.expire(key, self._TTL)
-                Publisher(pipe, 4096).publish(mq_pb2.Login(uid=uid))
+                Publisher(pipe).publish(mq_pb2.Login(uid=uid))
                 return values
 
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)

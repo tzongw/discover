@@ -10,14 +10,13 @@ from google.protobuf.json_format import ParseDict, MessageToDict
 
 
 class Publisher:
-    def __init__(self, redis: Redis, maxlen=None):
+    def __init__(self, redis: Redis):
         self._redis = redis
-        self._maxlen = maxlen
 
-    def publish(self, message: Message):
+    def publish(self, message: Message, maxlen=4096):
         stream = message.stream
         fields = MessageToDict(message, including_default_value_fields=True)
-        return self._redis.xadd(stream, fields, maxlen=self._maxlen)
+        return self._redis.xadd(stream, fields, maxlen=maxlen)
 
 
 class ProtoDispatcher(Dispatcher):
