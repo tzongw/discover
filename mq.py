@@ -17,7 +17,7 @@ class Publisher:
     def publish(self, message: Message):
         stream = message.stream
         fields = MessageToDict(message, including_default_value_fields=True)
-        self._redis.xadd(stream, fields, maxlen=self._maxlen)
+        return self._redis.xadd(stream, fields, maxlen=self._maxlen)
 
 
 class ProtoDispatcher(Dispatcher):
