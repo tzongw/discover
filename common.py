@@ -29,7 +29,7 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 executor = Executor()
 schedule = Schedule(executor)
 unique_id = UniqueId(schedule, redis)
-timer_dispatcher = Dispatcher()
+timer_dispatcher = Dispatcher(sep=':')
 
 _exits = [registry.stop, unique_id.stop]
 

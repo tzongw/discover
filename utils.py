@@ -23,10 +23,13 @@ wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:
-    def __init__(self):
+    def __init__(self, sep=None):
         self._handlers = {}
+        self._sep = sep
 
     def dispatch(self, key: str, *args, **kwargs):
+        if self._sep is not None:
+            key = key.split(self._sep, maxsplit=1)[0]
         handler = self._handlers.get(key)
         if handler:
             with LogSuppress(Exception):
