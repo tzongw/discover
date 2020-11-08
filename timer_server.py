@@ -128,23 +128,26 @@ class Handler:
                 handle.stop()
 
 
-def main():
-    handler = Handler(common.redis, common.schedule, common.registry)
+def rpc_serve(handler):
     processor = timer.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
+    g = gevent.spawn(server.serve)
+    gevent.sleep(0.1)
+    options.rpc_port = transport.handle.getsockname()[1]
+    logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
+    return g
 
-    def register():
-        options.rpc_port = transport.handle.getsockname()[1]
-        logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
-        common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
-        setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
-        handler.load_timers()
 
-    gevent.spawn_later(0.1, register)
-    server.serve()
+def main():
+    handler = Handler(common.redis, common.schedule, common.registry)
+    g = rpc_serve(handler)
+    common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
+    setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
+    handler.load_timers()
+    gevent.joinall([g], raise_error=True)
 
 
 if __name__ == '__main__':

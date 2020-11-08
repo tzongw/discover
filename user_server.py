@@ -172,26 +172,29 @@ def init_mq(consumer: str):
     common.at_exit(lambda: receiver.stop())
 
 
-def main():
-    app_id = common.unique_id.generate(app_name, range(1024))
-    logging.warning(f'app id: {app_id}')
+def rpc_serve():
     handler = Handler(common.redis, timer_dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
+    g = gevent.spawn(server.serve)
+    gevent.sleep(0.1)
+    options.rpc_port = transport.handle.getsockname()[1]
+    logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
+    return g
 
-    def register():
-        options.rpc_port = transport.handle.getsockname()[1]
-        logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
-        common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
-        setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
-        init_timers()
-        init_mq(str(app_id))
 
-    gevent.spawn_later(0.1, register)
-    server.serve()
+def main():
+    app_id = common.unique_id.generate(app_name, range(1024))
+    logging.warning(f'app id: {app_id}')
+    g = rpc_serve()
+    common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
+    setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
+    init_timers()
+    init_mq(str(app_id))
+    gevent.joinall([g], raise_error=True)
 
 
 if __name__ == '__main__':

@@ -24,7 +24,6 @@ from gevent import queue
 from urllib import parse
 from collections import defaultdict
 import utils
-from concurrent.futures import Future
 from schedule import PeriodicCallback
 from setproctitle import setproctitle
 
@@ -42,18 +41,14 @@ app = Flask(__name__)
 sockets = Sockets(app)
 
 
-def ws_serve(fut: Future):
+def ws_serve():
     server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
-
-    def register():
-        global ws_address
-        options.ws_port = server.address[1]
-        ws_address = f'{options.host}:{options.ws_port}'
-        logging.info(f'Starting ws server {ws_address} ...')
-        fut.set_result(ws_address)
-
-    gevent.spawn_later(0.1, register)
-    server.serve_forever()
+    g = gevent.spawn(server.serve_forever)
+    options.ws_port = server.address[1]
+    global ws_address
+    ws_address = f'{options.host}:{options.ws_port}'
+    logging.info(f'Starting ws server {ws_address} ...')
+    return g
 
 
 class Client:
@@ -229,35 +224,29 @@ class Handler:
     broadcast_text = _broadcast_message
 
 
-def rpc_serve(fut: Future):
+def rpc_serve():
     handler = Handler()
     processor = gate.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
-
-    def register():
-        global rpc_address
-        options.rpc_port = transport.handle.getsockname()[1]
-        rpc_address = f'{options.host}:{options.rpc_port}'
-        logging.info(f'Starting rpc server {rpc_address} ...')
-        fut.set_result(rpc_address)
-
-    gevent.spawn_later(0.1, register)
-    server.serve()
+    g = gevent.spawn(server.serve)
+    gevent.sleep(0.1)
+    options.rpc_port = transport.handle.getsockname()[1]
+    global rpc_address
+    rpc_address = f'{options.host}:{options.rpc_port}'
+    logging.info(f'Starting rpc server {rpc_address} ...')
+    return g
 
 
 def main():
     app_id = common.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
-    ws_future = Future()
-    rpc_future = Future()
-    ws = gevent.spawn(ws_serve, ws_future)
-    rpc = gevent.spawn(rpc_serve, rpc_future)
-    http_addr, rpc_addr = ws_future.result(timeout=1), rpc_future.result(timeout=1)
-    setproctitle(f'{app_name}-{app_id}-{http_addr}-{rpc_addr}')
-    common.registry.start({const.WS_GATE: http_addr, const.RPC_GATE: rpc_addr})
+    ws = ws_serve()
+    rpc = rpc_serve()
+    setproctitle(f'{app_name}-{app_id}-{ws_address}-{rpc_address}')
+    common.registry.start({const.WS_GATE: ws_address, const.RPC_GATE: rpc_address})
     gevent.joinall([ws, rpc], raise_error=True)
 
 
