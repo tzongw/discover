@@ -9,12 +9,3 @@ RPC_USER = f'rpc_{APP_USER}'
 RPC_TIMER = f'rpc_{APP_TIMER}'
 RPC_GATE = f'rpc_{APP_GATE}'
 WS_GATE = f'ws_{APP_GATE}'
-
-CONTEXT_UID = 'uid'
-CONTEXT_TOKEN = 'token'
-CONTEXT_GROUP = 'group'
-
-ONLINE_ADDRESS = 'address'
-ONLINE_CONN_ID = 'conn_id'
-
-CHAT_ROOM = 'chat_room'

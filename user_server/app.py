@@ -3,7 +3,7 @@ from gevent import monkey
 
 monkey.patch_all()
 import time
-from common import const, shared
+from user_server import shared, const
 from tornado.options import options, define, parse_command_line
 import logging
 from thrift.transport import TSocket
@@ -12,21 +12,19 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import gevent
 from service import user
-from common.shared import timer_dispatcher
+from user_server.shared import timer_dispatcher, app_name, app_id
 from typing import Dict
 from redis.client import Pipeline
 from redis import Redis
 from setproctitle import setproctitle
 from base import utils
-from base.mq import Receiver, Publisher
+from base.mq import Publisher
 from common import mq_pb2
 
 define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
-
-app_name = const.APP_USER
 
 
 class Handler:
@@ -156,8 +154,8 @@ def init_timers():
     shared.at_exit(lambda: shared.timer_service.remove_timer('welcome', const.RPC_USER))
 
 
-def init_mq(consumer: str):
-    receiver = Receiver(shared.redis, app_name, consumer)
+def init_mq():
+    from user_server.shared import receiver
 
     @receiver.group_handler(mq_pb2.Login)
     def on_login(id, data):
@@ -186,13 +184,12 @@ def rpc_serve():
 
 
 def main():
-    app_id = shared.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     g = rpc_serve()
     shared.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
     setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
     init_timers()
-    init_mq(str(app_id))
+    init_mq()
     gevent.joinall([g], raise_error=True)
 
 

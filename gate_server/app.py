@@ -2,7 +2,8 @@
 from gevent import monkey
 
 monkey.patch_all()
-from common import const, shared
+from gate_server import const, shared
+from gate_server.shared import app_name, app_id
 from tornado.options import options, define, parse_command_line
 import logging
 from thrift.transport import TSocket
@@ -32,7 +33,6 @@ define("rpc_port", 0, int, "rpc port")
 
 parse_command_line()
 
-app_name = const.APP_GATE
 rpc_address = f'{options.host}:{options.rpc_port}'
 ws_address = f'{options.host}:{options.ws_port}'
 
@@ -239,7 +239,6 @@ def rpc_serve():
 
 
 def main():
-    app_id = shared.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     ws = ws_serve()
     rpc = rpc_serve()
