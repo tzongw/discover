@@ -2,7 +2,7 @@
 from random import randrange
 from itertools import chain
 from redis import Redis
-from schedule import Schedule, PeriodicCallback
+from .schedule import Schedule, PeriodicCallback
 import logging
 from typing import Optional
 

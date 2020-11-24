@@ -4,10 +4,10 @@ import time
 import threading
 from typing import List
 import gevent
-from executor import Executor
+from .executor import Executor
 import heapq
 from typing import Optional, Callable
-from utils import LogSuppress
+from .utils import LogSuppress
 
 
 class Handle:

@@ -2,7 +2,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.Thrift import TException
-from pool import Pool
+from .pool import Pool
 
 
 class ThriftPool(Pool):

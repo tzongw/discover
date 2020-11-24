@@ -5,7 +5,7 @@ from typing import Set, DefaultDict
 import gevent
 from redis import Redis
 
-from utils import LogSuppress
+from .utils import LogSuppress
 
 
 class Registry:

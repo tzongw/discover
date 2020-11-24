@@ -23,8 +23,8 @@ from typing import Dict, DefaultDict, Set
 from gevent import queue
 from urllib import parse
 from collections import defaultdict
-import utils
-from schedule import PeriodicCallback
+from base import utils
+from base.schedule import PeriodicCallback
 from setproctitle import setproctitle
 
 define("host", utils.ip_address(), str, "public host")

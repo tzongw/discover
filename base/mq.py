@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Type
 from redis import Redis
-from utils import Dispatcher
+from .utils import Dispatcher
 from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 
