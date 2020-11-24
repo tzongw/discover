@@ -61,8 +61,8 @@ def main():
 
 
 if __name__ == '__main__':
-    from executor import Executor
-    from schedule import Schedule
+    from base.executor import Executor
+    from base.schedule import Schedule
 
     sch = Schedule()
     sch.call_later(lambda: print('later'), 2)

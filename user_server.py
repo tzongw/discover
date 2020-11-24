@@ -3,7 +3,7 @@ from gevent import monkey
 
 monkey.patch_all()
 import time
-import const
+from common import const, shared
 from tornado.options import options, define, parse_command_line
 import logging
 from thrift.transport import TSocket
@@ -12,15 +12,14 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import gevent
 from service import user
-import common
-from common import timer_dispatcher
+from common.shared import timer_dispatcher
 from typing import Dict
 from redis.client import Pipeline
 from redis import Redis
 from setproctitle import setproctitle
-import utils
-from mq import Receiver, Publisher
-import mq_pb2
+from base import utils
+from base.mq import Receiver, Publisher
+from common import mq_pb2
 
 define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
@@ -62,7 +61,7 @@ class Handler:
             old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
             if old_conn_id and old_address:
                 logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
-                with common.gate_service.client(old_address) as client:
+                with shared.gate_service.client(old_address) as client:
                     client.send_text(old_conn_id, f'login other device')
                     client.remove_conn(old_conn_id)
         except Exception as e:
@@ -70,11 +69,11 @@ class Handler:
                 logging.warning(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
-            with common.gate_service.client(address) as client:
+            with shared.gate_service.client(address) as client:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            with common.gate_service.client(address) as client:
+            with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, {const.CONTEXT_UID: str(uid)})
                 client.send_text(conn_id, f'login success')
 
@@ -89,7 +88,7 @@ class Handler:
             self._redis.expire(key, self._TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
-            with common.gate_service.client(address) as client:
+            with shared.gate_service.client(address) as client:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
 
@@ -112,7 +111,7 @@ class Handler:
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
-        with common.gate_service.client(address) as client:
+        with shared.gate_service.client(address) as client:
             client.send_text(conn_id, f'can not read binary')
 
     def recv_text(self, address: str, conn_id: str, context: Dict[str, str], message: str):
@@ -123,21 +122,21 @@ class Handler:
         uid = int(context[const.CONTEXT_UID])
         group = context.get(const.CONTEXT_GROUP)
         if message == 'join':
-            with common.gate_service.client(address) as client:
+            with shared.gate_service.client(address) as client:
                 client.join_group(conn_id, const.CHAT_ROOM)
                 client.set_context(conn_id, {const.CONTEXT_GROUP: const.CHAT_ROOM})
-            common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
+            shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
-            with common.gate_service.client(address) as client:
+            with shared.gate_service.client(address) as client:
                 client.leave_group(conn_id, const.CHAT_ROOM)
                 client.unset_context(conn_id, {const.CONTEXT_GROUP})
-            common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
+            shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
         else:
             if not group:
-                with common.gate_service.client(address) as client:
+                with shared.gate_service.client(address) as client:
                     client.send_text(conn_id, f'not in group')
             else:
-                common.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
+                shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
         self._timer_dispatcher.dispatch(key, data)
@@ -152,13 +151,13 @@ def init_timers():
     def on_notice(data):
         logging.info(f'got timer {data}')
 
-    common.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 30)
-    common.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
-    common.at_exit(lambda: common.timer_service.remove_timer('welcome', const.RPC_USER))
+    shared.timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 30)
+    shared.timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
+    shared.at_exit(lambda: shared.timer_service.remove_timer('welcome', const.RPC_USER))
 
 
 def init_mq(consumer: str):
-    receiver = Receiver(common.redis, app_name, consumer)
+    receiver = Receiver(shared.redis, app_name, consumer)
 
     @receiver.group_handler(mq_pb2.Login)
     def on_login(id, data):
@@ -169,11 +168,11 @@ def init_mq(consumer: str):
         logging.info(f'{id} {data}')
 
     receiver.start()
-    common.at_exit(lambda: receiver.stop())
+    shared.at_exit(lambda: receiver.stop())
 
 
 def rpc_serve():
-    handler = Handler(common.redis, timer_dispatcher)
+    handler = Handler(shared.redis, timer_dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
@@ -187,10 +186,10 @@ def rpc_serve():
 
 
 def main():
-    app_id = common.unique_id.generate(app_name, range(1024))
+    app_id = shared.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     g = rpc_serve()
-    common.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
+    shared.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
     setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
     init_timers()
     init_mq(str(app_id))

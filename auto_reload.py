@@ -5,9 +5,8 @@ monkey.patch_all()
 import gevent
 from tornado.options import define, options
 from tornado.options import parse_command_line
-import common
 import os
-import const
+from common import const, shared
 
 define("conf_d", "/etc/nginx/conf.d", str, "nginx conf dir")
 
@@ -20,7 +19,7 @@ addr_map = {}
 def update_upstreams():
     updated = False
     for name in upstreams:
-        addrs = common.registry.addresses(name)
+        addrs = shared.registry.addresses(name)
         if addrs != addr_map.get(name):
             addr_map[name] = addrs
             with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
@@ -32,8 +31,8 @@ def update_upstreams():
 
 
 def main():
-    common.registry.add_callback(update_upstreams)
-    common.registry.start({})
+    shared.registry.add_callback(update_upstreams)
+    shared.registry.start({})
     while True:
         gevent.sleep(3600)
 

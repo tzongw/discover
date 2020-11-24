@@ -3,7 +3,7 @@
 # WS client example
 
 import asyncio
-import const
+from common import const
 import websockets
 from tornado.options import options, define, parse_command_line
 

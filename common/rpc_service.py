@@ -2,9 +2,9 @@
 from functools import partial
 import contextlib
 from typing import ContextManager
-from service_pools import ServicePools
-from thrift_pool import ThriftPool
-from utils import LogSuppress
+from base.service_pools import ServicePools
+from base.thrift_pool import ThriftPool
+from base.utils import LogSuppress
 from service import gate, user, timer
 
 

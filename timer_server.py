@@ -2,7 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
-import const
+from common import const, shared
 from tornado.options import options, define, parse_command_line
 import logging
 from thrift.transport import TSocket
@@ -11,16 +11,15 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import gevent
 from service import timer
-import common
 from typing import Dict
-from registry import Registry
+from base.registry import Registry
 from redis import Redis
-import utils
-from schedule import Handle, PeriodicCallback, Schedule
-from service_pools import ServicePools
+from base import utils
+from base.schedule import Handle, PeriodicCallback, Schedule
+from base.service_pools import ServicePools
 from service import timeout
 from setproctitle import setproctitle
-from utils import LogSuppress
+from base.utils import LogSuppress
 
 define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
@@ -142,9 +141,9 @@ def rpc_serve(handler):
 
 
 def main():
-    handler = Handler(common.redis, common.schedule, common.registry)
+    handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
-    common.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
+    shared.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
     setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
     handler.load_timers()
     gevent.joinall([g], raise_error=True)

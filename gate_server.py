@@ -2,8 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
-import common
-import const
+from common import const, shared
 from tornado.options import options, define, parse_command_line
 import logging
 from thrift.transport import TSocket
@@ -53,7 +52,7 @@ def ws_serve():
 
 
 class Client:
-    schedule = common.schedule
+    schedule = shared.schedule
     ping_message = object()
 
     __slots__ = ["conn_id", "context", "ws", "messages", "groups"]
@@ -82,9 +81,9 @@ class Client:
             while not self.ws.closed:
                 message = self.ws.receive()
                 if isinstance(message, bytes):
-                    common.user_service.recv_binary(rpc_address, self.conn_id, self.context, message)
+                    shared.user_service.recv_binary(rpc_address, self.conn_id, self.context, message)
                 elif isinstance(message, str):
-                    common.user_service.recv_text(rpc_address, self.conn_id, self.context, message)
+                    shared.user_service.recv_text(rpc_address, self.conn_id, self.context, message)
                 else:
                     logging.warning(f'receive {message}')
         finally:
@@ -92,7 +91,7 @@ class Client:
 
     def _ping(self):
         self.send(self.ping_message)
-        common.user_service.ping(rpc_address, self.conn_id, self.context)
+        shared.user_service.ping(rpc_address, self.conn_id, self.context)
 
     def _writer(self):
         logging.info(f'start {self}')
@@ -139,7 +138,7 @@ def client_serve(ws: WebSocket):
         params = {}
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
-        common.user_service.login(rpc_address, conn_id, params)
+        shared.user_service.login(rpc_address, conn_id, params)
         client.serve()
     except Exception:
         logging.exception(f'{client}')
@@ -149,7 +148,7 @@ def client_serve(ws: WebSocket):
             remove_from_group(client, group)
         clients.pop(conn_id)
         client.stop()
-        common.user_service.disconnect(rpc_address, conn_id, client.context)
+        shared.user_service.disconnect(rpc_address, conn_id, client.context)
 
 
 def remove_from_group(client: Client, group):
@@ -240,12 +239,12 @@ def rpc_serve():
 
 
 def main():
-    app_id = common.unique_id.generate(app_name, range(1024))
+    app_id = shared.unique_id.generate(app_name, range(1024))
     logging.warning(f'app id: {app_id}')
     ws = ws_serve()
     rpc = rpc_serve()
     setproctitle(f'{app_name}-{app_id}-{ws_address}-{rpc_address}')
-    common.registry.start({const.WS_GATE: ws_address, const.RPC_GATE: rpc_address})
+    shared.registry.start({const.WS_GATE: ws_address, const.RPC_GATE: rpc_address})
     gevent.joinall([ws, rpc], raise_error=True)
 
 
