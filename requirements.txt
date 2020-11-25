@@ -1,9 +1,9 @@
 Click==7.0
 Flask==1.0.3
 Flask-Sockets==0.2.1
-gevent==1.4.0
+gevent==20.9.0
 gevent-websocket==0.10.1
-greenlet==0.4.15
+greenlet==0.4.17
 itsdangerous==1.1.0
 Jinja2==2.10.1
 MarkupSafe==1.1.1
@@ -16,4 +16,6 @@ thrift==0.11.0
 tornado==6.0.2
 websocket-client==0.56.0
 websockets==7.0
-Werkzeug==0.15.4
+Werkzeug==1.0.1
+zope.event==4.5.0
+zope.interface==5.2.0
