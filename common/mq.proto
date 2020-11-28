@@ -3,3 +3,8 @@ message Login {
     required int64 uid = 2;
 }
 
+message Logout {
+    optional string stream = 1 [default="user:logout"];
+    required int64 uid = 2;
+}
+

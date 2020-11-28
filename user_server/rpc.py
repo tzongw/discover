@@ -12,7 +12,7 @@ from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from .shared import timer_dispatcher, app_name
+from .shared import timer_dispatcher
 from .config import options
 from common import mq_pb2
 
@@ -93,7 +93,7 @@ class Handler:
                 logging.info(f'clear {uid} {old_conn_id}')
                 pipe.multi()
                 pipe.delete(key)
-                pipe.xadd(f'{app_name}:logout', context, maxlen=4096)
+                Publisher(pipe).publish(mq_pb2.Logout(uid=uid))
 
         self._redis.transaction(unset_login_status, key)
 
