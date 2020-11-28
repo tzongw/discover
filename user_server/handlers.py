@@ -20,7 +20,7 @@ def on_login(id, data):
     logging.info(f'{id} {data}')
 
 
-@receiver.fanout_handler(f'{app_name}:logout')
+@receiver.fanout_handler(mq_pb2.Logout)
 def on_logout(id, data):
     logging.info(f'{id} {data}')
 

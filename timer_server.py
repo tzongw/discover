@@ -54,7 +54,7 @@ class Handler:
                                                                                 self._DATA, self._DEADLINE,
                                                                                 self._INTERVAL)
                 if deadline:
-                    self.call_at(key, service_name, data, float(deadline))
+                    self.call_later(key, service_name, data, float(deadline)-time.time())
                 elif interval:
                     self.call_repeat(key, service_name, data, float(interval))
                 else:
