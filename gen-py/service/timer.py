@@ -19,13 +19,13 @@ all_structs = []
 
 
 class Iface(object):
-    def call_at(self, key, service_name, data, deadline):
+    def call_later(self, key, service_name, data, delay):
         """
         Parameters:
          - key
          - service_name
          - data
-         - deadline
+         - delay
 
         """
         pass
@@ -58,30 +58,30 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def call_at(self, key, service_name, data, deadline):
+    def call_later(self, key, service_name, data, delay):
         """
         Parameters:
          - key
          - service_name
          - data
-         - deadline
+         - delay
 
         """
-        self.send_call_at(key, service_name, data, deadline)
-        self.recv_call_at()
+        self.send_call_later(key, service_name, data, delay)
+        self.recv_call_later()
 
-    def send_call_at(self, key, service_name, data, deadline):
-        self._oprot.writeMessageBegin('call_at', TMessageType.CALL, self._seqid)
-        args = call_at_args()
+    def send_call_later(self, key, service_name, data, delay):
+        self._oprot.writeMessageBegin('call_later', TMessageType.CALL, self._seqid)
+        args = call_later_args()
         args.key = key
         args.service_name = service_name
         args.data = data
-        args.deadline = deadline
+        args.delay = delay
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_call_at(self):
+    def recv_call_later(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -89,7 +89,7 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = call_at_result()
+        result = call_later_result()
         result.read(iprot)
         iprot.readMessageEnd()
         return
@@ -167,7 +167,7 @@ class Processor(Iface, TProcessor):
     def __init__(self, handler):
         self._handler = handler
         self._processMap = {}
-        self._processMap["call_at"] = Processor.process_call_at
+        self._processMap["call_later"] = Processor.process_call_later
         self._processMap["call_repeat"] = Processor.process_call_repeat
         self._processMap["remove_timer"] = Processor.process_remove_timer
         self._on_message_begin = None
@@ -192,13 +192,13 @@ class Processor(Iface, TProcessor):
             self._processMap[name](self, seqid, iprot, oprot)
         return True
 
-    def process_call_at(self, seqid, iprot, oprot):
-        args = call_at_args()
+    def process_call_later(self, seqid, iprot, oprot):
+        args = call_later_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = call_at_result()
+        result = call_later_result()
         try:
-            self._handler.call_at(args.key, args.service_name, args.data, args.deadline)
+            self._handler.call_later(args.key, args.service_name, args.data, args.delay)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -210,7 +210,7 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("call_at", msg_type, seqid)
+        oprot.writeMessageBegin("call_later", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -264,22 +264,22 @@ class Processor(Iface, TProcessor):
 # HELPER FUNCTIONS AND STRUCTURES
 
 
-class call_at_args(object):
+class call_later_args(object):
     """
     Attributes:
      - key
      - service_name
      - data
-     - deadline
+     - delay
 
     """
 
 
-    def __init__(self, key=None, service_name=None, data=None, deadline=None,):
+    def __init__(self, key=None, service_name=None, data=None, delay=None,):
         self.key = key
         self.service_name = service_name
         self.data = data
-        self.deadline = deadline
+        self.delay = delay
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -307,7 +307,7 @@ class call_at_args(object):
                     iprot.skip(ftype)
             elif fid == 4:
                 if ftype == TType.DOUBLE:
-                    self.deadline = iprot.readDouble()
+                    self.delay = iprot.readDouble()
                 else:
                     iprot.skip(ftype)
             else:
@@ -319,7 +319,7 @@ class call_at_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('call_at_args')
+        oprot.writeStructBegin('call_later_args')
         if self.key is not None:
             oprot.writeFieldBegin('key', TType.STRING, 1)
             oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
@@ -332,9 +332,9 @@ class call_at_args(object):
             oprot.writeFieldBegin('data', TType.STRING, 3)
             oprot.writeString(self.data.encode('utf-8') if sys.version_info[0] == 2 else self.data)
             oprot.writeFieldEnd()
-        if self.deadline is not None:
-            oprot.writeFieldBegin('deadline', TType.DOUBLE, 4)
-            oprot.writeDouble(self.deadline)
+        if self.delay is not None:
+            oprot.writeFieldBegin('delay', TType.DOUBLE, 4)
+            oprot.writeDouble(self.delay)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -352,17 +352,17 @@ class call_at_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(call_at_args)
-call_at_args.thrift_spec = (
+all_structs.append(call_later_args)
+call_later_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'data', 'UTF8', None, ),  # 3
-    (4, TType.DOUBLE, 'deadline', None, None, ),  # 4
+    (4, TType.DOUBLE, 'delay', None, None, ),  # 4
 )
 
 
-class call_at_result(object):
+class call_later_result(object):
 
 
     def read(self, iprot):
@@ -383,7 +383,7 @@ class call_at_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('call_at_result')
+        oprot.writeStructBegin('call_later_result')
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -400,8 +400,8 @@ class call_at_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(call_at_result)
-call_at_result.thrift_spec = (
+all_structs.append(call_later_result)
+call_later_result.thrift_spec = (
 )
 
 

@@ -20,6 +20,7 @@ from base.service_pools import ServicePools
 from service import timeout
 from setproctitle import setproctitle
 from base.utils import LogSuppress
+import time
 
 define("host", utils.ip_address(), str, "public host")
 define("rpc_port", 0, int, "rpc port")
@@ -73,7 +74,8 @@ class Handler:
             client = timeout.Client(conn)
             client.timeout(key, data)
 
-    def call_at(self, key, service_name, data, deadline):
+    def call_later(self, key, service_name, data, delay):
+        deadline = time.time() + delay
         logging.info(f'{key} {service_name} {data} {deadline}')
         self._delete_timer(key, service_name)  # delete previous
         full_key = self._full_key(key, service_name)

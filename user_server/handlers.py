@@ -26,6 +26,6 @@ def on_logout(id, data):
 
 
 def init():
-    timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', 30)
-    timer_service.call_at('notice', const.RPC_USER, 'notice', time.time() + 10)
+    timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
+    timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
     at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
