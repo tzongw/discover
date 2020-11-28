@@ -4,10 +4,10 @@ from gevent import monkey
 monkey.patch_all()
 from user_server.config import options
 from user_server import shared, const, rpc, handlers
-import logging
-import gevent
 from user_server.shared import app_name, app_id
 from setproctitle import setproctitle
+import logging
+import gevent
 
 
 def main():

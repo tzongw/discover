@@ -2,12 +2,12 @@
 from gevent import monkey
 
 monkey.patch_all()
-import gevent
-import logging
 from gate_server.config import options
 from gate_server import const, shared, rpc, ws
 from gate_server.shared import app_name, app_id
 from setproctitle import setproctitle
+import gevent
+import logging
 
 
 def main():
