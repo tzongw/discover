@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
-import time
-from .shared import timer_dispatcher, app_name, receiver, timer_service, const, at_exit
 from common import mq_pb2
+from .shared import timer_dispatcher, receiver, timer_service, const, at_exit
 
 
 @timer_dispatcher.handler('welcome')
@@ -16,12 +15,12 @@ def on_notice(data):
 
 
 @receiver.group_handler(mq_pb2.Login)
-def on_login(id, data):
+def on_login(id, data: mq_pb2.Login):
     logging.info(f'{id} {data}')
 
 
 @receiver.fanout_handler(mq_pb2.Logout)
-def on_logout(id, data):
+def on_logout(id, data: mq_pb2.Logout):
     logging.info(f'{id} {data}')
 
 
