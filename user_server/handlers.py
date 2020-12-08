@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 from common import mq_pb2
-from .shared import timer_dispatcher, receiver, timer_service, const, at_exit
+from common.timer import Timer
+from .shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis
 
 
 @timer_dispatcher.handler('welcome')
@@ -25,6 +26,9 @@ def on_logout(id, data: mq_pb2.Logout):
 
 
 def init():
-    timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
-    timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
-    at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
+    # timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
+    # timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
+    # at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
+    timer = Timer(redis)
+    msg = mq_pb2.Login(uid=1234)
+    timer.stream_timer(msg, 3000)
