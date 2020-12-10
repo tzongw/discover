@@ -2,11 +2,11 @@
 import gevent
 import logging
 import uuid
-from typing import Type
+from typing import Type, Dict
 from redis import Redis
 from .utils import Dispatcher
 from google.protobuf.message import Message
-from google.protobuf.json_format import ParseDict, MessageToDict
+from google.protobuf.json_format import Parse, MessageToJson
 
 
 class Publisher:
@@ -15,8 +15,8 @@ class Publisher:
 
     def publish(self, message: Message, maxlen=4096):
         stream = message.stream
-        fields = MessageToDict(message, including_default_value_fields=True)
-        return self._redis.xadd(stream, fields, maxlen=maxlen)
+        json = MessageToJson(message)
+        return self._redis.xadd(stream, {'': json}, maxlen=maxlen)
 
 
 class ProtoDispatcher(Dispatcher):
@@ -31,8 +31,9 @@ class ProtoDispatcher(Dispatcher):
 
         def decorator(f):
             @super_handler(key)
-            def wrapper(id, data):
-                proto = ParseDict(data, message_cls(), ignore_unknown_fields=True)
+            def wrapper(id, data: Dict):
+                json = data.pop('')
+                proto = Parse(json, message_cls(), ignore_unknown_fields=True)
                 f(id, proto)
 
             return f
