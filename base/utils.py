@@ -34,7 +34,8 @@ class Dispatcher:
         if handler:
             with LogSuppress(Exception):
                 return handler(*args, **kwargs)
-        logging.warning(f'not handle {args} {kwargs}')
+        else:
+            logging.warning(f'not handle {args} {kwargs}')
 
     def handler(self, key: str):
         def decorator(f):
