@@ -9,7 +9,7 @@ import uuid
 class Timer:
     def __init__(self, redis: Redis):
         self._redis = redis
-        self._len2sha = {}
+        self._script2sha = {}
 
     def new(self, key: str, data: str, sha: str, interval: int, loop=False):
         params = [key, data, sha, interval]
@@ -22,24 +22,16 @@ class Timer:
         res = self._redis.execute_command('TIMER.KILL', *keys)
         return int(res)
 
-    def stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
+    def new_stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
         if key is None:
             key = str(uuid.uuid4())
-        sha = self._len2sha.get(maxlen)
+        stream = message.stream
+        script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
+        sha = self._script2sha.get(script)
         if sha is None:
-            sha = self._redis.script_load(f"""
-                local table = cjson.decode(ARGV[1])
-                local i = 1
-                local array = {{}}
-                for k, v in pairs(table) do
-                    array[i] = k
-                    array[i+1] = v
-                    i = i + 2
-                end
-                return redis.call('XADD', table.stream, 'MAXLEN', '~', '{maxlen}', '*', unpack(array))
-            """)
-            self._len2sha[maxlen] = sha
-        data = MessageToJson(message, including_default_value_fields=True)
+            sha = self._redis.script_load(script)
+            self._script2sha[script] = sha
+        data = MessageToJson(message)
         self.new(key, data, sha, interval, loop)
         return key
 

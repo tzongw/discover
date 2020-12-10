@@ -25,11 +25,16 @@ def on_logout(id, data: mq_pb2.Logout):
     logging.info(f'{id} {data}')
 
 
+@receiver.group_handler(mq_pb2.Alarm)
+def on_alarm(id, data: mq_pb2.Alarm):
+    logging.info(f'{id} {data}')
+
+
 def init():
-    # timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
-    # timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
-    # at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
+    timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
+    timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
+    at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     timer = Timer(redis)
-    msg = mq_pb2.Login(uid=1234)
-    tid = timer.stream_timer(msg, interval=3000, loop=True)
+    alarm = mq_pb2.Alarm()
+    tid = timer.new_stream_timer(alarm, interval=5000, loop=True)
     at_exit(lambda: timer.kill(tid))
