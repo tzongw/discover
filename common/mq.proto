@@ -8,3 +8,7 @@ message Logout {
     required int64 uid = 2;
 }
 
+message Alarm {
+    optional string stream = 1 [default="user:alarm"];
+}
+
