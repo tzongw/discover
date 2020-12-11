@@ -24,6 +24,8 @@ class Timer:
 
     def new_stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
         if key is None:
+            if loop:
+                raise ValueError('loop timer must set key')
             key = str(uuid.uuid4())
         stream = message.stream
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
