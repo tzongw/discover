@@ -10,5 +10,6 @@ message Logout {
 
 message Alarm {
     optional string stream = 1 [default="user:alarm"];
+    required string tip = 2;
 }
 
