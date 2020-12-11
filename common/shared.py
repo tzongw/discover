@@ -33,7 +33,7 @@ schedule = Schedule(executor)
 unique_id = UniqueId(schedule, redis)
 timer_dispatcher = Dispatcher(sep=':')
 
-_exits = [registry.stop, unique_id.stop]
+_exits = [registry.stop]
 
 
 def at_exit(fun):
@@ -46,6 +46,7 @@ def _sig_handler(sig, frame):
             with LogSuppress(Exception):
                 fun()
         gevent.sleep(1)
+        unique_id.stop()
         sys.exit(0)
 
     gevent.spawn(grace_exit)
