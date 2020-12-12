@@ -7,19 +7,39 @@ import uuid
 
 
 class Timer:
+    _PREFIX = 'timer'
+
     def __init__(self, redis: Redis):
         self._redis = redis
         self._script2sha = {}
+
+    @classmethod
+    def _key(cls, key):
+        return f'{cls._PREFIX}:{key}'
 
     def new(self, key: str, data: str, sha: str, interval: int, loop=False):
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
-        res = self._redis.execute_command('TIMER.NEW', *params)
+        with self._redis.pipeline(transaction=True) as pipe:
+            pipe.execute_command('TIMER.NEW', *params)
+            pipe.hset(self._key(key), mapping={
+                'data': data,
+                'sha': sha,
+                'interval': interval
+            })
+            if loop:
+                pipe.persist(self._key(key))
+            else:
+                pipe.expire(self._key(key), interval // 1000)
+            res, *_ = pipe.execute()
         return bool_ok(res)
 
     def kill(self, *keys):
-        res = self._redis.execute_command('TIMER.KILL', *keys)
+        with self._redis.pipeline(transaction=True) as pipe:
+            pipe.execute_command('TIMER.KILL', *keys)
+            pipe.delete(*[self._key(key) for key in keys])
+            res, *_ = pipe.execute()
         return int(res)
 
     def new_stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
@@ -36,5 +56,3 @@ class Timer:
         data = MessageToJson(message)
         self.new(key, data, sha, interval, loop)
         return key
-
-
