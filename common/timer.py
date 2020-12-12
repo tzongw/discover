@@ -23,12 +23,10 @@ class Timer:
         return int(res)
 
     def new_stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
-        if key is None:
-            if loop:
-                raise ValueError('loop timer must set key')
-            key = str(uuid.uuid4())
         # noinspection PyUnresolvedReferences
         stream = message.stream
+        if key is None:
+            key = stream if loop else str(uuid.uuid4())
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
         if sha is None:

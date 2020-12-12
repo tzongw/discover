@@ -37,5 +37,5 @@ def init():
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     timer = Timer(redis)
     timer.new_stream_timer(mq_pb2.Alarm(tip='one shot'), interval=1000)
-    tid = timer.new_stream_timer(mq_pb2.Alarm(tip='loop'), interval=5000, loop=True, key='alarm_loop')
+    tid = timer.new_stream_timer(mq_pb2.Alarm(tip='loop'), interval=5000, loop=True)
     at_exit(lambda: timer.kill(tid))
