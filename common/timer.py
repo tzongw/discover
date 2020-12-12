@@ -27,6 +27,7 @@ class Timer:
             if loop:
                 raise ValueError('loop timer must set key')
             key = str(uuid.uuid4())
+        # noinspection PyUnresolvedReferences
         stream = message.stream
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
         sha = self._script2sha.get(script)

@@ -14,6 +14,7 @@ class Publisher:
         self._redis = redis
 
     def publish(self, message: Message, maxlen=4096):
+        # noinspection PyUnresolvedReferences
         stream = message.stream
         json = MessageToJson(message)
         return self._redis.xadd(stream, {'': json}, maxlen=maxlen)
@@ -26,6 +27,7 @@ class ProtoDispatcher(Dispatcher):
 
         assert issubclass(key_or_cls, Message)
         message_cls = key_or_cls  # type: Type[Message]
+        # noinspection PyUnresolvedReferences
         key = message_cls().stream
         super_handler = super().handler
 
