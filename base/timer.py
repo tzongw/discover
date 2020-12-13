@@ -12,7 +12,7 @@ class Timer:
     def __init__(self, redis: Redis, cache=False):
         self._redis = redis
         self._script2sha = {}
-        self._cache = cache
+        self.cache = cache
 
     @classmethod
     def _key(cls, key):
@@ -22,9 +22,9 @@ class Timer:
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
-        with self._redis.pipeline(transaction=False) as pipe:
+        with self._redis.pipeline(transaction=self.cache) as pipe:
             pipe.execute_command('TIMER.NEW', *params)
-            if self._cache:
+            if self.cache:
                 pipe.hset(self._key(key), mapping={
                     'data': data,
                     'sha': sha,
@@ -38,9 +38,9 @@ class Timer:
         return bool_ok(res)
 
     def kill(self, *keys):
-        with self._redis.pipeline(transaction=False) as pipe:
+        with self._redis.pipeline(transaction=self.cache) as pipe:
             pipe.execute_command('TIMER.KILL', *keys)
-            if self._cache:
+            if self.cache:
                 pipe.delete(*[self._key(key) for key in keys])
             res, *_ = pipe.execute()
         return int(res)
