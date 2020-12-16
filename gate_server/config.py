@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # noinspection PyUnresolvedReferences
-import common.shared
+import common.config
 from tornado.options import define, options
 from base import utils
 

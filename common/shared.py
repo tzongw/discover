@@ -1,9 +1,7 @@
-import logging
 import signal
 from typing import Union
 import gevent
 from redis import Redis
-from tornado.log import LogFormatter
 from . import const
 import service
 from base.registry import Registry
@@ -15,14 +13,9 @@ from base.unique import UniqueId
 from base.utils import Dispatcher, LogSuppress
 from base.mq import Publisher
 from base.timer import Timer
+from tornado.options import options
 
-LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
-channel = logging.StreamHandler()
-channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt=None))
-logger = logging.getLogger()
-logger.addHandler(channel)
-
-redis = Redis(decode_responses=True)
+redis = Redis(options.redis.host, options.redis.port, decode_responses=True)
 registry = Registry(redis)
 publisher = Publisher(redis)
 timer = Timer(redis)
