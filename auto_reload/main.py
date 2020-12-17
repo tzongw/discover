@@ -2,15 +2,11 @@
 from gevent import monkey
 
 monkey.patch_all()
+from auto_reload.config import options
 import gevent
-from tornado.options import define, options
-from tornado.options import parse_command_line
 import os
 from common import const, shared
-
-define("conf_d", "/etc/nginx/conf.d", str, "nginx conf dir")
-
-parse_command_line()
+import logging
 
 upstreams = [const.WS_GATE]
 addr_map = {}
@@ -26,8 +22,9 @@ def update_upstreams():
                 f.write('\n'.join([f'server {l};' for l in addrs]))
                 f.write('\n')
             updated = True
+            logging.info(f'update {name}')
     if updated:
-        os.system("nginx -t && nginx -s reload")
+        os.system("nginx -s reload")
 
 
 def main():
