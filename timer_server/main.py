@@ -2,8 +2,8 @@
 from gevent import monkey
 
 monkey.patch_all()
-from common import const, shared
-from tornado.options import options, define, parse_command_line
+from timer_server.config import options
+from timer_server import const, shared
 import logging
 from thrift.transport import TSocket
 from thrift.transport import TTransport
@@ -21,13 +21,6 @@ from service import timeout
 from setproctitle import setproctitle
 from base.utils import LogSuppress
 import time
-
-define("host", utils.ip_address(), str, "public host")
-define("rpc_port", 0, int, "rpc port")
-
-parse_command_line()
-
-app_name = const.APP_TIMER
 
 
 class Handler:
@@ -54,7 +47,7 @@ class Handler:
                                                                                 self._DATA, self._DEADLINE,
                                                                                 self._INTERVAL)
                 if deadline:
-                    self.call_later(key, service_name, data, float(deadline)-time.time())
+                    self.call_later(key, service_name, data, float(deadline) - time.time())
                 elif interval:
                     self.call_repeat(key, service_name, data, float(interval))
                 else:
@@ -146,7 +139,7 @@ def main():
     handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
     shared.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
-    setproctitle(f'{app_name}-{options.host}:{options.rpc_port}')
+    setproctitle(f'{shared.app_name}-{options.host}:{options.rpc_port}')
     handler.load_timers()
     gevent.joinall([g], raise_error=True)
 
