@@ -15,6 +15,7 @@ from service import user
 from .shared import timer_dispatcher
 from .config import options
 from common import mq_pb2
+from base.utils import Parser
 
 
 class Handler:
@@ -23,6 +24,7 @@ class Handler:
 
     def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
+        self._parser = Parser(redis)
         self._timer_dispatcher = dispatcher
 
     @classmethod
@@ -39,19 +41,20 @@ class Handler:
             key = self._key(uid)
 
             def set_login_status(pipe: Pipeline):
-                values = pipe.hmget(key, const.ONLINE_CONN_ID, const.ONLINE_ADDRESS)
+                parser = Parser(pipe)
+                online = parser.hget(key, mq_pb2.Online())
                 pipe.multi()
-                pipe.hset(key, mapping={const.ONLINE_ADDRESS: address, const.ONLINE_CONN_ID: conn_id})
+                parser.hset(key, mq_pb2.Online(address=address, conn_id=conn_id))
                 pipe.expire(key, self._TTL)
                 Publisher(pipe).publish(mq_pb2.Login(uid=uid))
-                return values
+                return online
 
-            old_conn_id, old_address = self._redis.transaction(set_login_status, key, value_from_callable=True)
-            if old_conn_id and old_address:
-                logging.warning(f'kick conn {uid} {old_conn_id} {old_address}')
-                with shared.gate_service.client(old_address) as client:
-                    client.send_text(old_conn_id, f'login other device')
-                    client.remove_conn(old_conn_id)
+            old = self._redis.transaction(set_login_status, key, value_from_callable=True)
+            if old.address and old.conn_id:
+                logging.warning(f'kick conn {uid} {old}')
+                with shared.gate_service.client(old.address) as client:
+                    client.send_text(old.conn_id, f'login other device')
+                    client.remove_conn(old.conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
                 logging.warning(f'login fail {address} {conn_id} {params}')
@@ -70,9 +73,9 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
             key = self._key(uid)
-            login_conn_id = self._redis.hget(key, const.ONLINE_CONN_ID)
-            if login_conn_id != conn_id:
-                raise ValueError(f'{login_conn_id}')
+            online = self._parser.hget(key, mq_pb2.Online())
+            if conn_id != online.conn_id:
+                raise ValueError(f'{online} {conn_id}')
             self._redis.expire(key, self._TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
@@ -88,9 +91,9 @@ class Handler:
         key = self._key(uid)
 
         def unset_login_status(pipe: Pipeline):
-            old_conn_id = pipe.hget(key, const.ONLINE_CONN_ID)
-            if old_conn_id == conn_id:
-                logging.info(f'clear {uid} {old_conn_id}')
+            online = Parser(pipe).hget(key, mq_pb2.Online())
+            if conn_id == online.conn_id:
+                logging.info(f'clear {uid} {online}')
                 pipe.multi()
                 pipe.delete(key)
                 Publisher(pipe).publish(mq_pb2.Logout(uid=uid))

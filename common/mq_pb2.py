@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto2',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x08mq.proto\"0\n\x05Login\x12\x1a\n\x06stream\x18\x01 \x01(\t:\nuser:login\x12\x0b\n\x03uid\x18\x02 \x02(\x03\"2\n\x06Logout\x12\x1b\n\x06stream\x18\x01 \x01(\t:\x0buser:logout\x12\x0b\n\x03uid\x18\x02 \x02(\x03\"0\n\x05\x41larm\x12\x1a\n\x06stream\x18\x01 \x01(\t:\nuser:alarm\x12\x0b\n\x03tip\x18\x02 \x02(\t'
+  serialized_pb=b'\n\x08mq.proto\"0\n\x05Login\x12\x1a\n\x06stream\x18\x01 \x01(\t:\nuser:login\x12\x0b\n\x03uid\x18\x02 \x02(\x03\"2\n\x06Logout\x12\x1b\n\x06stream\x18\x01 \x01(\t:\x0buser:logout\x12\x0b\n\x03uid\x18\x02 \x02(\x03\"0\n\x05\x41larm\x12\x1a\n\x06stream\x18\x01 \x01(\t:\nuser:alarm\x12\x0b\n\x03tip\x18\x02 \x02(\t\"*\n\x06Online\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\x12\x0f\n\x07\x63onn_id\x18\x02 \x01(\t'
 )
 
 
@@ -141,9 +141,49 @@ _ALARM = _descriptor.Descriptor(
   serialized_end=162,
 )
 
+
+_ONLINE = _descriptor.Descriptor(
+  name='Online',
+  full_name='Online',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='address', full_name='Online.address', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='conn_id', full_name='Online.conn_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=164,
+  serialized_end=206,
+)
+
 DESCRIPTOR.message_types_by_name['Login'] = _LOGIN
 DESCRIPTOR.message_types_by_name['Logout'] = _LOGOUT
 DESCRIPTOR.message_types_by_name['Alarm'] = _ALARM
+DESCRIPTOR.message_types_by_name['Online'] = _ONLINE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Login = _reflection.GeneratedProtocolMessageType('Login', (_message.Message,), {
@@ -166,6 +206,13 @@ Alarm = _reflection.GeneratedProtocolMessageType('Alarm', (_message.Message,), {
   # @@protoc_insertion_point(class_scope:Alarm)
   })
 _sym_db.RegisterMessage(Alarm)
+
+Online = _reflection.GeneratedProtocolMessageType('Online', (_message.Message,), {
+  'DESCRIPTOR' : _ONLINE,
+  '__module__' : 'mq_pb2'
+  # @@protoc_insertion_point(class_scope:Online)
+  })
+_sym_db.RegisterMessage(Online)
 
 
 # @@protoc_insertion_point(module_scope)
