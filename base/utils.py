@@ -3,6 +3,9 @@ import logging
 import socket
 from functools import lru_cache
 import sys
+from redis import Redis
+from google.protobuf.message import Message
+from google.protobuf.json_format import ParseDict, MessageToDict
 
 
 class LogSuppress(contextlib.suppress):
@@ -48,3 +51,16 @@ class Dispatcher:
     @property
     def handlers(self):
         return self._handlers
+
+
+class Parser:
+    def __init__(self, redis: Redis):
+        self._redis = redis
+
+    def hset(self, name: str, message: Message):  # embedded message not work
+        mapping = MessageToDict(message)
+        self._redis.hset(name, mapping=mapping)
+
+    def hget(self, name: str, message: Message):
+        mapping = self._redis.hgetall(name)
+        return ParseDict(mapping, message, ignore_unknown_fields=True)
