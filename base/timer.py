@@ -33,7 +33,7 @@ class Timer:
                 if loop:
                     pipe.persist(self._key(key))
                 else:
-                    pipe.expire(self._key(key), interval // 1000)
+                    pipe.pexpire(self._key(key), interval)
             res, *_ = pipe.execute()
         return bool_ok(res)
 
