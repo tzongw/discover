@@ -84,7 +84,7 @@ def serve():
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     g = gevent.spawn(server.serve)
     gevent.sleep(0.1)
-    options.rpc_port = transport.handle.getsockname()[1]
-    rpc_address = f'{options.host}:{options.rpc_port}'
-    logging.info(f'Starting rpc server {rpc_address} ...')
+    if not options.rpc_port:
+        options.rpc_port = transport.handle.getsockname()[1]
+    logging.info(f'Starting rpc server {options.rpc_address} ...')
     return g

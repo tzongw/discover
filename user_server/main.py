@@ -13,8 +13,8 @@ import gevent
 def main():
     logging.warning(f'app id: {app_id}')
     g = rpc.serve()
-    shared.registry.start({const.RPC_USER: f'{options.host}:{options.rpc_port}'})
-    setproctitle(f'{app_name}-{app_id}-{options.host}:{options.rpc_port}')
+    shared.registry.start({const.RPC_USER: f'{options.rpc_address}'})
+    setproctitle(f'{app_name}-{app_id}-{options.rpc_address}')
     shared.receiver.start()
     handlers.init()
     gevent.joinall([g], raise_error=True)

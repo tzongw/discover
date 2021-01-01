@@ -25,9 +25,9 @@ def serve():
     server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
     g = gevent.spawn(server.serve_forever)
     gevent.sleep(0.1)
-    options.ws_port = server.address[1]
-    ws_address = f'{options.host}:{options.ws_port}'
-    logging.info(f'Starting ws server {ws_address} ...')
+    if not options.ws_port:
+        options.ws_port = server.address[1]
+    logging.info(f'Starting ws server {options.ws_address} ...')
     return g
 
 
@@ -50,10 +50,6 @@ class Client:
     def __repr__(self):
         return f'{self.conn_id} {self.context}'
 
-    @property
-    def rpc_address(self):
-        return f'{options.host}:{options.rpc_port}'
-
     def send(self, message):
         self.messages.put_nowait(message)
 
@@ -65,9 +61,9 @@ class Client:
             while not self.ws.closed:
                 message = self.ws.receive()
                 if isinstance(message, bytes):
-                    shared.user_service.recv_binary(self.rpc_address, self.conn_id, self.context, message)
+                    shared.user_service.recv_binary(options.rpc_address, self.conn_id, self.context, message)
                 elif isinstance(message, str):
-                    shared.user_service.recv_text(self.rpc_address, self.conn_id, self.context, message)
+                    shared.user_service.recv_text(options.rpc_address, self.conn_id, self.context, message)
                 else:
                     logging.warning(f'receive {message}')
         finally:
@@ -75,7 +71,7 @@ class Client:
 
     def _ping(self):
         self.send(self.ping_message)
-        shared.user_service.ping(self.rpc_address, self.conn_id, self.context)
+        shared.user_service.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
         logging.info(f'start {self}')
@@ -121,7 +117,6 @@ def remove_from_group(client: Client, group):
 
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
-    rpc_address = f'{options.host}:{options.rpc_port}'
     conn_id = str(uuid.uuid4())
     client = Client(ws, conn_id)
     clients[conn_id] = client
@@ -130,7 +125,7 @@ def client_serve(ws: WebSocket):
         params = {}
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
-        shared.user_service.login(rpc_address, conn_id, params)
+        shared.user_service.login(options.rpc_address, conn_id, params)
         client.serve()
     except Exception:
         logging.exception(f'{client}')
@@ -140,4 +135,4 @@ def client_serve(ws: WebSocket):
             remove_from_group(client, group)
         clients.pop(conn_id)
         client.stop()
-        shared.user_service.disconnect(rpc_address, conn_id, client.context)
+        shared.user_service.disconnect(options.rpc_address, conn_id, client.context)

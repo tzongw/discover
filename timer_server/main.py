@@ -130,16 +130,17 @@ def rpc_serve(handler):
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     g = gevent.spawn(server.serve)
     gevent.sleep(0.1)
-    options.rpc_port = transport.handle.getsockname()[1]
-    logging.info(f'Starting the server {options.host}:{options.rpc_port} ...')
+    if not options.rpc_port:
+        options.rpc_port = transport.handle.getsockname()[1]
+    logging.info(f'Starting the server {options.rpc_address} ...')
     return g
 
 
 def main():
     handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
-    shared.registry.start({const.RPC_TIMER: f'{options.host}:{options.rpc_port}'})
-    setproctitle(f'{shared.app_name}-{options.host}:{options.rpc_port}')
+    shared.registry.start({const.RPC_TIMER: f'{options.rpc_address}'})
+    setproctitle(f'{shared.app_name}-{options.host}:{options.rpc_address}')
     handler.load_timers()
     gevent.joinall([g], raise_error=True)
 
