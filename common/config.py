@@ -21,3 +21,4 @@ class Addr:
 
 
 define("redis", Addr("localhost:6379"), Addr, "redis address")
+define("datacenter", 0, int, "data center id")
