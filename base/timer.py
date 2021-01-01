@@ -7,7 +7,7 @@ import uuid
 
 
 class Timer:
-    _PREFIX = 'timer'
+    _PREFIX = 'TIMER'
 
     def __init__(self, redis: Redis, cache=False):
         self._redis = redis
