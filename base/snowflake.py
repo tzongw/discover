@@ -74,3 +74,8 @@ if __name__ == '__main__':
     print(local_datetime(t0))
     args = (t0, 12, 23, 34)
     assert melt(make_snowflake(*args)) == args
+    g = IdGenerator(datacenter_id=1, worker_id=2)
+    for _ in range(100):
+        uid = g.gen()
+        args = melt(uid)
+        print(local_datetime(args[0]), args)
