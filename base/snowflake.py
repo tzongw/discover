@@ -1,4 +1,5 @@
 import datetime
+import time
 
 # twitter's snowflake parameters
 twepoch = 1288834974657
@@ -47,6 +48,25 @@ def melt(snowflake_id):
 def local_datetime(timestamp_ms):
     """convert millisecond timestamp to local datetime object."""
     return datetime.datetime.fromtimestamp(timestamp_ms // 1000)
+
+
+class IdGenerator:
+    def __init__(self, datacenter_id: int, worker_id: int):
+        self._datacenter_id = datacenter_id
+        self._worker_id = worker_id
+        self._timestamp = 0
+        self._sequence_id = 0
+
+    def gen(self) -> int:
+        timestamp = time.time_ns() // 1_000_000
+        while timestamp < self._timestamp:
+            raise ValueError(f'clock go backwards {timestamp} < {self._timestamp}')
+        if timestamp == self._timestamp:
+            self._sequence_id += 1
+        else:
+            self._sequence_id = 0
+        self._timestamp = timestamp
+        return make_snowflake(timestamp, self._datacenter_id, self._worker_id, self._sequence_id)
 
 
 if __name__ == '__main__':
