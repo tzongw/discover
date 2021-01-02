@@ -140,7 +140,7 @@ def main():
     handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
     shared.registry.start({const.RPC_TIMER: f'{options.rpc_address}'})
-    setproctitle(f'{shared.app_name}-{options.host}:{options.rpc_address}')
+    setproctitle(f'{shared.app_name}-{options.rpc_address}')
     handler.load_timers()
     gevent.joinall([g], raise_error=True)
 
