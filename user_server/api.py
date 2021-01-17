@@ -10,6 +10,7 @@ import gevent
 import logging
 from base import snowflake
 from .shared import app_id
+from werkzeug.exceptions import UnprocessableEntity
 
 app = Flask(__name__)
 user_id = snowflake.IdGenerator(options.datacenter, app_id)
@@ -28,6 +29,11 @@ def serve():
 @app.route('/')
 def hello():
     return 'hello'
+
+
+@app.errorhandler(UnprocessableEntity)
+def error_handler(e: UnprocessableEntity):
+    return e.data['messages']
 
 
 @app.route('/register', methods=['POST'])
