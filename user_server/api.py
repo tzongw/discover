@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
-from flask import Flask
+from flask import Flask, jsonify
 from webargs import fields
 from webargs.flaskparser import use_args
-from .dao import User
+from .dao import User, engine
+from sqlalchemy.orm import Session
 from gevent import pywsgi
 from .config import options
 import gevent
 import logging
+from base import snowflake
+from .shared import app_id
 
 app = Flask(__name__)
+user_id = snowflake.IdGenerator(options.datacenter, app_id)
 
 
 def serve():
@@ -21,7 +25,16 @@ def serve():
     return g
 
 
+@app.route('/')
+def hello():
+    return 'hello'
+
+
 @app.route('/register', methods=['POST'])
-@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)})
+@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
 def register(args):
-    return User.create(args['username'], args['password'])
+    session = Session(engine)
+    user = User(id=user_id.gen(), username=args['username'], password=args['password'])
+    session.add(user)
+    session.commit()
+    return jsonify(user)
