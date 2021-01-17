@@ -6,6 +6,7 @@ APP_GATE = 'gate'
 APP_TIMER = 'timer'
 
 RPC_USER = f'rpc_{APP_USER}'
+HTTP_USER = f'http_{APP_USER}'
 RPC_TIMER = f'rpc_{APP_TIMER}'
 RPC_GATE = f'rpc_{APP_GATE}'
 WS_GATE = f'ws_{APP_GATE}'
