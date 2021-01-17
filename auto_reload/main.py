@@ -5,18 +5,21 @@ monkey.patch_all()
 from auto_reload.config import options
 import gevent
 import os
-from common import const, shared
+from common import shared
 import logging
 
-upstreams = [const.WS_GATE]
 addr_map = {}
+
+
+def is_api(name: str):
+    return name.startswith('ws') or name.startswith('http')
 
 
 def update_upstreams():
     updated = False
-    for name in upstreams:
-        addrs = shared.registry.addresses(name)
-        if addrs != addr_map.get(name):
+    # noinspection PyProtectedMember
+    for name, addrs in shared.registry._addresses.items():
+        if is_api(name) and addrs != addr_map.get(name):
             addr_map[name] = addrs
             with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
                 f.write('\n'.join([f'server {l};' for l in addrs]))
