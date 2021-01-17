@@ -13,12 +13,9 @@ Base = declarative_base()
 
 @dataclass
 class User(Base):
-    __tablename__ = "accounts"
-
     id: int
-    username: str
-    password: str
 
+    __tablename__ = "accounts"
     id = Column(BigInteger, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
     password = Column(String(40), nullable=False)
