@@ -6,7 +6,7 @@ from sqlalchemy import BigInteger
 from sqlalchemy import String
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = create_engine('sqlite:///db.sqlite3', echo=True)
+engine = create_engine('sqlite:///db.sqlite3', echo='debug')
 
 Base = declarative_base()
 

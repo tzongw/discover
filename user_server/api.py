@@ -44,3 +44,16 @@ def register(args):
     session.add(user)
     session.commit()
     return jsonify(user)
+
+
+@app.route('/login', methods=['POST'])
+@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
+def login(args):
+    session = Session(engine)
+    user = session.query(User).filter(User.username == args['username']).first()  # type: User
+    if user is None:
+        return 'user not exist'
+    elif user.password != args['password']:
+        return 'password error'
+    else:
+        return jsonify(user)
