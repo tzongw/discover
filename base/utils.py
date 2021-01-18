@@ -6,6 +6,7 @@ import sys
 from redis import Redis
 from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
+from werkzeug.routing import BaseConverter
 
 
 class LogSuppress(contextlib.suppress):
@@ -64,3 +65,16 @@ class Parser:
     def hget(self, name: str, message: Message):
         mapping = self._redis.hgetall(name)
         return ParseDict(mapping, message, ignore_unknown_fields=True)
+
+
+class ListConverter(BaseConverter):
+    def __init__(self, map, type='str', sep=','):
+        super().__init__(map)
+        self.type = eval(type)
+        self.sep = sep
+
+    def to_python(self, value):
+        return [self.type(v) for v in value.split(self.sep)]
+
+    def to_url(self, value):
+        return self.sep.join([str(v) for v in value])

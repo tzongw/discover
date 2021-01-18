@@ -11,8 +11,11 @@ import logging
 from base import snowflake
 from .shared import app_id
 from werkzeug.exceptions import UnprocessableEntity
+from base.utils import ListConverter
 
 app = Flask(__name__)
+app.url_map.converters['list'] = ListConverter
+
 user_id = snowflake.IdGenerator(options.datacenter, app_id)
 
 
@@ -26,9 +29,9 @@ def serve():
     return g
 
 
-@app.route('/')
-def hello():
-    return 'hello'
+@app.route('/<list:names>')
+def hello(names):
+    return f'hello {names}'
 
 
 @app.errorhandler(UnprocessableEntity)
