@@ -115,6 +115,10 @@ def remove_from_group(client: Client, group):
         groups.pop(group)
 
 
+def normalize_header(name: str):
+    return name[len('HTTP_X_'):].replace('_', '-')
+
+
 @sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
@@ -122,7 +126,7 @@ def client_serve(ws: WebSocket):
     clients[conn_id] = client
     logging.info(f'new client {client}')
     try:
-        params = {}
+        params = {normalize_header(k): v for k, v in ws.environ.items() if k.startswith('HTTP_X_')}
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
