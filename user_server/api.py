@@ -32,7 +32,7 @@ def hello():
 
 
 @app.errorhandler(UnprocessableEntity)
-def error_handler(e: UnprocessableEntity):
+def args_error(e: UnprocessableEntity):
     return e.data['messages']
 
 
