@@ -12,7 +12,7 @@ Base = declarative_base()
 
 
 @dataclass
-class User(Base):
+class Account(Base):
     id: int
 
     __tablename__ = "accounts"

@@ -2,7 +2,7 @@
 from flask import Flask, jsonify
 from webargs import fields
 from webargs.flaskparser import use_args
-from .dao import User, engine
+from .dao import Account, engine
 from sqlalchemy.orm import Session
 from gevent import pywsgi
 from .config import options
@@ -40,20 +40,20 @@ def error_handler(e: UnprocessableEntity):
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
 def register(args):
     session = Session(engine)
-    user = User(id=user_id.gen(), username=args['username'], password=args['password'])
-    session.add(user)
+    account = Account(id=user_id.gen(), username=args['username'], password=args['password'])
+    session.add(account)
     session.commit()
-    return jsonify(user)
+    return jsonify(account)
 
 
 @app.route('/login', methods=['POST'])
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
 def login(args):
     session = Session(engine)
-    user = session.query(User).filter(User.username == args['username']).first()  # type: User
-    if user is None:
-        return 'user not exist'
-    elif user.password != args['password']:
+    account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
+    if account is None:
+        return 'account not exist'
+    elif account.password != args['password']:
         return 'password error'
     else:
-        return jsonify(user)
+        return jsonify(account)
