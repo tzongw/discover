@@ -11,9 +11,11 @@ from base import snowflake
 from .shared import app_id
 from werkzeug.exceptions import UnprocessableEntity
 from base.utils import ListConverter
+from flasgger import Swagger
 
 app = Flask(__name__)
 app.url_map.converters['list'] = ListConverter
+swagger = Swagger(app)
 
 user_id = snowflake.IdGenerator(options.datacenter, app_id)
 
@@ -30,6 +32,17 @@ def serve():
 
 @app.route('/<list:names>')
 def hello(names):
+    """say hello
+    ---
+    parameters:
+      - name: names
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: hello
+    """
     return f'hello {names}'
 
 
