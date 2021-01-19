@@ -5,9 +5,10 @@ from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
 from sqlalchemy import String
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 engine = create_engine('sqlite:///db.sqlite3', echo='debug')
-
+Session = sessionmaker(engine)
 Base = declarative_base()
 
 

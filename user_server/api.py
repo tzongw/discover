@@ -2,8 +2,7 @@
 from flask import Flask, jsonify
 from webargs import fields
 from webargs.flaskparser import use_args
-from .dao import Account, engine
-from sqlalchemy.orm import Session
+from .dao import Account, Session
 from gevent import pywsgi
 from .config import options
 import gevent
@@ -42,7 +41,7 @@ def args_error(e: UnprocessableEntity):
 @app.route('/register', methods=['POST'])
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
 def register(args):
-    session = Session(engine)
+    session = Session()
     account = Account(id=user_id.gen(), username=args['username'], password=args['password'])
     session.add(account)
     session.commit()
@@ -52,7 +51,7 @@ def register(args):
 @app.route('/login', methods=['POST'])
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
 def login(args):
-    session = Session(engine)
+    session = Session()
     account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
     if account is None:
         return 'account not exist'
