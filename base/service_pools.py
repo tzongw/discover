@@ -45,7 +45,6 @@ class ServicePools:
             try:
                 yield conn
             except Exception as e:
-                logging.exception(f'')
                 if not ThriftPool.acceptable(e):
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
                 raise

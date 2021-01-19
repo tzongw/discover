@@ -64,10 +64,10 @@ class Pool:
         try:
             yield conn
         except Exception as e:
-            logging.exception(f'')
             if self._acceptable(e):
                 return_conn()
             else:
+                logging.exception(f'')
                 close_conn()
             raise
         else:

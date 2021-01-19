@@ -6,6 +6,7 @@ from base.service_pools import ServicePools
 from base.thrift_pool import ThriftPool
 from base.utils import LogSuppress
 from service import gate, user, timer
+import logging
 
 
 class Selector:
@@ -22,6 +23,7 @@ class Selector:
             if ThriftPool.acceptable(e):
                 raise
         # will retry another node
+        logging.warning(f'retry {item} {args} {kwargs}')
         return Selector._one_shot(client_factory, item, *args, **kwargs)
 
     @staticmethod
