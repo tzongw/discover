@@ -1,9 +1,7 @@
 import contextlib
 from random import choice
 from typing import Dict, ContextManager
-
 from thrift.protocol.TProtocol import TProtocolBase
-
 from .registry import Registry
 from .thrift_pool import ThriftPool
 import logging

@@ -7,6 +7,7 @@ from redis import Redis
 from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
+from random import choice
 
 
 class LogSuppress(contextlib.suppress):
@@ -78,3 +79,11 @@ class ListConverter(BaseConverter):
 
     def to_url(self, value):
         return self.sep.join([str(v) for v in value])
+
+
+class Proxy:
+    def __init__(self, *targets):
+        self._targets = targets
+
+    def __getattr__(self, name):
+        return getattr(choice(self._targets), name)

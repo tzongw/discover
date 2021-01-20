@@ -11,27 +11,27 @@ import logging
 
 class Selector:
     @staticmethod
-    def _one_shot(client_factory, item, *args, **kwargs):
+    def _one_shot(client_factory, name, *args, **kwargs):
         with client_factory() as client:
-            return getattr(client, item)(*args, **kwargs)
+            return getattr(client, name)(*args, **kwargs)
 
     @staticmethod
-    def _retry(client_factory, item, *args, **kwargs):
+    def _retry(client_factory, name, *args, **kwargs):
         try:
-            return Selector._one_shot(client_factory, item, *args, **kwargs)
+            return Selector._one_shot(client_factory, name, *args, **kwargs)
         except Exception as e:
             if ThriftPool.acceptable(e):
                 raise
         # will retry another node
-        logging.warning(f'retry {item} {args} {kwargs}')
-        return Selector._one_shot(client_factory, item, *args, **kwargs)
+        logging.warning(f'retry {name} {args} {kwargs}')
+        return Selector._one_shot(client_factory, name, *args, **kwargs)
 
     @staticmethod
-    def _traverse(address_client_factory, addresses, item, *args, **kwargs):
+    def _traverse(address_client_factory, addresses, name, *args, **kwargs):
         for address in addresses:
             with LogSuppress(Exception):
                 with address_client_factory(address) as client:
-                    getattr(client, item)(*args, **kwargs)
+                    getattr(client, name)(*args, **kwargs)
 
 
 class UserService(ServicePools, Selector):
@@ -40,10 +40,10 @@ class UserService(ServicePools, Selector):
         with self.connection() as conn:
             yield user.Client(conn)
 
-    def __getattr__(self, item):
-        if hasattr(user.Iface, item):
-            return partial(self._one_shot, self.client, item)
-        return super().__getattr__(item)
+    def __getattr__(self, name):
+        if hasattr(user.Iface, name):
+            return partial(self._one_shot, self.client, name)
+        return super().__getattr__(name)
 
 
 class GateService(ServicePools, Selector):
@@ -52,11 +52,11 @@ class GateService(ServicePools, Selector):
         with self.address_connection(address) as conn:
             yield gate.Client(conn)
 
-    def __getattr__(self, item):
-        if hasattr(gate.Iface, item):
+    def __getattr__(self, name):
+        if hasattr(gate.Iface, name):
             addresses = self.addresses()
-            return partial(self._traverse, self.client, addresses, item)
-        return super().__getattr__(item)
+            return partial(self._traverse, self.client, addresses, name)
+        return super().__getattr__(name)
 
 
 class TimerService(ServicePools, Selector):
@@ -65,7 +65,7 @@ class TimerService(ServicePools, Selector):
         with self.connection() as conn:
             yield timer.Client(conn)
 
-    def __getattr__(self, item):
-        if hasattr(timer.Iface, item):
-            return partial(self._one_shot, self.client, item)
-        return super().__getattr__(item)
+    def __getattr__(self, name):
+        if hasattr(timer.Iface, name):
+            return partial(self._one_shot, self.client, name)
+        return super().__getattr__(name)
