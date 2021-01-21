@@ -59,7 +59,7 @@ class IdGenerator:
 
     def gen(self) -> int:
         timestamp = time.time_ns() // 1_000_000
-        while timestamp < self._timestamp:
+        if timestamp < self._timestamp:
             raise ValueError(f'clock go backwards {timestamp} < {self._timestamp}')
         if timestamp == self._timestamp:
             self._sequence_id += 1

@@ -21,7 +21,7 @@ class UniqueId:
     def _key(self, biz: str, id: int):
         return f'{self._PREFIX}:{biz}:{id}'
 
-    def generate(self, biz: str, r: range):
+    def gen(self, biz: str, r: range):
         partition = randrange(r.start, r.stop)
         range_chain = chain(range(partition, r.stop), range(r.start, partition))
         for id in range_chain:
