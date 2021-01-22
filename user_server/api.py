@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, jsonify
+import flask
 from webargs import fields
 from webargs.flaskparser import use_args
 from .dao import Account, Session
@@ -14,6 +15,7 @@ from base.utils import ListConverter
 from flasgger import Swagger
 
 app = Flask(__name__)
+app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 swagger = Swagger(app)
 
@@ -45,7 +47,7 @@ def hello(names):
       200:
         description: hello
     """
-    return f'hello {names}'
+    return f'{flask.session["uid"]} say hello {names}'
 
 
 @app.errorhandler(UnprocessableEntity)
@@ -66,6 +68,23 @@ def register(args):
 @app.route('/login', methods=['POST'])
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(args):
+    """login
+    ---
+    tags:
+      - account
+    parameters:
+      - name: username
+        in: formData
+        type: string
+        required: true
+      - name: password
+        in: formData
+        type: string
+        required: true
+    responses:
+      200:
+        description: session
+    """
     session = Session()
     account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
     if account is None:
@@ -73,4 +92,6 @@ def login(args):
     elif account.password != args['password']:
         return 'password error'
     else:
+        flask.session['uid'] = account.id
+        flask.session.permanent = True
         return jsonify(account)
