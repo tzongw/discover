@@ -30,10 +30,12 @@ def serve():
     return g
 
 
-@app.route('/<list:names>')
+@app.route('/hello/<list:names>')
 def hello(names):
     """say hello
     ---
+    tags:
+      - hello
     parameters:
       - name: names
         in: path
@@ -52,7 +54,7 @@ def args_error(e: UnprocessableEntity):
 
 
 @app.route('/register', methods=['POST'])
-@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
+@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def register(args):
     session = Session()
     account = Account(id=user_id.gen(), username=args['username'], password=args['password'])
@@ -62,7 +64,7 @@ def register(args):
 
 
 @app.route('/login', methods=['POST'])
-@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='form')
+@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(args):
     session = Session()
     account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
