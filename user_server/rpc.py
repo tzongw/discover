@@ -12,7 +12,7 @@ from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from .shared import timer_dispatcher
+from .shared import timer_dispatcher, app
 from .config import options
 from common import mq_pb2
 from base.utils import Parser
@@ -35,6 +35,11 @@ class Handler:
         logging.info(f'{address} {conn_id} {params}')
         try:
             params = {k.lower(): v for k, v in params.items()}
+            cookie = params.pop('cookie', None)
+            if cookie:
+                request = app.request_class({'HTTP_COOKIE': cookie})
+                session = app.open_session(request)
+                params.update(session)
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
             if token != "pass":

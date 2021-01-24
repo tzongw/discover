@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, jsonify
 import flask
+from flask import jsonify
 from webargs import fields
 from webargs.flaskparser import use_args
 from .dao import Account, Session
+from .shared import app
 from gevent import pywsgi
 from .config import options
 import gevent
@@ -14,7 +15,6 @@ from werkzeug.exceptions import UnprocessableEntity
 from base.utils import ListConverter
 from flasgger import Swagger
 
-app = Flask(__name__)
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 swagger = Swagger(app)

@@ -127,6 +127,9 @@ def client_serve(ws: WebSocket):
     logging.info(f'new client {client}')
     try:
         params = {normalize_header(k): v for k, v in ws.environ.items() if k.startswith('HTTP_X_')}
+        cookie = ws.environ.get('HTTP_COOKIE')
+        if cookie:
+            params['cookie'] = cookie
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
