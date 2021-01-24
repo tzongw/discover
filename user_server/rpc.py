@@ -7,14 +7,15 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from . import shared, const
+from .hash_pb2 import Online, Session
+from common.mq_pb2 import Login, Logout
 from redis.client import Pipeline
 from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from .shared import timer_dispatcher, app, online_key
+from .shared import timer_dispatcher, app, online_key, session_key
 from .config import options
-from common import mq_pb2
 from base.utils import Parser
 
 
@@ -37,17 +38,18 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
-            if token != "pass":
-                raise ValueError("token")
+            session = self._parser.hget(session_key(uid), Session())
+            if token != session.token:
+                raise ValueError("token error")
             key = online_key(uid)
 
             def set_login_status(pipe: Pipeline):
                 parser = Parser(pipe)
-                online = parser.hget(key, mq_pb2.Online())
+                online = parser.hget(key, Online())
                 pipe.multi()
-                parser.hset(key, mq_pb2.Online(address=address, conn_id=conn_id))
+                parser.hset(key, Online(address=address, conn_id=conn_id))
                 pipe.expire(key, self._TTL)
-                Publisher(pipe).publish(mq_pb2.Login(uid=uid))
+                Publisher(pipe).publish(Login(uid=uid))
                 return online
 
             old = self._redis.transaction(set_login_status, key, value_from_callable=True)
@@ -58,7 +60,7 @@ class Handler:
                     client.remove_conn(old.conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
-                logging.warning(f'login fail {address} {conn_id} {params}')
+                logging.info(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
             with shared.gate_service.client(address) as client:
@@ -74,7 +76,7 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
             key = online_key(uid)
-            online = self._parser.hget(key, mq_pb2.Online())
+            online = self._parser.hget(key, Online())
             if conn_id != online.conn_id:
                 raise ValueError(f'{online} {conn_id}')
             self._redis.expire(key, self._TTL)
@@ -92,12 +94,12 @@ class Handler:
         key = online_key(uid)
 
         def unset_login_status(pipe: Pipeline):
-            online = Parser(pipe).hget(key, mq_pb2.Online())
+            online = Parser(pipe).hget(key, Online())
             if conn_id == online.conn_id:
                 logging.info(f'clear {uid} {online}')
                 pipe.multi()
                 pipe.delete(key)
-                Publisher(pipe).publish(mq_pb2.Logout(uid=uid))
+                Publisher(pipe).publish(Logout(uid=uid))
 
         self._redis.transaction(unset_login_status, key)
 

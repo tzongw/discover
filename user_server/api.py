@@ -6,7 +6,7 @@ from webargs import fields
 from webargs.flaskparser import use_args
 from .dao import Account, Session
 from .shared import app, parser
-from user_server import hash_pb2
+from . import hash_pb2
 from gevent import pywsgi
 from .config import options
 from .const import CONTEXT_UID, CONTEXT_TOKEN

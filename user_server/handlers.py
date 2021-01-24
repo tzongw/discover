@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-from common import mq_pb2
+from common.mq_pb2 import Login, Logout, Alarm
 from .shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer
 
 
@@ -14,18 +14,18 @@ def on_notice(data):
     logging.info(f'got timer {data}')
 
 
-@receiver.group_handler(mq_pb2.Login)
-def on_login(id, data: mq_pb2.Login):
+@receiver.group_handler(Login)
+def on_login(id, data: Login):
     logging.info(f'{id} {data}')
 
 
-@receiver.fanout_handler(mq_pb2.Logout)
-def on_logout(id, data: mq_pb2.Logout):
+@receiver.fanout_handler(Logout)
+def on_logout(id, data: Logout):
     logging.info(f'{id} {data}')
 
 
-@receiver.group_handler(mq_pb2.Alarm)
-def on_alarm(id, data: mq_pb2.Alarm):
+@receiver.group_handler(Alarm)
+def on_alarm(id, data: Alarm):
     logging.info(f'{id} {data}')
 
 
@@ -35,6 +35,6 @@ def init():
         timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
-        timer.new_stream_timer(mq_pb2.Alarm(tip='one shot'), interval=10_000)
-        tid = timer.new_stream_timer(mq_pb2.Alarm(tip='loop'), interval=20_000, loop=True)
+        timer.new_stream_timer(Alarm(tip='one shot'), interval=10_000)
+        tid = timer.new_stream_timer(Alarm(tip='loop'), interval=20_000, loop=True)
         at_exit(lambda: timer.kill(tid))

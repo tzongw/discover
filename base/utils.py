@@ -73,8 +73,6 @@ class Parser:
                 pipe.execute()
 
     def hget(self, name: str, message: Message):
-        if isinstance(self._redis, Pipeline):
-            raise ValueError('pipeline not work')
         mapping = self._redis.hgetall(name)
         return ParseDict(mapping, message, ignore_unknown_fields=True)
 
