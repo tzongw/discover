@@ -10,7 +10,7 @@ import sys
 from base.executor import Executor
 from base.schedule import Schedule
 from base.unique import UniqueId
-from base.utils import Dispatcher, LogSuppress
+from base.utils import Dispatcher, LogSuppress, Parser
 from base.mq import Publisher
 from base.timer import Timer
 from tornado.options import options
@@ -18,7 +18,8 @@ from tornado.options import options
 redis = Redis(options.redis.host, options.redis.port, decode_responses=True)
 registry = Registry(redis)
 publisher = Publisher(redis)
-timer = Timer(redis)
+parser = Parser(redis)
+timer = Timer(redis, cache=True)
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]

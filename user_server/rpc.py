@@ -12,24 +12,19 @@ from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from .shared import timer_dispatcher, app
+from .shared import timer_dispatcher, app, online_key
 from .config import options
 from common import mq_pb2
 from base.utils import Parser
 
 
 class Handler:
-    _PREFIX = 'online'
     _TTL = const.MISS_TIMES * const.PING_INTERVAL
 
     def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
         self._parser = Parser(redis)
         self._timer_dispatcher = dispatcher
-
-    @classmethod
-    def _key(cls, uid):
-        return f'{cls._PREFIX}:{uid}'
 
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
@@ -44,7 +39,7 @@ class Handler:
             token = params[const.CONTEXT_TOKEN]
             if token != "pass":
                 raise ValueError("token")
-            key = self._key(uid)
+            key = online_key(uid)
 
             def set_login_status(pipe: Pipeline):
                 parser = Parser(pipe)
@@ -78,7 +73,7 @@ class Handler:
         try:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
-            key = self._key(uid)
+            key = online_key(uid)
             online = self._parser.hget(key, mq_pb2.Online())
             if conn_id != online.conn_id:
                 raise ValueError(f'{online} {conn_id}')
@@ -94,7 +89,7 @@ class Handler:
         if not context:
             return
         uid = int(context[const.CONTEXT_UID])
-        key = self._key(uid)
+        key = online_key(uid)
 
         def unset_login_status(pipe: Pipeline):
             online = Parser(pipe).hget(key, mq_pb2.Online())

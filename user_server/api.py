@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
+import uuid
 import flask
 from flask import jsonify
 from webargs import fields
 from webargs.flaskparser import use_args
 from .dao import Account, Session
-from .shared import app
+from .shared import app, parser
+from user_server import hash_pb2
 from gevent import pywsgi
 from .config import options
+from .const import CONTEXT_UID, CONTEXT_TOKEN
 import gevent
 import logging
 from base import snowflake
-from .shared import app_id
+from .shared import app_id, session_key
 from werkzeug.exceptions import UnprocessableEntity
 from base.utils import ListConverter
 from flasgger import Swagger
@@ -47,7 +50,7 @@ def hello(names):
       200:
         description: hello
     """
-    return f'{flask.session["uid"]} say hello {names}'
+    return f'{flask.session[CONTEXT_UID]} say hello {names}'
 
 
 @app.errorhandler(UnprocessableEntity)
@@ -58,6 +61,23 @@ def args_error(e: UnprocessableEntity):
 @app.route('/register', methods=['POST'])
 @use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def register(args):
+    """register
+    ---
+    tags:
+      - account
+    parameters:
+      - name: username
+        in: formData
+        type: string
+        required: true
+      - name: password
+        in: formData
+        type: string
+        required: true
+    responses:
+      200:
+        description: account
+    """
     session = Session()
     account = Account(id=user_id.gen(), username=args['username'], password=args['password'])
     session.add(account)
@@ -87,11 +107,13 @@ def login(args):
     """
     session = Session()
     account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
-    if account is None:
-        return 'account not exist'
-    elif account.password != args['password']:
-        return 'password error'
+    if account is None or account.password != args['password']:
+        return 'account not exist or password error'
     else:
-        flask.session['uid'] = account.id
+        flask.session[CONTEXT_UID] = account.id
+        token = str(uuid.uuid4())
+        flask.session[CONTEXT_TOKEN] = token
         flask.session.permanent = True
+        key = session_key(account.id)
+        parser.hset(key, hash_pb2.Session(token=token), expire=app.permanent_session_lifetime)
         return jsonify(account)

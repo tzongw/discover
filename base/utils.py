@@ -4,6 +4,7 @@ import socket
 from functools import lru_cache
 import sys
 from redis import Redis
+from redis.client import Pipeline
 from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
@@ -59,11 +60,21 @@ class Parser:
     def __init__(self, redis: Redis):
         self._redis = redis
 
-    def hset(self, name: str, message: Message):  # embedded message not work
+    def hset(self, name: str, message: Message, expire=None):  # embedded message not work
         mapping = MessageToDict(message)
-        self._redis.hset(name, mapping=mapping)
+        if expire is None:
+            self._redis.hset(name, mapping=mapping)
+        else:
+            if isinstance(self._redis, Pipeline):
+                raise ValueError('already in pipeline')
+            with self._redis.pipeline(transaction=True) as pipe:
+                pipe.hset(name, mapping=mapping)
+                pipe.expire(name, expire)
+                pipe.execute()
 
     def hget(self, name: str, message: Message):
+        if isinstance(self._redis, Pipeline):
+            raise ValueError('pipeline not work')
         mapping = self._redis.hgetall(name)
         return ParseDict(mapping, message, ignore_unknown_fields=True)
 

@@ -11,3 +11,11 @@ app = Flask(__name__)
 
 receiver = Receiver(redis, app_name, str(app_id))
 at_exit(receiver.stop)
+
+
+def online_key(uid: int):
+    return f'online:{uid}'
+
+
+def session_key(uid: int):
+    return f'session:{uid}'

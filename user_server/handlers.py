@@ -35,7 +35,6 @@ def init():
         timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
-        timer.cache = True
         timer.new_stream_timer(mq_pb2.Alarm(tip='one shot'), interval=10_000)
         tid = timer.new_stream_timer(mq_pb2.Alarm(tip='loop'), interval=20_000, loop=True)
         at_exit(lambda: timer.kill(tid))
