@@ -1,0 +1,9 @@
+message Online {
+    optional string address = 1;
+    optional string conn_id = 2;
+}
+
+message Session {
+    optional string token = 1;
+}
+

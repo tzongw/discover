@@ -13,8 +13,3 @@ message Alarm {
     required string tip = 2;
 }
 
-message Online {
-    optional string address = 1;
-    optional string conn_id = 2;
-}
-
