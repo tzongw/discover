@@ -9,6 +9,7 @@ from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
+from copy import copy
 
 
 class LogSuppress(contextlib.suppress):
@@ -75,6 +76,18 @@ class Parser:
     def hget(self, name: str, message: Message):
         mapping = self._redis.hgetall(name)
         return ParseDict(mapping, message, ignore_unknown_fields=True)
+
+    def hget_batch(self, *names: str, message: Message):
+        if isinstance(self._redis, Pipeline):
+            raise ValueError('already in pipeline')
+        with self._redis.pipeline(transaction=False) as pipe:
+            for name in names:
+                pipe.hgetall(name)
+            results = pipe.execute()
+        for i, mapping in enumerate(results):
+            m = copy(message)
+            results[i] = ParseDict(mapping, m, ignore_unknown_fields=True)
+        return results
 
 
 class ListConverter(BaseConverter):
