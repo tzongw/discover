@@ -77,7 +77,7 @@ class Parser:
         mapping = self._redis.hgetall(name)
         return ParseDict(mapping, message, ignore_unknown_fields=True)
 
-    def hget_batch(self, *names: str, message: Message):
+    def hget_batch(self, names, message: Message):
         if isinstance(self._redis, Pipeline):
             raise ValueError('already in pipeline')
         with self._redis.pipeline(transaction=False) as pipe:

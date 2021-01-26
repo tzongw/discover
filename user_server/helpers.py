@@ -3,7 +3,8 @@ from .shared import online_key, parser, gate_service
 from .hash_pb2 import Online
 
 
-def send(message, *uids):
+def send(uid_or_uids, message):
+    uids = [uid_or_uids] if isinstance(uid_or_uids, int) else uid_or_uids
     keys = [online_key(uid) for uid in uids]
     for online in parser.hget_batch(keys, Online()):
         if not online.conn_id:  # not online
