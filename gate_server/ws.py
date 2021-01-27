@@ -54,7 +54,7 @@ class Client:
         self.messages.put_nowait(message)
 
     def serve(self):
-        self.ws.handler.socket.settimeout(const.MISS_TIMES * const.PING_INTERVAL)
+        self.ws.handler.socket.settimeout(const.CLIENT_TTL)
         gevent.spawn(self._writer)
         pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL).start()
         try:

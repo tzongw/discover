@@ -20,8 +20,6 @@ from base.utils import Parser
 
 
 class Handler:
-    _TTL = const.MISS_TIMES * const.PING_INTERVAL
-
     def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
         self._parser = Parser(redis)
@@ -48,7 +46,7 @@ class Handler:
                 online = parser.hget(key, Online())
                 pipe.multi()
                 parser.hset(key, Online(address=address, conn_id=conn_id))
-                pipe.expire(key, self._TTL)
+                pipe.expire(key, const.CLIENT_TTL)
                 Publisher(pipe).publish(Login(uid=uid))
                 return online
 
@@ -79,7 +77,7 @@ class Handler:
             online = self._parser.hget(key, Online())
             if conn_id != online.conn_id:
                 raise ValueError(f'{online} {conn_id}')
-            self._redis.expire(key, self._TTL)
+            self._redis.expire(key, const.CLIENT_TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
