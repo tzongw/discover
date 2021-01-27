@@ -2,6 +2,7 @@
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from .shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer
+from datetime import datetime
 
 
 @timer_dispatcher.handler('welcome')
@@ -36,5 +37,7 @@ def init():
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
         timer.new_stream_timer(Alarm(tip='one shot'), delay=10_000)
-        tid = timer.new_stream_timer(Alarm(tip='loop'), delay=0, interval=20_000)
+        now = datetime.now()
+        delay = (10 - now.second % 10) * 1000 - now.microsecond // 1000
+        tid = timer.new_stream_timer(Alarm(tip='loop'), delay=delay, interval=10_000)
         at_exit(lambda: timer.kill(tid))

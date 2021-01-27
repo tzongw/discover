@@ -18,7 +18,9 @@ class Timer:
     def _key(cls, key):
         return f'{cls._PREFIX}:{key}'
 
-    def new(self, key: str, data: str, sha: str, delay: int, interval=0):
+    def new(self, key: str, data: str, sha: str, delay=None, interval=0):
+        if delay is None and interval:
+            delay = interval
         params = [key, data, sha, delay]
         if interval:
             params.append(interval)
@@ -46,7 +48,7 @@ class Timer:
             res, *_ = pipe.execute()
         return int(res)
 
-    def new_stream_timer(self, message: Message, delay: int, interval=0, key=None, maxlen=4096):
+    def new_stream_timer(self, message: Message, delay=None, interval=0, key=None, maxlen=4096):
         # noinspection PyUnresolvedReferences
         stream = message.stream
         if key is None:
