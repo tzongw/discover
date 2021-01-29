@@ -3,7 +3,7 @@ import uuid
 import flask
 from flask import jsonify
 from webargs import fields
-from webargs.flaskparser import use_args
+from webargs.flaskparser import use_kwargs
 from .dao import Account, Session
 from .shared import app, parser
 from . import hash_pb2
@@ -59,8 +59,8 @@ def args_error(e: UnprocessableEntity):
 
 
 @app.route('/register', methods=['POST'])
-@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
-def register(args):
+@use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
+def register(username: str, password: str):
     """register
     ---
     tags:
@@ -79,15 +79,15 @@ def register(args):
         description: account
     """
     session = Session()
-    account = Account(id=user_id.gen(), username=args['username'], password=args['password'])
+    account = Account(id=user_id.gen(), username=username, password=password)
     session.add(account)
     session.commit()
     return jsonify(account)
 
 
 @app.route('/login', methods=['POST'])
-@use_args({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
-def login(args):
+@use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
+def login(username: str, password: str):
     """login
     ---
     tags:
@@ -106,8 +106,8 @@ def login(args):
         description: session
     """
     session = Session()
-    account = session.query(Account).filter(Account.username == args['username']).first()  # type: Account
-    if account is None or account.password != args['password']:
+    account = session.query(Account).filter(Account.username == username).first()  # type: Account
+    if account is None or account.password != password:
         return 'account not exist or password error'
     else:
         flask.session[CONTEXT_UID] = account.id
