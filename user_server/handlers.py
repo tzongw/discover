@@ -2,7 +2,7 @@
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from .shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 
 @timer_dispatcher.handler('welcome')
