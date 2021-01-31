@@ -4,6 +4,8 @@ from redis.client import bool_ok
 from google.protobuf.message import Message
 from google.protobuf.json_format import MessageToJson
 import uuid
+from datetime import timedelta
+from typing import Union
 
 
 class Timer:
@@ -18,7 +20,9 @@ class Timer:
     def _key(cls, key):
         return f'{cls._PREFIX}:{key}'
 
-    def new(self, key: str, data: str, sha: str, interval: int, loop=False):
+    def new(self, key: str, data: str, sha: str, interval: Union[int, timedelta], loop=False):
+        if isinstance(interval, timedelta):
+            interval = int(interval.total_seconds() * 1000)
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
@@ -45,7 +49,7 @@ class Timer:
             res, *_ = pipe.execute()
         return int(res)
 
-    def new_stream_timer(self, message: Message, interval: int, loop=False, key=None, maxlen=4096):
+    def new_stream_timer(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
         # noinspection PyUnresolvedReferences
         stream = message.stream
         if key is None:
