@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import uuid
 import flask
-from flask import jsonify
+from flask import jsonify, g, request
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from .dao import Account, Session
@@ -21,8 +21,14 @@ from flasgger import Swagger
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 swagger = Swagger(app)
+no_auth_methods = set()
 
 user_id = snowflake.IdGenerator(options.datacenter, app_id)
+
+
+def no_auth(f):
+    no_auth_methods.add(f)
+    return f
 
 
 def serve():
@@ -33,6 +39,13 @@ def serve():
         options.http_port = server.address[1]
     logging.info(f'Starting http server {options.http_address} ...')
     return g
+
+
+@app.before_request
+def before_request():
+    rule = request.url_rule
+    if rule and app.view_functions[rule.endpoint] not in no_auth_methods:
+        g.uid = flask.session[CONTEXT_UID]
 
 
 @app.route('/hello/<list:names>')
@@ -50,7 +63,7 @@ def hello(names):
       200:
         description: hello
     """
-    return f'{flask.session[CONTEXT_UID]} say hello {names}'
+    return f'{g.uid} say hello {names}'
 
 
 @app.errorhandler(UnprocessableEntity)
@@ -59,6 +72,7 @@ def args_error(e: UnprocessableEntity):
 
 
 @app.route('/register', methods=['POST'])
+@no_auth
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def register(username: str, password: str):
     """register
@@ -86,6 +100,7 @@ def register(username: str, password: str):
 
 
 @app.route('/login', methods=['POST'])
+@no_auth
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(username: str, password: str):
     """login
