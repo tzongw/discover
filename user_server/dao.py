@@ -21,7 +21,7 @@ class Account(Base):
     __tablename__ = "accounts"
     id = Column(BigInteger, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
-    password = Column(String(40), nullable=False)
+    hashed = Column(String(40), nullable=False)
 
 
 Base.metadata.create_all(engine)

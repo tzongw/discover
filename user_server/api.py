@@ -17,6 +17,7 @@ from .shared import app_id, session_key
 from werkzeug.exceptions import UnprocessableEntity
 from base.utils import ListConverter
 from flasgger import Swagger
+from hashlib import sha1
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
@@ -71,6 +72,11 @@ def args_error(e: UnprocessableEntity):
     return e.data['messages']
 
 
+def hash_password(uid: int, password: str) -> str:
+    # uid as salt
+    return sha1(f'{uid}{password}'.encode()).hexdigest()
+
+
 @app.route('/register', methods=['POST'])
 @no_auth
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
@@ -93,7 +99,9 @@ def register(username: str, password: str):
         description: account
     """
     session = Session()
-    account = Account(id=user_id.gen(), username=username, password=password)
+    uid = user_id.gen()
+    hashed = hash_password(uid, password)
+    account = Account(id=uid, username=username, hashed=hashed)
     session.add(account)
     session.commit()
     return jsonify(account)
@@ -122,7 +130,7 @@ def login(username: str, password: str):
     """
     session = Session()
     account = session.query(Account).filter(Account.username == username).first()  # type: Account
-    if account is None or account.password != password:
+    if account is None or account.hashed != hash_password(account.id, password):
         return 'account not exist or password error'
     else:
         flask.session[CONTEXT_UID] = account.id
