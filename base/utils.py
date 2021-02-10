@@ -73,11 +73,11 @@ class Parser:
                 pipe.expire(name, expire)
                 pipe.execute()
 
-    def hget(self, name: str, message: Message):
+    def hget(self, name: str, message: Message, return_none=False):
         mapping = self._redis.hgetall(name)
-        return ParseDict(mapping, message, ignore_unknown_fields=True)
+        return ParseDict(mapping, message, ignore_unknown_fields=True) if mapping or not return_none else None
 
-    def hget_batch(self, names, message: Message):
+    def hget_batch(self, names, message: Message, return_none=False):
         if isinstance(self._redis, Pipeline):
             raise ValueError('already in pipeline')
         with self._redis.pipeline(transaction=False) as pipe:
@@ -86,7 +86,7 @@ class Parser:
             results = pipe.execute()
         for i, mapping in enumerate(results):
             m = copy(message)
-            results[i] = ParseDict(mapping, m, ignore_unknown_fields=True)
+            results[i] = ParseDict(mapping, m, ignore_unknown_fields=True) if mapping or not return_none else None
         return results
 
 

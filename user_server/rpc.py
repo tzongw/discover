@@ -43,19 +43,19 @@ class Handler:
 
             def set_login_status(pipe: Pipeline):
                 parser = Parser(pipe)
-                online = parser.hget(key, Online())
+                online = parser.hget(key, Online(), return_none=True)
                 pipe.multi()
                 parser.hset(key, Online(address=address, conn_id=conn_id))
                 pipe.expire(key, const.CLIENT_TTL)
                 Publisher(pipe).publish(Login(uid=uid))
                 return online
 
-            old = self._redis.transaction(set_login_status, key, value_from_callable=True)
-            if old.address and old.conn_id:
-                logging.warning(f'kick conn {uid} {old}')
-                with shared.gate_service.client(old.address) as client:
-                    client.send_text(old.conn_id, f'login other device')
-                    client.remove_conn(old.conn_id)
+            old_online = self._redis.transaction(set_login_status, key, value_from_callable=True)
+            if old_online:
+                logging.warning(f'kick conn {uid} {old_online}')
+                with shared.gate_service.client(old_online.address) as client:
+                    client.send_text(old_online.conn_id, f'login other device')
+                    client.remove_conn(old_online.conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
                 logging.info(f'login fail {address} {conn_id} {params}')
