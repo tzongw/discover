@@ -60,6 +60,13 @@ class Dispatcher:
 class Parser:
     def __init__(self, redis: Redis):
         self._redis = redis
+        if redis.response_callbacks['HGETALL'] is Redis.RESPONSE_CALLBACKS['HGETALL']:
+            redis.response_callbacks['HGETALL'] = self.hgetall_callback
+
+    @staticmethod
+    def hgetall_callback(response, converter=None):
+        response = Redis.RESPONSE_CALLBACKS['HGETALL'](response)
+        return converter(response) if converter else response
 
     def hset(self, name: str, message: Message, expire=None):  # embedded message not work
         mapping = MessageToDict(message)
@@ -67,27 +74,20 @@ class Parser:
             self._redis.hset(name, mapping=mapping)
         else:
             if isinstance(self._redis, Pipeline):
-                raise ValueError('already in pipeline')
-            with self._redis.pipeline(transaction=True) as pipe:
-                pipe.hset(name, mapping=mapping)
-                pipe.expire(name, expire)
-                pipe.execute()
+                self._redis.hset(name, mapping=mapping)
+                self._redis.expire(name, expire)
+            else:
+                with self._redis.pipeline(transaction=True) as pipe:
+                    pipe.hset(name, mapping=mapping)
+                    pipe.expire(name, expire)
+                    pipe.execute()
 
     def hget(self, name: str, message: Message, return_none=False):
-        mapping = self._redis.hgetall(name)
-        return ParseDict(mapping, message, ignore_unknown_fields=True) if mapping or not return_none else None
+        def converter(mapping):
+            return ParseDict(mapping, message, ignore_unknown_fields=True) \
+                if mapping or not return_none else None
 
-    def hget_batch(self, names, message: Message, return_none=False):
-        if isinstance(self._redis, Pipeline):
-            raise ValueError('already in pipeline')
-        with self._redis.pipeline(transaction=False) as pipe:
-            for name in names:
-                pipe.hgetall(name)
-            results = pipe.execute()
-        for i, mapping in enumerate(results):
-            m = copy(message)
-            results[i] = ParseDict(mapping, m, ignore_unknown_fields=True) if mapping or not return_none else None
-        return results
+        return self._redis.execute_command('HGETALL', name, converter=converter)
 
 
 class ListConverter(BaseConverter):
