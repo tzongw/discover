@@ -61,7 +61,7 @@ class Registry:
         return self._addresses.get(name) or set()
 
     def _refresh(self):
-        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*'))
+        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         addresses = defaultdict(set)
         for key in keys:
             with LogSuppress(Exception):
