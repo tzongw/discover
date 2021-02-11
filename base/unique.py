@@ -47,7 +47,7 @@ class UniqueId:
             self._keys.clear()
 
     def _refresh(self):
-        with self._redis.pipeline(transaction=False) as pipe:
+        with self._redis.pipeline() as pipe:
             for key in self._keys:
                 pipe.set(key, '', self._TTL)
             pipe.execute()

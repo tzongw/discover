@@ -65,7 +65,7 @@ class Receiver:
         def fanout_wakeup(id, data):
             logging.info(f'{id} {data}')
 
-        with self._redis.pipeline(transaction=True) as pipe:
+        with self._redis.pipeline() as pipe:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             unique_group = str(uuid.uuid4())
@@ -92,7 +92,7 @@ class Receiver:
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        with self._redis.pipeline(transaction=False) as pipe:
+        with self._redis.pipeline() as pipe:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
@@ -100,7 +100,7 @@ class Receiver:
         logging.info(f'delete {self._waker}')
 
     def _fanout_run(self):
-        with self._redis.pipeline(transaction=False) as pipe:
+        with self._redis.pipeline() as pipe:
             stream_names = self._fanout_dispatcher.handlers.keys()
             for stream in stream_names:
                 pipe.xinfo_stream(stream)

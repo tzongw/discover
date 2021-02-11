@@ -9,7 +9,6 @@ from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
-from copy import copy
 
 
 class LogSuppress(contextlib.suppress):
@@ -77,7 +76,7 @@ class Parser:
                 self._redis.hset(name, mapping=mapping)
                 self._redis.expire(name, expire)
             else:
-                with self._redis.pipeline(transaction=True) as pipe:
+                with self._redis.pipeline() as pipe:
                     pipe.hset(name, mapping=mapping)
                     pipe.expire(name, expire)
                     pipe.execute()

@@ -80,7 +80,7 @@ class Registry:
         while not self._stopped:
             try:
                 if self._services:
-                    with self._redis.pipeline(transaction=False) as pipe:
+                    with self._redis.pipeline() as pipe:
                         for name, address in self._services.items():
                             key = self._full_key(name, address)
                             pipe.set(key, '', self._TTL)

@@ -40,17 +40,12 @@ class Handler:
             if token != session.token:
                 raise ValueError("token error")
             key = online_key(uid)
-
-            def set_login_status(pipe: Pipeline):
+            with self._redis.pipeline() as pipe:
                 parser = Parser(pipe)
-                online = parser.hget(key, Online(), return_none=True)
-                pipe.multi()
-                parser.hset(key, Online(address=address, conn_id=conn_id))
-                pipe.expire(key, const.CLIENT_TTL)
+                parser.hget(key, Online(), return_none=True)
+                parser.hset(key, Online(address=address, conn_id=conn_id), expire=const.CLIENT_TTL)
                 Publisher(pipe).publish(Login(uid=uid))
-                return online
-
-            old_online = self._redis.transaction(set_login_status, key, value_from_callable=True)
+                old_online, *_ = pipe.execute()
             if old_online:
                 logging.warning(f'kick conn {uid} {old_online}')
                 with shared.gate_service.client(old_online.address) as client:

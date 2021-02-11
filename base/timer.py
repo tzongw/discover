@@ -26,7 +26,7 @@ class Timer:
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
-        with self._redis.pipeline(transaction=self.cache) as pipe:
+        with self._redis.pipeline() as pipe:
             pipe.execute_command('TIMER.NEW', *params)
             if self.cache:
                 pipe.hset(self._key(key), mapping={
@@ -42,7 +42,7 @@ class Timer:
         return bool_ok(res)
 
     def kill(self, *keys):
-        with self._redis.pipeline(transaction=self.cache) as pipe:
+        with self._redis.pipeline() as pipe:
             pipe.execute_command('TIMER.KILL', *keys)
             if self.cache:
                 pipe.delete(*[self._key(key) for key in keys])
