@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
-from .shared import online_key, parser, gate_service
+from .shared import online_key, redis, gate_service, parser
 from .hash_pb2 import Online
+from base.utils import Parser
 
 
 def send(uid_or_uids, message):
     uids = [uid_or_uids] if isinstance(uid_or_uids, int) else uid_or_uids
     keys = [online_key(uid) for uid in uids]
-    for online in parser.hget_batch(keys, Online(), return_none=True):
+    with redis.pipeline() as pipe:
+        parser = Parser(pipe)
+        for key in keys:
+            parser.hget(key, Online(), return_none=True)
+        onlines = pipe.execute()
+    for online in onlines:
         if not online:
             continue
         with gate_service.client(online.address) as client:
@@ -33,7 +39,11 @@ def broadcast(group, message, exclude=None):
     if exclude is None:
         exclude = []
     keys = [online_key(uid) for uid in exclude]
-    onlines = parser.hget_batch(keys, Online(), return_none=True)
+    with redis.pipeline() as pipe:
+        parser = Parser(pipe)
+        for key in keys:
+            parser.hget(key, Online(), return_none=True)
+        onlines = pipe.execute()
     exclude = {online.conn_id for online in onlines if online}
     if isinstance(message, str):
         gate_service.broadcast_text(group, exclude, message)
