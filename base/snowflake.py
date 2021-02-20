@@ -22,7 +22,9 @@ def make_snowflake(timestamp_ms: int, datacenter_id: int, worker_id: int, sequen
     """generate a twitter-snowflake id, based on 
     https://github.com/twitter/snowflake/blob/master/src/main/scala/com/twitter/service/snowflake/IdWorker.scala
     :param: timestamp_ms time since UNIX epoch in milliseconds"""
-
+    if timestamp_ms >= max_timestamp or datacenter_id >= max_datacenter_id or \
+            worker_id >= max_worker_id or sequence_id >= max_sequence_id:
+        raise ValueError(f'overflow {timestamp_ms} {datacenter_id} {worker_id} {sequence_id}')
     sid = (timestamp_ms - twepoch) & timestamp_mask
     sid = (sid << datacenter_id_bits) | (datacenter_id & datacenter_id_mask)
     sid = (sid << worker_id_bits) | (worker_id & worker_id_mask)
