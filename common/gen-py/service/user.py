@@ -307,11 +307,11 @@ class login_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.params = {}
-                    (_ktype31, _vtype32, _size30) = iprot.readMapBegin()
-                    for _i34 in range(_size30):
-                        _key35 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val36 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.params[_key35] = _val36
+                    (_ktype15, _vtype16, _size14) = iprot.readMapBegin()
+                    for _i18 in range(_size14):
+                        _key19 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val20 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.params[_key19] = _val20
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -336,9 +336,9 @@ class login_args(object):
         if self.params is not None:
             oprot.writeFieldBegin('params', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.params))
-            for kiter37, viter38 in self.params.items():
-                oprot.writeString(kiter37.encode('utf-8') if sys.version_info[0] == 2 else kiter37)
-                oprot.writeString(viter38.encode('utf-8') if sys.version_info[0] == 2 else viter38)
+            for kiter21, viter22 in self.params.items():
+                oprot.writeString(kiter21.encode('utf-8') if sys.version_info[0] == 2 else kiter21)
+                oprot.writeString(viter22.encode('utf-8') if sys.version_info[0] == 2 else viter22)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -403,11 +403,11 @@ class ping_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.context = {}
-                    (_ktype40, _vtype41, _size39) = iprot.readMapBegin()
-                    for _i43 in range(_size39):
-                        _key44 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val45 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context[_key44] = _val45
+                    (_ktype24, _vtype25, _size23) = iprot.readMapBegin()
+                    for _i27 in range(_size23):
+                        _key28 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val29 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context[_key28] = _val29
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -432,9 +432,9 @@ class ping_args(object):
         if self.context is not None:
             oprot.writeFieldBegin('context', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
-            for kiter46, viter47 in self.context.items():
-                oprot.writeString(kiter46.encode('utf-8') if sys.version_info[0] == 2 else kiter46)
-                oprot.writeString(viter47.encode('utf-8') if sys.version_info[0] == 2 else viter47)
+            for kiter30, viter31 in self.context.items():
+                oprot.writeString(kiter30.encode('utf-8') if sys.version_info[0] == 2 else kiter30)
+                oprot.writeString(viter31.encode('utf-8') if sys.version_info[0] == 2 else viter31)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -499,11 +499,11 @@ class disconnect_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.context = {}
-                    (_ktype49, _vtype50, _size48) = iprot.readMapBegin()
-                    for _i52 in range(_size48):
-                        _key53 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val54 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context[_key53] = _val54
+                    (_ktype33, _vtype34, _size32) = iprot.readMapBegin()
+                    for _i36 in range(_size32):
+                        _key37 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val38 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context[_key37] = _val38
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -528,9 +528,9 @@ class disconnect_args(object):
         if self.context is not None:
             oprot.writeFieldBegin('context', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
-            for kiter55, viter56 in self.context.items():
-                oprot.writeString(kiter55.encode('utf-8') if sys.version_info[0] == 2 else kiter55)
-                oprot.writeString(viter56.encode('utf-8') if sys.version_info[0] == 2 else viter56)
+            for kiter39, viter40 in self.context.items():
+                oprot.writeString(kiter39.encode('utf-8') if sys.version_info[0] == 2 else kiter39)
+                oprot.writeString(viter40.encode('utf-8') if sys.version_info[0] == 2 else viter40)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -597,11 +597,11 @@ class recv_binary_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.context = {}
-                    (_ktype58, _vtype59, _size57) = iprot.readMapBegin()
-                    for _i61 in range(_size57):
-                        _key62 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val63 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context[_key62] = _val63
+                    (_ktype42, _vtype43, _size41) = iprot.readMapBegin()
+                    for _i45 in range(_size41):
+                        _key46 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val47 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context[_key46] = _val47
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -631,9 +631,9 @@ class recv_binary_args(object):
         if self.context is not None:
             oprot.writeFieldBegin('context', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
-            for kiter64, viter65 in self.context.items():
-                oprot.writeString(kiter64.encode('utf-8') if sys.version_info[0] == 2 else kiter64)
-                oprot.writeString(viter65.encode('utf-8') if sys.version_info[0] == 2 else viter65)
+            for kiter48, viter49 in self.context.items():
+                oprot.writeString(kiter48.encode('utf-8') if sys.version_info[0] == 2 else kiter48)
+                oprot.writeString(viter49.encode('utf-8') if sys.version_info[0] == 2 else viter49)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         if self.message is not None:
@@ -705,11 +705,11 @@ class recv_text_args(object):
             elif fid == 3:
                 if ftype == TType.MAP:
                     self.context = {}
-                    (_ktype67, _vtype68, _size66) = iprot.readMapBegin()
-                    for _i70 in range(_size66):
-                        _key71 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val72 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context[_key71] = _val72
+                    (_ktype51, _vtype52, _size50) = iprot.readMapBegin()
+                    for _i54 in range(_size50):
+                        _key55 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        _val56 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.context[_key55] = _val56
                     iprot.readMapEnd()
                 else:
                     iprot.skip(ftype)
@@ -739,9 +739,9 @@ class recv_text_args(object):
         if self.context is not None:
             oprot.writeFieldBegin('context', TType.MAP, 3)
             oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
-            for kiter73, viter74 in self.context.items():
-                oprot.writeString(kiter73.encode('utf-8') if sys.version_info[0] == 2 else kiter73)
-                oprot.writeString(viter74.encode('utf-8') if sys.version_info[0] == 2 else viter74)
+            for kiter57, viter58 in self.context.items():
+                oprot.writeString(kiter57.encode('utf-8') if sys.version_info[0] == 2 else kiter57)
+                oprot.writeString(viter58.encode('utf-8') if sys.version_info[0] == 2 else viter58)
             oprot.writeMapEnd()
             oprot.writeFieldEnd()
         if self.message is not None:

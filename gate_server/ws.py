@@ -96,11 +96,11 @@ class Client:
     def stop(self):
         self.messages.put_nowait(None)
 
-    def set_context(self, context):
-        self.context.update(context)
+    def set_context(self, key, value):
+        self.context[key] = value
 
-    def unset_context(self, context):
-        for key in context:
+    def unset_context(self, key, value):
+        if self.context.get(key) == value or value == "":
             self.context.pop(key, None)
 
 

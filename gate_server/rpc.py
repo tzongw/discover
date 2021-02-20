@@ -12,21 +12,21 @@ from .config import options
 
 
 class Handler:
-    def set_context(self, conn_id, context):
+    def set_context(self, conn_id, key, value):
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{client} {context}')
-            client.set_context(context)
+            logging.debug(f'{client} {key} {value}')
+            client.set_context(key, value)
         else:
-            logging.warning(f'not found {conn_id} {context}')
+            logging.warning(f'not found {conn_id} {key} {value}')
 
-    def unset_context(self, conn_id, context):
+    def unset_context(self, conn_id, key, value):
         client = clients.get(conn_id)
         if client:
-            logging.debug(f'{client} {context}')
-            client.unset_context(context)
+            logging.debug(f'{client} {key} {value}')
+            client.unset_context(key, value)
         else:
-            logging.warning(f'not found {conn_id} {context}')
+            logging.warning(f'not found {conn_id} {key} {value}')
 
     def remove_conn(self, conn_id):
         client = clients.get(conn_id)

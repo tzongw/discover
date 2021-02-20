@@ -61,7 +61,7 @@ class Handler:
                 client.remove_conn(conn_id)
         else:
             with shared.gate_service.client(address) as client:
-                client.set_context(conn_id, {const.CONTEXT_UID: str(uid)})
+                client.set_context(conn_id, const.CONTEXT_UID, str(uid))
                 client.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: Dict[str, str]):
@@ -111,12 +111,12 @@ class Handler:
         if message == 'join':
             with shared.gate_service.client(address) as client:
                 client.join_group(conn_id, const.CHAT_ROOM)
-                client.set_context(conn_id, {const.CONTEXT_GROUP: const.CHAT_ROOM})
+                client.set_context(conn_id, const.CONTEXT_GROUP, const.CHAT_ROOM)
             shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
             with shared.gate_service.client(address) as client:
                 client.leave_group(conn_id, const.CHAT_ROOM)
-                client.unset_context(conn_id, {const.CONTEXT_GROUP})
+                client.unset_context(conn_id, const.CONTEXT_GROUP, const.CHAT_ROOM)
             shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
         else:
             if not group:

@@ -19,20 +19,22 @@ all_structs = []
 
 
 class Iface(object):
-    def set_context(self, conn_id, context):
+    def set_context(self, conn_id, key, value):
         """
         Parameters:
          - conn_id
-         - context
+         - key
+         - value
 
         """
         pass
 
-    def unset_context(self, conn_id, context):
+    def unset_context(self, conn_id, key, value):
         """
         Parameters:
          - conn_id
-         - context
+         - key
+         - value
 
         """
         pass
@@ -109,38 +111,42 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def set_context(self, conn_id, context):
+    def set_context(self, conn_id, key, value):
         """
         Parameters:
          - conn_id
-         - context
+         - key
+         - value
 
         """
-        self.send_set_context(conn_id, context)
+        self.send_set_context(conn_id, key, value)
 
-    def send_set_context(self, conn_id, context):
+    def send_set_context(self, conn_id, key, value):
         self._oprot.writeMessageBegin('set_context', TMessageType.ONEWAY, self._seqid)
         args = set_context_args()
         args.conn_id = conn_id
-        args.context = context
+        args.key = key
+        args.value = value
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def unset_context(self, conn_id, context):
+    def unset_context(self, conn_id, key, value):
         """
         Parameters:
          - conn_id
-         - context
+         - key
+         - value
 
         """
-        self.send_unset_context(conn_id, context)
+        self.send_unset_context(conn_id, key, value)
 
-    def send_unset_context(self, conn_id, context):
+    def send_unset_context(self, conn_id, key, value):
         self._oprot.writeMessageBegin('unset_context', TMessageType.ONEWAY, self._seqid)
         args = unset_context_args()
         args.conn_id = conn_id
-        args.context = context
+        args.key = key
+        args.value = value
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -314,7 +320,7 @@ class Processor(Iface, TProcessor):
         args.read(iprot)
         iprot.readMessageEnd()
         try:
-            self._handler.set_context(args.conn_id, args.context)
+            self._handler.set_context(args.conn_id, args.key, args.value)
         except TTransport.TTransportException:
             raise
         except Exception:
@@ -325,7 +331,7 @@ class Processor(Iface, TProcessor):
         args.read(iprot)
         iprot.readMessageEnd()
         try:
-            self._handler.unset_context(args.conn_id, args.context)
+            self._handler.unset_context(args.conn_id, args.key, args.value)
         except TTransport.TTransportException:
             raise
         except Exception:
@@ -415,14 +421,16 @@ class set_context_args(object):
     """
     Attributes:
      - conn_id
-     - context
+     - key
+     - value
 
     """
 
 
-    def __init__(self, conn_id=None, context=None,):
+    def __init__(self, conn_id=None, key=None, value=None,):
         self.conn_id = conn_id
-        self.context = context
+        self.key = key
+        self.value = value
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -439,14 +447,13 @@ class set_context_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.MAP:
-                    self.context = {}
-                    (_ktype1, _vtype2, _size0) = iprot.readMapBegin()
-                    for _i4 in range(_size0):
-                        _key5 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        _val6 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context[_key5] = _val6
-                    iprot.readMapEnd()
+                if ftype == TType.STRING:
+                    self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             else:
@@ -463,13 +470,13 @@ class set_context_args(object):
             oprot.writeFieldBegin('conn_id', TType.STRING, 1)
             oprot.writeString(self.conn_id.encode('utf-8') if sys.version_info[0] == 2 else self.conn_id)
             oprot.writeFieldEnd()
-        if self.context is not None:
-            oprot.writeFieldBegin('context', TType.MAP, 2)
-            oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.context))
-            for kiter7, viter8 in self.context.items():
-                oprot.writeString(kiter7.encode('utf-8') if sys.version_info[0] == 2 else kiter7)
-                oprot.writeString(viter8.encode('utf-8') if sys.version_info[0] == 2 else viter8)
-            oprot.writeMapEnd()
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+            oprot.writeFieldEnd()
+        if self.value is not None:
+            oprot.writeFieldBegin('value', TType.STRING, 3)
+            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -491,7 +498,8 @@ all_structs.append(set_context_args)
 set_context_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
-    (2, TType.MAP, 'context', (TType.STRING, 'UTF8', TType.STRING, 'UTF8', False), None, ),  # 2
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'value', 'UTF8', None, ),  # 3
 )
 
 
@@ -499,14 +507,16 @@ class unset_context_args(object):
     """
     Attributes:
      - conn_id
-     - context
+     - key
+     - value
 
     """
 
 
-    def __init__(self, conn_id=None, context=None,):
+    def __init__(self, conn_id=None, key=None, value=None,):
         self.conn_id = conn_id
-        self.context = context
+        self.key = key
+        self.value = value
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -523,13 +533,13 @@ class unset_context_args(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
-                if ftype == TType.SET:
-                    self.context = set()
-                    (_etype12, _size9) = iprot.readSetBegin()
-                    for _i13 in range(_size9):
-                        _elem14 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.context.add(_elem14)
-                    iprot.readSetEnd()
+                if ftype == TType.STRING:
+                    self.key = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.value = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             else:
@@ -546,12 +556,13 @@ class unset_context_args(object):
             oprot.writeFieldBegin('conn_id', TType.STRING, 1)
             oprot.writeString(self.conn_id.encode('utf-8') if sys.version_info[0] == 2 else self.conn_id)
             oprot.writeFieldEnd()
-        if self.context is not None:
-            oprot.writeFieldBegin('context', TType.SET, 2)
-            oprot.writeSetBegin(TType.STRING, len(self.context))
-            for iter15 in self.context:
-                oprot.writeString(iter15.encode('utf-8') if sys.version_info[0] == 2 else iter15)
-            oprot.writeSetEnd()
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+            oprot.writeFieldEnd()
+        if self.value is not None:
+            oprot.writeFieldBegin('value', TType.STRING, 3)
+            oprot.writeString(self.value.encode('utf-8') if sys.version_info[0] == 2 else self.value)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -573,7 +584,8 @@ all_structs.append(unset_context_args)
 unset_context_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'conn_id', 'UTF8', None, ),  # 1
-    (2, TType.SET, 'context', (TType.STRING, 'UTF8', False), None, ),  # 2
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'value', 'UTF8', None, ),  # 3
 )
 
 
@@ -967,10 +979,10 @@ class broadcast_binary_args(object):
             elif fid == 2:
                 if ftype == TType.SET:
                     self.exclude = set()
-                    (_etype19, _size16) = iprot.readSetBegin()
-                    for _i20 in range(_size16):
-                        _elem21 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.exclude.add(_elem21)
+                    (_etype3, _size0) = iprot.readSetBegin()
+                    for _i4 in range(_size0):
+                        _elem5 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem5)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -996,8 +1008,8 @@ class broadcast_binary_args(object):
         if self.exclude is not None:
             oprot.writeFieldBegin('exclude', TType.SET, 2)
             oprot.writeSetBegin(TType.STRING, len(self.exclude))
-            for iter22 in self.exclude:
-                oprot.writeString(iter22.encode('utf-8') if sys.version_info[0] == 2 else iter22)
+            for iter6 in self.exclude:
+                oprot.writeString(iter6.encode('utf-8') if sys.version_info[0] == 2 else iter6)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.message is not None:
@@ -1061,10 +1073,10 @@ class broadcast_text_args(object):
             elif fid == 2:
                 if ftype == TType.SET:
                     self.exclude = set()
-                    (_etype26, _size23) = iprot.readSetBegin()
-                    for _i27 in range(_size23):
-                        _elem28 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
-                        self.exclude.add(_elem28)
+                    (_etype10, _size7) = iprot.readSetBegin()
+                    for _i11 in range(_size7):
+                        _elem12 = iprot.readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()
+                        self.exclude.add(_elem12)
                     iprot.readSetEnd()
                 else:
                     iprot.skip(ftype)
@@ -1090,8 +1102,8 @@ class broadcast_text_args(object):
         if self.exclude is not None:
             oprot.writeFieldBegin('exclude', TType.SET, 2)
             oprot.writeSetBegin(TType.STRING, len(self.exclude))
-            for iter29 in self.exclude:
-                oprot.writeString(iter29.encode('utf-8') if sys.version_info[0] == 2 else iter29)
+            for iter13 in self.exclude:
+                oprot.writeString(iter13.encode('utf-8') if sys.version_info[0] == 2 else iter13)
             oprot.writeSetEnd()
             oprot.writeFieldEnd()
         if self.message is not None:

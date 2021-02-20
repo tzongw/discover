@@ -9,8 +9,8 @@ service timeout {
 }
 
 service gate {
-    oneway void set_context(1: string conn_id, 2: map<string, string> context)
-    oneway void unset_context(1: string conn_id, 2: set<string> context)
+    oneway void set_context(1: string conn_id, 2: string key 3: string value)
+    oneway void unset_context(1: string conn_id, 2: string key 3: string value)
     oneway void remove_conn(1: string conn_id)
     oneway void send_text(1: string conn_id, 2: string message)
     oneway void send_binary(1: string conn_id, 2: binary message)
