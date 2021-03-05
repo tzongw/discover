@@ -9,6 +9,7 @@ from google.protobuf.message import Message
 from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
+from concurrent.futures import Future
 
 
 class LogSuppress(contextlib.suppress):
@@ -108,3 +109,24 @@ class Proxy:
 
     def __getattr__(self, name):
         return getattr(choice(self._targets), name)
+
+
+class SingleFlight:
+    def __init__(self, f):
+        self._f = f
+        self._futures = {}
+
+    def get(self, key, *args, **kwargs):
+        if key in self._futures:
+            return self._futures[key].result()
+        fut = Future()
+        self._futures[key] = fut
+        try:
+            r = self._f(key, *args, **kwargs)
+            fut.set_result(r)
+            return r
+        except Exception as e:
+            fut.set_exception(e)
+            raise
+        finally:
+            self._futures.pop(key)
