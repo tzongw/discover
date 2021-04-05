@@ -11,16 +11,19 @@ from .utils import LogSuppress
 
 
 class Handle:
-    __slots__ = ["when", "callback", "cancelled"]
+    __slots__ = ["when", "callback"]
 
     def __init__(self, callback, when):
+        assert callback is not None
         self.callback = callback
         self.when = when
-        self.cancelled = False
 
     def cancel(self):
-        self.cancelled = True
         self.callback = None
+
+    @property
+    def cancelled(self):
+        return self.callback is None
 
     def __lt__(self, other: Handle):
         return self.when < other.when
@@ -34,10 +37,10 @@ class Schedule:
         gevent.spawn(self._run)
 
     def call_later(self, callback: Callable, delay) -> Handle:
-        assert callable(callback)
         return self.call_at(callback, time.time() + delay)
 
     def call_at(self, callback: Callable, at) -> Handle:
+        assert callable(callback)
         with self._cond:
             handle = Handle(callback, at)
             heapq.heappush(self._handles, handle)
@@ -66,6 +69,7 @@ class PeriodicCallback:
         self._callback = callback
         self._period = period
         self._handle = None  # type: Optional[Handle]
+        self.start()
 
     def _run(self):
         with LogSuppress(Exception):
@@ -79,7 +83,6 @@ class PeriodicCallback:
     def start(self):
         if self._handle is None:
             self._schedule_next()
-        return self
 
     def stop(self):
         if self._handle:

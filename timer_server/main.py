@@ -102,7 +102,7 @@ class Handler:
         def callback():
             self._fire_timer(key, service_name, data)
 
-        timer[self._HANDLE] = PeriodicCallback(self._schedule, callback, interval).start()
+        timer[self._HANDLE] = PeriodicCallback(self._schedule, callback, interval)
 
     def remove_timer(self, key, service_name):
         logging.info(f'{key} {service_name}')

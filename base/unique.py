@@ -33,7 +33,7 @@ class UniqueId:
             self._keys.add(key)
             if not self._pc:
                 logging.info(f'start')
-                self._pc = PeriodicCallback(self._schedule, self._refresh, self._REFRESH_INTERVAL).start()
+                self._pc = PeriodicCallback(self._schedule, self._refresh, self._REFRESH_INTERVAL)
             return id
         raise ValueError('no id')
 

@@ -56,7 +56,7 @@ class Client:
     def serve(self):
         self.ws.handler.socket.settimeout(const.CLIENT_TTL)
         gevent.spawn(self._writer)
-        pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL).start()
+        pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL)
         try:
             while not self.ws.closed:
                 message = self.ws.receive()
