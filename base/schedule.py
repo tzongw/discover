@@ -46,21 +46,15 @@ class Schedule:
             return handle
 
     def _run(self):
-        while True:
-            with self._cond:
-                timeout = None
-                if self._handles:
-                    when = self._handles[0].when
-                    timeout = max(0, when - time.time())
-                self._cond.wait(timeout)
+        with self._cond:
+            while True:
                 now = time.time()
-                while self._handles:
-                    handle = self._handles[0]
-                    if handle.when > now:
-                        break
+                while self._handles and self._handles[0].when <= now:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
                         self._executor.submit(handle.callback)
+                timeout = (self._handles[0].when - now) if self._handles else None
+                self._cond.wait(timeout)
 
 
 class PeriodicCallback:
