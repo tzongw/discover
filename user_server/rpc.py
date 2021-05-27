@@ -140,5 +140,5 @@ def serve():
     gevent.sleep(0.1)
     if not options.rpc_port:
         options.rpc_port = transport.handle.getsockname()[1]
-    logging.info(f'Starting the server {options.rpc_address} ...')
+    logging.info(f'Starting rpc server {options.rpc_address} ...')
     return g
