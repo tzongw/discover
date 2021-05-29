@@ -109,8 +109,9 @@ class Receiver:
             last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
         # race happen if use $ as last id
         # 1. xread stream1 stream2 $ $
-        # 2. while handling stream1 message1 id1, xadd stream2 message2 id2
-        # 3. xread stream1 id1 stream2 $, message2 is missing
+        # 2. xadd stream1 message1
+        # 3. while handling message1, xadd stream2 message2
+        # 4. xread stream1 stream2 $ $, message2 is missing
         streams = dict(zip(stream_names, last_ids))
         while not self._stopped:
             try:
