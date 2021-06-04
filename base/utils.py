@@ -20,8 +20,8 @@ class LogSuppress(contextlib.suppress):
 
 
 @lru_cache()
-def ip_address():
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+def ip_address(ipv6=False):
+    with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect(('8.8.8.8', 9))
         return sock.getsockname()[0]
 
