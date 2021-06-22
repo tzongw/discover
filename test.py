@@ -62,16 +62,17 @@ def main():
 
 if __name__ == '__main__':
     from base.executor import Executor
-    from base.schedule import Schedule
 
-    sch = Schedule()
-    sch.call_later(lambda: print('later'), 2)
-    exe = Executor(idle=3, max_workers=2)
-    exe.submit(lambda: print('aaa'))
-    exe.submit(lambda: print('bbb'))
-    gevent.sleep(1)
-    exe.gather(lambda: print('ccc'), lambda: print('ddd'), lambda: print('eee'))
-    gevent.sleep(1)
-    exe.submit(lambda: print('fff'))
-    exe.submit(lambda: print('ggg'))
+
+    def sleep_print(msg):
+        time.sleep(1)
+        print(msg)
+
+
+    exe = Executor(max_workers=2, queue_size=2, idle=5)
+    exe.submit(lambda: sleep_print('aaa'))
+    exe.submit(lambda: sleep_print('bbb'))
+    gevent.sleep(0.1)
+    exe.gather(lambda: sleep_print('ccc'), lambda: sleep_print('ddd'), lambda: sleep_print('eee'),
+               lambda: sleep_print('kkk'), lambda: sleep_print('mmm'))
     gevent.sleep(5)

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-import sys
 from concurrent.futures import Future
 from gevent import queue
 import gevent
@@ -29,21 +28,21 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, idle=600):
+    def __init__(self, max_workers=128, queue_size=None, idle=600):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
-        self._items = queue.Queue()
+        self._items = queue.Queue(queue_size)
         self._idle = idle
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
-        self._unfinished += 1
-        logging.debug(f'+job {self}')
-        self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
         self._items.put(item)
+        self._unfinished += 1
+        logging.debug(f'+job {self}')
+        self._adjust_workers()
         return fut
 
     def gather(self, *fns):
