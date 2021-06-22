@@ -45,7 +45,7 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, executor=None):
+    def __init__(self, redis: Redis, group: str, consumer: str):
         super().__init__()
         self._redis = redis
         self._group = group
@@ -56,7 +56,6 @@ class Receiver:
         self._fanout_dispatcher = ProtoDispatcher()
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
-        self._executor = executor or Executor()
 
     def start(self):
         @self.group_handler(self._waker)
@@ -90,7 +89,7 @@ class Receiver:
                 result = self._redis.xreadgroup(self._group, self._consumer, streams, count=10, block=0, noack=True)
                 for stream, messages in result:
                     for message in messages:
-                        self._executor.submit(lambda: self._group_dispatcher.dispatch(stream, *message))
+                        self._group_dispatcher.dispatch(stream, *message)
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
@@ -118,7 +117,7 @@ class Receiver:
                 result = self._redis.xread(streams, count=10, block=0)
                 for stream, messages in result:
                     for message in messages:
-                        self._executor.submit(lambda: self._fanout_dispatcher.dispatch(stream, *message))
+                        self._fanout_dispatcher.dispatch(stream, *message)
                         streams[stream] = message[0]  # update last id
             except Exception:
                 logging.exception(f'')
