@@ -5,7 +5,6 @@ import uuid
 from typing import Type, Dict
 from redis import Redis
 from .utils import Dispatcher
-from .executor import Executor
 from google.protobuf.message import Message
 from google.protobuf.json_format import Parse, MessageToJson
 
