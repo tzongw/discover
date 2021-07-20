@@ -20,5 +20,5 @@ class Addr:
         return f'{self.host}:{self.port}'
 
 
-define("redis", Addr("localhost:6379"), Addr, "redis address")
+define("redis", "redis://", str, "redis url")
 define("datacenter", 0, int, "data center id")

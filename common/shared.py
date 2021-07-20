@@ -15,7 +15,7 @@ from base.mq import Publisher
 from base.timer import Timer
 from tornado.options import options
 
-redis = Redis(options.redis.host, options.redis.port, decode_responses=True)
+redis = Redis.from_url(options.redis, decode_responses=True)
 registry = Registry(redis)
 publisher = Publisher(redis)
 parser = Parser(redis)
