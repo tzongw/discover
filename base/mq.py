@@ -34,8 +34,11 @@ class ProtoDispatcher(Dispatcher):
         def decorator(f):
             @super_handler(key)
             def inner(id, data: Dict):
-                json = data['']
-                proto = Parse(json, message_cls(), ignore_unknown_fields=True)
+                proto = data.get('proto')
+                if proto is None:
+                    json = data.pop('')
+                    proto = Parse(json, message_cls(), ignore_unknown_fields=True)
+                    data['proto'] = proto
                 f(id, proto)
 
             return f
