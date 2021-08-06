@@ -10,6 +10,7 @@ from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
 from concurrent.futures import Future
+from collections import defaultdict
 
 
 class LogSuppress(contextlib.suppress):
@@ -30,24 +31,23 @@ wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:
-    def __init__(self, sep=None):
-        self._handlers = {}
+    def __init__(self, sep=None, multi=False):
+        self._handlers = defaultdict(list)
         self._sep = sep
+        self._multi = multi
 
     def dispatch(self, key: str, *args, **kwargs):
         if self._sep is not None:
             key = key.split(self._sep, maxsplit=1)[0]
-        handler = self._handlers.get(key)
-        if handler:
+        handlers = self._handlers.get(key) or []
+        for handle in handlers:
             with LogSuppress(Exception):
-                return handler(*args, **kwargs)
-        else:
-            logging.warning(f'not handle {args} {kwargs}')
+                handle(*args, **kwargs)
 
     def handler(self, key: str):
         def decorator(f):
-            assert key not in self._handlers
-            self._handlers[key] = f
+            assert self._multi or key not in self._handlers
+            self._handlers[key].append(f)
             return f
 
         return decorator

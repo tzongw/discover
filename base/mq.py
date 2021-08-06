@@ -34,7 +34,7 @@ class ProtoDispatcher(Dispatcher):
         def decorator(f):
             @super_handler(key)
             def inner(id, data: Dict):
-                json = data.pop('')
+                json = data['']
                 proto = Parse(json, message_cls(), ignore_unknown_fields=True)
                 f(id, proto)
 
@@ -52,7 +52,7 @@ class Receiver:
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
         self._group_dispatcher = ProtoDispatcher()
-        self._fanout_dispatcher = ProtoDispatcher()
+        self._fanout_dispatcher = ProtoDispatcher(multi=True)
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
 
