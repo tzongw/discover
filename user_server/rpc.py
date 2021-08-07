@@ -53,7 +53,7 @@ class Handler:
                     client.remove_conn(old_online.conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
-                logging.info(f'login fail {address} {conn_id} {params}')
+                logging.warning(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
             with shared.gate_service.client(address) as client:

@@ -9,17 +9,6 @@ channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt=None))
 logger = logging.getLogger()
 logger.addHandler(channel)
 
-
-class Addr:
-    def __init__(self, value: str):
-        host, port = value.rsplit(':', maxsplit=1)
-        self.host = host
-        self.port = int(port)
-
-    def __str__(self):
-        return f'{self.host}:{self.port}'
-
-
 define("config", type=str, help="path to config file",
        callback=lambda path: parse_config_file(path, final=False))
 define("redis", "redis://", str, "redis url")

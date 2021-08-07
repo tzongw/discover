@@ -1,11 +1,10 @@
 import logging
 from collections import defaultdict
-from typing import Set, DefaultDict
-
+from typing import Set, DefaultDict, Dict
 import gevent
 from redis import Redis
 
-from .utils import LogSuppress
+from .utils import LogSuppress, Addr
 
 
 class Registry:
@@ -30,9 +29,9 @@ class Registry:
 
     def __init__(self, redis: Redis):
         self._redis = redis
-        self._services = {}  # type: Map[str, str]
+        self._services = {}  # type: Dict[str, str]
         self._stopped = False
-        self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
+        self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[Addr]]
         self._callbacks = []
 
     def add_callback(self, cb):
@@ -57,7 +56,7 @@ class Registry:
         self._redis.delete(*keys)
         self._redis.publish(self._PREFIX, 'unregister')
 
-    def addresses(self, name) -> Set[str]:  # constant
+    def addresses(self, name) -> Set[Addr]:  # constant
         return self._addresses.get(name) or set()
 
     def _refresh(self):
@@ -66,7 +65,7 @@ class Registry:
         for key in keys:
             with LogSuppress(Exception):
                 name, address = self._unpack(key)
-                addresses[name].add(address)
+                addresses[name].add(Addr(address))
         if addresses != self._addresses:
             logging.warning(f'{self._addresses} -> {addresses}')
             self._addresses = addresses

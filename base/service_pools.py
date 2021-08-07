@@ -1,20 +1,20 @@
 import contextlib
 from random import choice
-from typing import Dict, ContextManager
+from typing import Dict, ContextManager, Union
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
 from .thrift_pool import ThriftPool
 import logging
 import time
-from base.utils import ip_address
+from base.utils import ip_address, Addr
 
 
 class ServicePools:
     def __init__(self, registry: Registry, name, **settings):
         self._name = name
         self._registry = registry
-        self._pools = {}  # type: Dict[str, ThriftPool]
-        self._cool_down = {}  # type: Dict[str, float]
+        self._pools = {}  # type: Dict[Addr, ThriftPool]
+        self._cool_down = {}  # type: Dict[Addr, float]
         self._settings = settings
         registry.add_callback(self._clean_pools)
 
@@ -26,21 +26,22 @@ class ServicePools:
         addresses = self.addresses()
         now = time.time()
         good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
-        local_prefix = ip_address() + ':'
-        local_ones = [addr for addr in good_ones if addr.startswith(local_prefix)]
-        address = choice(local_ones or good_ones or tuple(addresses))  # type: str
+        local_host = ip_address()
+        local_ones = [addr for addr in good_ones if addr.host == local_host]
+        address = choice(local_ones or good_ones or tuple(addresses))  # type: Addr
         with self.address_connection(address) as conn:
             yield conn
 
     @contextlib.contextmanager
-    def address_connection(self, address) -> ContextManager[TProtocolBase]:
+    def address_connection(self, address: Union[Addr, str]) -> ContextManager[TProtocolBase]:
+        if isinstance(address, str):
+            address = Addr(address)
         addresses = self.addresses()
         if address not in addresses:
             raise ValueError(f"{self._name} {address} {addresses}")
         pool = self._pools.get(address)
         if not pool:
-            host, port = address.rsplit(':', maxsplit=1)
-            pool = ThriftPool(host, int(port), **self._settings)
+            pool = ThriftPool(address.host, address.port, **self._settings)
             self._pools[address] = pool
         with pool.connection() as conn:
             try:

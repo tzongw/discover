@@ -20,6 +20,25 @@ class LogSuppress(contextlib.suppress):
         return super().__exit__(exctype, excinst, exctb)
 
 
+class Addr:
+    def __init__(self, value: str):
+        host, port = value.rsplit(':', maxsplit=1)
+        self.host = host
+        self.port = int(port)
+
+    def __str__(self):
+        return f'{self.host}:{self.port}'
+
+    def __repr__(self):
+        return str(self)
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.host == other.host and self.port == other.port
+
+    def __hash__(self):
+        return hash(str(self))
+
+
 @lru_cache()
 def ip_address(ipv6=False):
     with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
