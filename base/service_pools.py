@@ -6,6 +6,7 @@ from .registry import Registry
 from .thrift_pool import ThriftPool
 import logging
 import time
+from base.utils import ip_address
 
 
 class ServicePools:
@@ -25,7 +26,9 @@ class ServicePools:
         addresses = self.addresses()
         now = time.time()
         good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
-        address = choice(good_ones or tuple(addresses))  # type: str
+        local_prefix = ip_address() + ':'
+        local_ones = [addr for addr in good_ones if addr.startswith(local_prefix)]
+        address = choice(local_ones or good_ones or tuple(addresses))  # type: str
         with self.address_connection(address) as conn:
             yield conn
 
