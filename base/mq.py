@@ -5,6 +5,7 @@ import uuid
 from typing import Type, Dict
 from redis import Redis
 from .utils import Dispatcher
+from .executor import Executor
 from google.protobuf.message import Message
 from google.protobuf.json_format import Parse, MessageToJson
 
@@ -47,8 +48,7 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str):
-        super().__init__()
+    def __init__(self, redis: Redis, group: str, consumer: str, executor: Executor):
         self._redis = redis
         self._group = group
         self._consumer = consumer
@@ -58,6 +58,7 @@ class Receiver:
         self._fanout_dispatcher = ProtoDispatcher(multi=True)
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
+        self._executor = executor
 
     def start(self):
         @self.group_handler(self._waker)
@@ -91,7 +92,7 @@ class Receiver:
                 result = self._redis.xreadgroup(self._group, self._consumer, streams, count=10, block=0, noack=True)
                 for stream, messages in result:
                     for message in messages:
-                        self._group_dispatcher.dispatch(stream, *message)
+                        self._executor.submit(self._group_dispatcher.dispatch, stream, *message)
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
@@ -119,7 +120,7 @@ class Receiver:
                 result = self._redis.xread(streams, count=10, block=0)
                 for stream, messages in result:
                     for message in messages:
-                        self._fanout_dispatcher.dispatch(stream, *message)
+                        self._executor.submit(self._fanout_dispatcher.dispatch, stream, *message)
                         streams[stream] = message[0]  # update last id
             except Exception:
                 logging.exception(f'')
