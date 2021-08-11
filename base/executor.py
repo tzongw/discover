@@ -28,12 +28,13 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=600):
+    def __init__(self, max_workers=128, queue_size=None, idle=600, name=''):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
         self._items = queue.Queue(queue_size)
         self._idle = idle
+        self._name = name
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
@@ -55,7 +56,7 @@ class Executor:
             logging.debug(f'+worker {self}')
 
     def __str__(self):
-        return f'unfinished: {self._unfinished}, workers: {self._workers}'
+        return f'{self._name or "unnamed"}: unfinished: {self._unfinished}, workers: {self._workers}'
 
     def _worker(self):
         try:

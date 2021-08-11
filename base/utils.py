@@ -55,7 +55,7 @@ class Dispatcher:
         self._handlers = defaultdict(list)
         self._sep = sep
         self._multi = multi
-        self._executor = executor or Executor(max_workers=10, queue_size=0)
+        self._executor = executor or Executor(max_workers=1, queue_size=0, name='dispatch')
 
     def dispatch(self, key: str, *args, **kwargs):
         if self._sep is not None:

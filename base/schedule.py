@@ -32,7 +32,7 @@ class Handle:
 class Schedule:
     def __init__(self, executor=None):
         self._cond = threading.Condition()
-        self._executor = executor or Executor()
+        self._executor = executor or Executor(name='schedule')
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 

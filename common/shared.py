@@ -24,7 +24,7 @@ user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService,
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]
 
-executor = Executor()
+executor = Executor(name='shared')
 schedule = Schedule()
 unique_id = UniqueId(schedule, redis)
 timer_dispatcher = Dispatcher(sep=':')

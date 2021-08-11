@@ -5,6 +5,7 @@ import uuid
 from typing import Type, Dict
 from redis import Redis
 from .utils import Dispatcher
+from base.executor import Executor
 from google.protobuf.message import Message
 from google.protobuf.json_format import Parse, MessageToJson
 
@@ -54,8 +55,9 @@ class Receiver:
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = ProtoDispatcher()
-        self._fanout_dispatcher = ProtoDispatcher(multi=True)
+        self._group_dispatcher = ProtoDispatcher(executor=Executor(max_workers=10, queue_size=0, name='group_dispatch'))
+        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=10, queue_size=0,
+                                                                                name='fanout_dispatch'))
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
 
