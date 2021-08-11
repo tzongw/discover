@@ -3,6 +3,7 @@ import logging
 import socket
 from functools import lru_cache
 import sys
+from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
 from google.protobuf.message import Message
@@ -50,18 +51,18 @@ wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:
-    def __init__(self, sep=None, multi=False):
+    def __init__(self, sep=None, multi=False, executor=None):
         self._handlers = defaultdict(list)
         self._sep = sep
         self._multi = multi
+        self._executor = executor or Executor(max_workers=10, queue_size=0)
 
     def dispatch(self, key: str, *args, **kwargs):
         if self._sep is not None:
             key = key.split(self._sep, maxsplit=1)[0]
         handlers = self._handlers.get(key) or []
         for handle in handlers:
-            with LogSuppress(Exception):
-                handle(*args, **kwargs)
+            self._executor.submit(handle, *args, **kwargs)
 
     def handler(self, key: str):
         def decorator(f):
