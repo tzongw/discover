@@ -56,8 +56,8 @@ class Receiver:
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
         self._group_dispatcher = ProtoDispatcher(
-            executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
-        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=0,
+            executor=Executor(max_workers=batch, queue_size=batch, name='group_dispatch'))
+        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=batch,
                                                                                 name='fanout_dispatch'))
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
