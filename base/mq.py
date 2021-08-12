@@ -48,18 +48,19 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str):
+    def __init__(self, redis: Redis, group: str, consumer: str, batch=10):
         super().__init__()
         self._redis = redis
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = ProtoDispatcher(executor=Executor(max_workers=10, queue_size=0, name='group_dispatch'))
-        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=10, queue_size=0,
+        self._group_dispatcher = ProtoDispatcher(executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
+        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=0,
                                                                                 name='fanout_dispatch'))
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
+        self._batch = batch
 
     def start(self):
         @self.group_handler(self._waker)
@@ -90,7 +91,7 @@ class Receiver:
         streams = {stream: '>' for stream in self._group_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self._redis.xreadgroup(self._group, self._consumer, streams, count=10, block=0, noack=True)
+                result = self._redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0, noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self._group_dispatcher.dispatch(stream, *message)
@@ -118,7 +119,7 @@ class Receiver:
         streams = dict(zip(stream_names, last_ids))
         while not self._stopped:
             try:
-                result = self._redis.xread(streams, count=10, block=0)
+                result = self._redis.xread(streams, count=self._batch, block=0)
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)
