@@ -62,6 +62,7 @@ class Receiver:
         self.group_handler = self._group_dispatcher.handler
         self.fanout_handler = self._fanout_dispatcher.handler
         self._batch = batch
+        self._workers = []
 
     def start(self):
         @self.group_handler(self._waker)
@@ -81,12 +82,19 @@ class Receiver:
                 pipe.xgroup_create(stream, unique_group, mkstream=True)
                 pipe.xgroup_destroy(stream, unique_group)
             pipe.execute(raise_on_error=False)
-        gevent.spawn(self._group_run)
-        gevent.spawn(self._fanout_run)
+        self._workers = [gevent.spawn(self._group_run), gevent.spawn(self._fanout_run)]
 
     def stop(self):
         self._stopped = True
         self._redis.xadd(self._waker, {'wake': 'up'})
+        gevent.joinall(self._workers)
+        with self._redis.pipeline() as pipe:
+            for stream in self._group_dispatcher.handlers:
+                pipe.xgroup_delconsumer(stream, self._group, self._consumer)
+            pipe.delete(self._waker)
+            pipe.execute()
+        logging.info(f'delete consumers {self._group_dispatcher.handlers.keys()}')
+        logging.info(f'delete {self._waker}')
 
     def _group_run(self):
         streams = {stream: '>' for stream in self._group_dispatcher.handlers}
@@ -100,12 +108,7 @@ class Receiver:
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        with self._redis.pipeline() as pipe:
-            for stream in self._group_dispatcher.handlers:
-                pipe.xgroup_delconsumer(stream, self._group, self._consumer)
-            pipe.delete(self._waker)
-            pipe.execute()
-        logging.info(f'delete {self._waker}')
+        logging.info(f'group exit')
 
     def _fanout_run(self):
         with self._redis.pipeline() as pipe:
