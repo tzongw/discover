@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from redis import Redis
-from redis.client import bool_ok
 from google.protobuf.message import Message
 from google.protobuf.json_format import MessageToJson
 import uuid
@@ -39,7 +38,7 @@ class Timer:
                 else:
                     pipe.pexpire(self._key(key), interval)
             res, *_ = pipe.execute()
-        return bool_ok(res)
+        return res
 
     def kill(self, *keys):
         with self._redis.pipeline() as pipe:
@@ -47,7 +46,7 @@ class Timer:
             if self.cache:
                 pipe.delete(*[self._key(key) for key in keys])
             res, *_ = pipe.execute()
-        return int(res)
+        return res
 
     def new_stream_timer(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
         # noinspection PyUnresolvedReferences
