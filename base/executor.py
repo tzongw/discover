@@ -32,18 +32,18 @@ class Executor:
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
-        self._items = queue.Queue(queue_size)
+        self._items = queue.Channel() if queue_size == 0 else queue.Queue(queue_size)
         self._idle = idle
         self._name = name
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
-        fut = Future()
-        item = _WorkItem(fut, fn, *args, **kwargs)
-        self._items.put(item)
         self._unfinished += 1
         logging.debug(f'+job {self}')
         self._adjust_workers()
+        fut = Future()
+        item = _WorkItem(fut, fn, *args, **kwargs)
+        self._items.put(item)
         return fut
 
     def gather(self, *fns):
