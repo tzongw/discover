@@ -15,17 +15,17 @@ def on_notice(data):
     logging.info(f'got timer {data}')
 
 
-@receiver.group_handler(Login)
+@receiver.group(Login)
 def on_login(id, data: Login):
     logging.info(f'{id} {data}')
 
 
-@receiver.fanout_handler(Logout)
+@receiver.fanout(Logout)
 def on_logout(id, data: Logout):
     logging.info(f'{id} {data}')
 
 
-@receiver.group_handler(Alarm)
+@receiver.group(Alarm)
 def on_alarm(id, data: Alarm):
     logging.info(f'{id} {data}')
 

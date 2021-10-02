@@ -59,17 +59,23 @@ class Receiver:
             executor=Executor(max_workers=batch, queue_size=batch, name='group_dispatch'))
         self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=batch,
                                                                                 name='fanout_dispatch'))
-        self.group_handler = self._group_dispatcher.handler
-        self.fanout_handler = self._fanout_dispatcher.handler
         self._batch = batch
         self._workers = []
 
+    @property
+    def group(self):
+        return self._group_dispatcher.handler
+
+    @property
+    def fanout(self):
+        return self._fanout_dispatcher.handler
+
     def start(self):
-        @self.group_handler(self._waker)
+        @self.group(self._waker)
         def group_wakeup(id, data):
             logging.info(f'{id} {data}')
 
-        @self.fanout_handler(self._waker)
+        @self.fanout(self._waker)
         def fanout_wakeup(id, data):
             logging.info(f'{id} {data}')
 
