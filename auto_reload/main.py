@@ -2,7 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
-from auto_reload.config import options
+from config import options
 import gevent
 import os
 from common import shared

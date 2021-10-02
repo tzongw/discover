@@ -2,8 +2,9 @@
 from gevent import monkey
 
 monkey.patch_all()
-from timer_server.config import options
-from timer_server import const, shared
+from config import options
+import const
+import shared
 import logging
 from thrift.transport import TSocket
 from thrift.transport import TTransport
