@@ -7,8 +7,8 @@ from thrift.server import TServer
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from base import utils
-from .ws import clients, Client, remove_from_group, groups
-from .config import options
+from ws import clients, Client, remove_from_group, groups
+from config import options
 
 
 class Handler:

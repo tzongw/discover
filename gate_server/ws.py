@@ -14,8 +14,8 @@ from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base.schedule import PeriodicCallback
-from . import shared, const
-from .config import options
+import shared, const
+from config import options
 
 app = Flask(__name__)
 sockets = Sockets(app)
