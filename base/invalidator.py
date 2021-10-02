@@ -35,7 +35,7 @@ class Invalidator:
                     self.sub.subscribe('__redis__:invalidate')
                     for prefix in self.prefixes:
                         self.dispatcher.dispatch(prefix, '')  # invalidate all
-                msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=10)
+                msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=None)
                 if msg is not None:
                     logging.debug(f'got {msg}')
                     for key in msg['data']:
