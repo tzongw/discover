@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from .shared import online_key, redis, gate_service, parser
-from .hash_pb2 import Online
+from shared import online_key, redis, gate_service, parser
+from hash_pb2 import Online
 from base.utils import Parser
 
 

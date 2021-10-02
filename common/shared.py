@@ -14,6 +14,7 @@ from base.utils import Dispatcher, LogSuppress, Parser
 from base.mq import Publisher
 from base.timer import Timer
 from tornado.options import options
+from base.invalidator import Invalidator
 
 redis = Redis.from_url(options.redis, decode_responses=True)
 registry = Registry(redis)
@@ -28,6 +29,7 @@ executor = Executor(name='shared')
 schedule = Schedule()
 unique_id = UniqueId(schedule, redis)
 timer_dispatcher = Dispatcher(sep=':')
+invalidator = Invalidator(redis)
 
 _exits = [registry.stop]
 

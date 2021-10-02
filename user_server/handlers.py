@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
-from .shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer
+from shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator
 from datetime import timedelta
 
 
@@ -28,6 +28,11 @@ def on_logout(id, data: Logout):
 @receiver.group_handler(Alarm)
 def on_alarm(id, data: Alarm):
     logging.info(f'{id} {data}')
+
+
+@invalidator.handler('session:')
+def session_invalidate(key):
+    logging.info(key)
 
 
 def init():
