@@ -6,16 +6,17 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
-from . import shared, const
-from .hash_pb2 import Online, Session
+import shared
+import const
+from hash_pb2 import Online, Session
 from common.mq_pb2 import Login, Logout
 from redis.client import Pipeline
 from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from .shared import timer_dispatcher, app, online_key, session_key
-from .config import options
+from shared import timer_dispatcher, app, online_key, session_key
+from config import options
 from base.utils import Parser
 
 

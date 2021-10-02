@@ -4,16 +4,16 @@ import flask
 from flask import jsonify, g, request
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from .dao import Account, Session
-from .shared import app, parser
-from . import hash_pb2
+from dao import Account, Session
+from shared import app, parser
+import hash_pb2
 from gevent import pywsgi
-from .config import options
-from .const import CONTEXT_UID, CONTEXT_TOKEN
+from config import options
+from const import CONTEXT_UID, CONTEXT_TOKEN
 import gevent
 import logging
 from base import snowflake
-from .shared import app_id, session_key
+from shared import app_id, session_key
 from werkzeug.exceptions import UnprocessableEntity
 from base.utils import ListConverter
 from flasgger import Swagger

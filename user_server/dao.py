@@ -6,7 +6,7 @@ from sqlalchemy import BigInteger
 from sqlalchemy import String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from .config import options
+from config import options
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
 engine = create_engine('sqlite:///db.sqlite3', echo=echo)
