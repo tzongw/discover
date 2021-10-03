@@ -22,6 +22,10 @@ class Invalidator:
     def start(self):
         gevent.spawn(self._run)
 
+    def _invalidate_all(self):
+        for prefix in self.prefixes:
+            self.dispatcher.dispatch(prefix, '')
+
     def _run(self):
         while True:
             try:
@@ -31,13 +35,18 @@ class Invalidator:
                     client_id = self.sub.parse_response()
                     prefixes = ' '.join([f'PREFIX {prefix}' for prefix in self.prefixes])
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
-                    self.redis.execute_command(command)
+                    self.sub.execute_command(command)
+                    res = self.sub.parse_response()
+                    logging.info(f'TRACKING ON {client_id} {res}')
                     self.sub.subscribe('__redis__:invalidate')
-                    for prefix in self.prefixes:
-                        self.dispatcher.dispatch(prefix, '')  # invalidate all
+                    self._invalidate_all()
                 msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=None)
                 if msg is not None:
                     logging.debug(f'got {msg}')
+                    if msg['data'] is None:
+                        logging.warning(f'db flush all')
+                        self._invalidate_all()
+                        continue
                     for key in msg['data']:
                         for prefix in self.prefixes:
                             if key.startswith(prefix):
