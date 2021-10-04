@@ -41,7 +41,7 @@ class Handler:
         self._services = {}  # type: Dict[str, ServicePools]
 
     def load_timers(self):
-        full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*'))
+        full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         for full_key in full_keys:
             with LogSuppress(Exception):
                 key, service_name, data, deadline, interval = self._redis.hmget(full_key, self._KEY, self._SERVICE,
