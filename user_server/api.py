@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import uuid
 import flask
-from flask import jsonify, g, request
+from flask import jsonify, request
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
@@ -14,7 +14,7 @@ import gevent
 import logging
 from base import snowflake
 from shared import app_id, session_key
-from werkzeug.exceptions import UnprocessableEntity
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized
 from base.utils import ListConverter
 from flasgger import Swagger
 from hashlib import sha1
@@ -46,10 +46,15 @@ def serve():
 def before_request():
     rule = request.url_rule
     if rule and app.view_functions[rule.endpoint] not in no_auth_methods:
-        g.uid = flask.session[CONTEXT_UID]
+        uid = flask.session[CONTEXT_UID]
+        key = session_key(uid)
+        session = parser.hget(key, hash_pb2.Session())
+        if flask.session[CONTEXT_TOKEN] != session.token:
+            return Unauthorized()
 
 
 @app.route('/hello/<list:names>')
+@no_auth
 def hello(names):
     """say hello
     ---
@@ -64,7 +69,7 @@ def hello(names):
       200:
         description: hello
     """
-    return f'{g.uid} say hello {names}'
+    return f'say hello {names}'
 
 
 @app.errorhandler(UnprocessableEntity)
