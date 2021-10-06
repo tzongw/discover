@@ -46,10 +46,8 @@ def serve():
 def before_request():
     rule = request.url_rule
     if rule and app.view_functions[rule.endpoint] not in no_auth_methods:
-        uid = flask.session[CONTEXT_UID]
-        key = session_key(uid)
-        session = parser.hget(key, hash_pb2.Session())
-        if flask.session[CONTEXT_TOKEN] != session.token:
+        uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
+        if not uid or not token or token != parser.hget(session_key(uid), hash_pb2.Session()).token:
             return Unauthorized()
 
 
