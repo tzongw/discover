@@ -6,10 +6,10 @@ from .utils import Dispatcher
 
 
 class Invalidator:
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Redis, sep=':'):
         self.redis = redis
         self.sub = None
-        self.dispatcher = Dispatcher()
+        self.dispatcher = Dispatcher(sep=sep)
 
     @property
     def handler(self):
@@ -48,9 +48,7 @@ class Invalidator:
                         self._invalidate_all()
                         continue
                     for key in msg['data']:
-                        for prefix in self.prefixes:
-                            if key.startswith(prefix):
-                                self.dispatcher.dispatch(prefix, key)
+                        self.dispatcher.dispatch(key, key)
             except Exception:
                 logging.exception(f'')
                 self.sub = None

@@ -30,7 +30,7 @@ def on_alarm(id, data: Alarm):
     logging.info(f'{id} {data}')
 
 
-@invalidator.handler('session:')
+@invalidator.handler('session')
 def session_invalidate(key):
     logging.info(key)
 
