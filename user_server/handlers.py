@@ -6,13 +6,13 @@ from datetime import timedelta
 
 
 @timer_dispatcher.handler('welcome')
-def on_welcome(data):
-    logging.info(f'got timer {data}')
+def on_welcome(key, data):
+    logging.info(f'got timer {key} {data}')
 
 
 @timer_dispatcher.handler('notice')
-def on_notice(data):
-    logging.info(f'got timer {data}')
+def on_notice(key, data):
+    logging.info(f'got timer {key} {data}')
 
 
 @receiver.group(Login)
@@ -37,10 +37,10 @@ def session_invalidate(key):
 
 def init():
     if registry.addresses(const.RPC_TIMER):
-        timer_service.call_later('notice', const.RPC_USER, 'notice', delay=10)
-        timer_service.call_repeat('welcome', const.RPC_USER, 'welcome', interval=30)
+        timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)
+        timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
-        timer.new_stream_timer(Alarm(tip='one shot'), timedelta(seconds=10))
-        tid = timer.new_stream_timer(Alarm(tip='loop'), timedelta(seconds=20), loop=True)
+        timer.create(Alarm(tip='one shot'), timedelta(seconds=2))
+        tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(tid))

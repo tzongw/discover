@@ -127,7 +127,7 @@ class Handler:
                 shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        self._timer_dispatcher.dispatch(key, data)
+        self._timer_dispatcher.dispatch(key, key, data)
 
 
 def serve():

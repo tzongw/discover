@@ -48,7 +48,7 @@ class Timer:
             res, *_ = pipe.execute()
         return res
 
-    def new_stream_timer(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
+    def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
         # noinspection PyUnresolvedReferences
         stream = message.stream
         if key is None:
