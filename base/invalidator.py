@@ -22,6 +22,9 @@ class Invalidator:
     def start(self):
         gevent.spawn(self._run)
 
+    def publish(self, key):
+        self.redis.publish('__redis__:invalidate', key)
+
     def _invalidate_all(self):
         for prefix in self.prefixes:
             self.dispatcher.dispatch(prefix, '')
@@ -41,14 +44,18 @@ class Invalidator:
                     self.sub.subscribe('__redis__:invalidate')
                     self._invalidate_all()
                 msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=None)
-                if msg is not None:
-                    logging.debug(f'got {msg}')
-                    if msg['data'] is None:
-                        logging.warning(f'db flush all')
-                        self._invalidate_all()
-                        continue
-                    for key in msg['data']:
-                        self.dispatcher.dispatch(key, key)
+                if msg is None:
+                    continue
+                logging.debug(f'got {msg}')
+                data = msg['data']
+                if data is None:
+                    logging.warning(f'db flush all')
+                    self._invalidate_all()
+                    continue
+                if isinstance(data, str):
+                    data = [data]
+                for key in data:
+                    self.dispatcher.dispatch(key, key)
             except Exception:
                 logging.exception(f'')
                 self.sub = None
