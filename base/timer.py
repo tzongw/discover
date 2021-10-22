@@ -5,6 +5,7 @@ from google.protobuf.json_format import MessageToJson
 import uuid
 from datetime import timedelta
 from typing import Union
+from .utils import stream_name
 
 
 class Timer:
@@ -49,8 +50,7 @@ class Timer:
         return res
 
     def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
-        # noinspection PyUnresolvedReferences
-        stream = message.stream
+        stream = stream_name(message)
         if key is None:
             key = stream if loop else str(uuid.uuid4())
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"

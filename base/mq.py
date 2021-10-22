@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Type, Dict
 from redis import Redis
-from .utils import Dispatcher
+from .utils import Dispatcher, stream_name
 from base.executor import Executor
 from google.protobuf.message import Message
 from google.protobuf.json_format import Parse, MessageToJson
@@ -15,8 +15,7 @@ class Publisher:
         self._redis = redis
 
     def publish(self, message: Message, maxlen=4096):
-        # noinspection PyUnresolvedReferences
-        stream = message.stream
+        stream = stream_name(message)
         json = MessageToJson(message)
         return self._redis.xadd(stream, {'': json}, maxlen=maxlen)
 
@@ -28,8 +27,7 @@ class ProtoDispatcher(Dispatcher):
 
         assert issubclass(key_or_cls, Message)
         message_cls = key_or_cls  # type: Type[Message]
-        # noinspection PyUnresolvedReferences
-        key = message_cls().stream
+        key = stream_name(message_cls())
         super_handler = super().handler
 
         def decorator(f):

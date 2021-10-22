@@ -150,3 +150,7 @@ class SingleFlight:
             raise
         finally:
             self._futures.pop(key)
+
+
+def stream_name(message: Message) -> str:
+    return f'stream:{message.__class__.__name__}'
