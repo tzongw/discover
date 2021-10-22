@@ -1,9 +1,11 @@
+syntax = "proto3";
+
 message Online {
-    optional string address = 1;
-    optional string conn_id = 2;
+    string address = 1;
+    string conn_id = 2;
 }
 
 message Session {
-    optional string token = 1;
+    string token = 1;
 }
 

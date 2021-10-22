@@ -1,15 +1,14 @@
+syntax = "proto3";
+
 message Login {
-    optional string stream = 1 [default="user:login"];
-    required int64 uid = 2;
+    int64 uid = 1;
 }
 
 message Logout {
-    optional string stream = 1 [default="user:logout"];
-    required int64 uid = 2;
+    int64 uid = 1;
 }
 
 message Alarm {
-    optional string stream = 1 [default="user:alarm"];
-    required string tip = 2;
+    string tip = 1;
 }
 
