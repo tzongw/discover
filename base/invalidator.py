@@ -2,14 +2,16 @@
 from redis import Redis
 import gevent
 import logging
+from .executor import Executor
 from .utils import Dispatcher
 
 
 class Invalidator:
-    def __init__(self, redis: Redis, sep=':'):
+    def __init__(self, redis: Redis, sep=':', batch=5):
         self.redis = redis
         self.sub = None
-        self.dispatcher = Dispatcher(sep=sep)
+        self.dispatcher = Dispatcher(sep=sep,
+                                     executor=Executor(max_workers=batch, queue_size=batch, name='invalidator'))
 
     @property
     def handler(self):

@@ -6,7 +6,7 @@ from .registry import Registry
 from .thrift_pool import ThriftPool
 import logging
 import time
-from base.utils import ip_address, Addr
+from .utils import ip_address, Addr
 
 
 class ServicePools:
