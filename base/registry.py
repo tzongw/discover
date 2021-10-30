@@ -37,15 +37,15 @@ class Registry:
     def add_callback(self, cb):
         self._callbacks.append(cb)
 
-    def start(self, services):
-        logging.info(f'start')
-        self._services.update(services)
+    def start(self, services=None):
+        logging.info(f'start {services}')
+        self._services.update(services or {})
         self._unregister()  # in case process restart
         self._refresh()
         gevent.spawn_later(0.5, self._run)  # wait unregister publish & socket listen
 
     def stop(self):
-        logging.info(f'stop')
+        logging.info(f'stop {self._services}')
         self._stopped = True
         self._unregister()
 
