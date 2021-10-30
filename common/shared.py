@@ -32,17 +32,25 @@ timer_dispatcher = Dispatcher(sep=':')
 invalidator = Invalidator(redis)
 
 _exits = [registry.stop]
+_mains = []
+
+
+def at_main(fun):
+    _mains.append(fun)
 
 
 def at_exit(fun):
     _exits.append(fun)
 
 
+def init_main():
+    executor.gather(*_mains)
+
+
 def _sig_handler(sig, frame):
     def grace_exit():
-        for fun in _exits:
-            with LogSuppress(Exception):
-                fun()
+        with LogSuppress(Exception):
+            executor.gather(*_exits)
         gevent.sleep(1)
         unique_id.stop()
         sys.exit(0)
