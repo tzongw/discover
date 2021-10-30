@@ -52,10 +52,10 @@ class ServicePools:
                 raise
 
     def _clean_pools(self):
-        available_addresses = self.addresses()
-        holding_addresses = set(self._pools.keys())
-        for removed_address in (holding_addresses - available_addresses):
-            logging.warning(f'clean {self._name} {removed_address}')
-            self._cool_down.pop(removed_address, None)
-            pool = self._pools.pop(removed_address)
+        available = self.addresses()
+        holding = set(self._pools.keys())
+        for removed in (holding - available):
+            logging.warning(f'clean {self._name} {removed}')
+            self._cool_down.pop(removed, None)
+            pool = self._pools.pop(removed)
             pool.close_all()
