@@ -46,7 +46,7 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, batch=10):
+    def __init__(self, redis: Redis, group: str, consumer: str, batch=5):
         super().__init__()
         self._redis = redis
         self._group = group

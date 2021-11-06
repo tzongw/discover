@@ -10,6 +10,7 @@ class Invalidator:
     def __init__(self, redis: Redis, sep=':', batch=5):
         self.redis = redis
         self.sub = None
+        self.sep = sep
         self.dispatcher = Dispatcher(sep=sep,
                                      executor=Executor(max_workers=batch, queue_size=batch, name='invalidator'))
 
@@ -38,7 +39,7 @@ class Invalidator:
                     self.sub = self.redis.pubsub()
                     self.sub.execute_command('CLIENT ID')
                     client_id = self.sub.parse_response()
-                    prefixes = ' '.join([f'PREFIX {prefix}' for prefix in self.prefixes])
+                    prefixes = ' '.join([f'PREFIX {prefix}{self.sep}' for prefix in self.prefixes])
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
                     self.sub.execute_command(command)
                     res = self.sub.parse_response()
