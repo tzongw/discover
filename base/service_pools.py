@@ -55,7 +55,7 @@ class ServicePools:
         available = self.addresses()
         holding = set(self._pools.keys())
         for removed in (holding - available):
-            logging.warning(f'clean {self._name} {removed}')
+            logging.info(f'clean {self._name} {removed}')
             self._cool_down.pop(removed, None)
             pool = self._pools.pop(removed)
             pool.close_all()

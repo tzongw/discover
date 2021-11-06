@@ -14,7 +14,7 @@ import logging
 
 
 def main():
-    logging.warning(f'app id: {app_id}')
+    logging.info(f'app id: {app_id}')
     workers = [ws.serve(), rpc.serve()]
     setproctitle(f'{app_name}-{app_id}-{options.ws_address}-{options.rpc_address}')
     shared.registry.start({const.WS_GATE: options.ws_address, const.RPC_GATE: options.rpc_address})

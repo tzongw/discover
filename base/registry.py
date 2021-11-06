@@ -67,7 +67,7 @@ class Registry:
                 name, address = self._unpack(key)
                 addresses[name].add(Addr(address))
         if addresses != self._addresses:
-            logging.warning(f'{self._addresses} -> {addresses}')
+            logging.info(f'{self._addresses} -> {addresses}')
             self._addresses = addresses
             for cb in self._callbacks:
                 with LogSuppress(Exception):
