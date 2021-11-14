@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import uuid
 import flask
-from flask import jsonify, request
+from flask import jsonify, Blueprint, g
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
@@ -21,15 +21,8 @@ from hashlib import sha1
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
-swagger = Swagger(app)
-no_auth_methods = set()
 
 user_id = snowflake.IdGenerator(options.datacenter, app_id)
-
-
-def no_auth(f):
-    no_auth_methods.add(f)
-    return f
 
 
 def serve():
@@ -42,17 +35,7 @@ def serve():
     return g
 
 
-@app.before_request
-def before_request():
-    rule = request.url_rule
-    if rule and app.view_functions[rule.endpoint] not in no_auth_methods:
-        uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
-        if not uid or not token or token != parser.hget(session_key(uid), hash_pb2.Session()).token:
-            return Unauthorized()
-
-
 @app.route('/hello/<list:names>')
-@no_auth
 def hello(names):
     """say hello
     ---
@@ -81,7 +64,6 @@ def hash_password(uid: int, password: str) -> str:
 
 
 @app.route('/register', methods=['POST'])
-@no_auth
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def register(username: str, password: str):
     """register
@@ -111,7 +93,6 @@ def register(username: str, password: str):
 
 
 @app.route('/login', methods=['POST'])
-@no_auth
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(username: str, password: str):
     """login
@@ -143,3 +124,32 @@ def login(username: str, password: str):
         key = session_key(account.id)
         parser.hset(key, hash_pb2.Session(token=token), expire=app.permanent_session_lifetime)
         return jsonify(account)
+
+
+bp = Blueprint('/', __name__)
+
+
+@bp.before_request
+def before_request():
+    uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
+    if not uid or not token or token != parser.hget(session_key(uid), hash_pb2.Session()).token:
+        raise Unauthorized()
+    g.uid = uid
+
+
+@bp.route('/whoami')
+def whoami():
+    """whoami
+    ---
+    tags:
+      - account
+    responses:
+      200:
+        description: accout
+    """
+    account = Account(id=g.uid)
+    return jsonify(account)
+
+
+app.register_blueprint(bp)
+swagger = Swagger(app)
