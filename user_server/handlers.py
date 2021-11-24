@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
-from shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator
+from shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
+    async_task
 from datetime import timedelta
 
 
@@ -35,6 +36,11 @@ def session_invalidate(key):
     logging.info(key)
 
 
+@async_task
+def task(hello: str, repeat: int):
+    logging.info(hello * repeat)
+
+
 def init():
     if registry.addresses(const.RPC_TIMER):
         timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)
@@ -44,3 +50,4 @@ def init():
         timer.create(Alarm(tip='one shot'), timedelta(seconds=2))
         tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(tid))
+    async_task.post(task('hello', 3), timedelta(seconds=10))

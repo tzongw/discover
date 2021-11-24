@@ -17,10 +17,10 @@ class AsyncTask:
             logging.debug(f'got task {id} {task.task_id}')
             args = pickle.loads(task.args)
             kwargs = pickle.loads(task.kwargs)
-            f = self.handlers[task]
+            f = self.handlers[task.path]
             f(*args, **kwargs)
 
-    def wrap(self, f):
+    def __call__(self, f):
         path = f.__module__ + f.__name__
         self.handlers[path] = f
 
