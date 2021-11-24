@@ -5,12 +5,15 @@ import logging
 from base.mq import Receiver
 from base.timer import Timer
 from .mq_pb2 import Task
+from gevent.local import local
 
 
 class AsyncTask:
-    def __init__(self, timer: Timer):
+    def __init__(self, timer: Timer, maxlen=4096):
         self.timer = timer
+        self.maxlen = maxlen
         self.handlers = {}
+        self.task_data = local()
 
     def register(self, receiver: Receiver):
         @receiver.group(Task)
@@ -19,10 +22,11 @@ class AsyncTask:
             args = pickle.loads(task.args)
             kwargs = pickle.loads(task.kwargs)
             f = self.handlers[task.path]
+            self.task_data.task_id = task.task_id
             f(*args, **kwargs)
 
     def __call__(self, f):
-        path = f.__module__ + f.__name__
+        path = f'{f.__module__ }.{f.__name__}'
         self.handlers[path] = f
 
         def wrapper(*args, **kwargs):
@@ -31,5 +35,10 @@ class AsyncTask:
 
         return wrapper
 
-    def post(self, task: Task, delay=0):
-        return self.timer.create(task, delay, key=task.task_id)
+    def post(self, task: Task, interval, loop=False, task_id=None):
+        if task_id:
+            task.task_id = task_id
+        return self.timer.create(task, interval, loop, key=task.task_id, maxlen=self.maxlen)
+
+    def cancel(self, task_id=None):
+        return self.timer.kill(task_id or self.task_data.task_id)

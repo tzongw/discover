@@ -39,6 +39,7 @@ def session_invalidate(key):
 @async_task
 def task(hello: str, repeat: int):
     logging.info(hello * repeat)
+    async_task.cancel()
 
 
 def init():
@@ -51,4 +52,5 @@ def init():
         tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(tid))
     async_task.register(receiver)
-    async_task.post(task('hello', 3), timedelta(seconds=10))
+    task_id = async_task.post(task('hello', 3), timedelta(seconds=2), task_id='task:hello', loop=True)
+    at_exit(lambda: async_task.cancel(task_id))
