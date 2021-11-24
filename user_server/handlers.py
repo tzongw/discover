@@ -50,4 +50,5 @@ def init():
         timer.create(Alarm(tip='one shot'), timedelta(seconds=2))
         tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(tid))
+    async_task.register(receiver)
     async_task.post(task('hello', 3), timedelta(seconds=10))

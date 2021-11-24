@@ -8,10 +8,11 @@ from .mq_pb2 import Task
 
 
 class AsyncTask:
-    def __init__(self, timer: Timer, receiver: Receiver):
+    def __init__(self, timer: Timer):
         self.timer = timer
         self.handlers = {}
 
+    def register(self, receiver: Receiver):
         @receiver.group(Task)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.task_id}')
