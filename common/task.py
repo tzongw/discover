@@ -9,7 +9,7 @@ from gevent.local import local
 
 
 class AsyncTask:
-    def __init__(self, timer: Timer, maxlen=4096):
+    def __init__(self, timer: Timer, maxlen=16384):
         self.timer = timer
         self.maxlen = maxlen
         self.handlers = {}
@@ -24,6 +24,7 @@ class AsyncTask:
             f = self.handlers[task.path]
             self.task_data.task_id = task.task_id
             f(*args, **kwargs)
+            self.task_data.task_id = None
 
     def __call__(self, f):
         path = f'{f.__module__ }.{f.__name__}'
@@ -41,4 +42,5 @@ class AsyncTask:
         return self.timer.create(task, interval, loop, key=task.task_id, maxlen=self.maxlen)
 
     def cancel(self, task_id=None):
+        assert task_id or self.task_data.task_id
         return self.timer.kill(task_id or self.task_data.task_id)
