@@ -4,6 +4,7 @@ import uuid
 import logging
 from base.mq import Receiver
 from base.timer import Timer
+from base.utils import stream_name
 from .mq_pb2 import Task
 from gevent.local import local
 
@@ -19,6 +20,7 @@ class AsyncTask:
         @receiver.group(Task)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.task_id}')
+            receiver.redis.xtrim(stream_name(task), minid=id)
             args = pickle.loads(task.args)
             kwargs = pickle.loads(task.kwargs)
             f = self.handlers[task.path]
