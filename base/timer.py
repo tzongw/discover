@@ -12,9 +12,9 @@ class Timer:
     _PREFIX = 'TIMER'
 
     def __init__(self, redis: Redis, cache=False):
-        self._redis = redis
-        self._script2sha = {}
+        self.redis = redis
         self.cache = cache
+        self._script2sha = {}
 
     @classmethod
     def _key(cls, key):
@@ -26,7 +26,7 @@ class Timer:
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
-        with self._redis.pipeline() as pipe:
+        with self.redis.pipeline() as pipe:
             pipe.execute_command('TIMER.NEW', *params)
             if self.cache:
                 pipe.hset(self._key(key), mapping={
@@ -42,7 +42,7 @@ class Timer:
         return res
 
     def kill(self, *keys):
-        with self._redis.pipeline() as pipe:
+        with self.redis.pipeline() as pipe:
             pipe.execute_command('TIMER.KILL', *keys)
             if self.cache:
                 pipe.delete(*[self._key(key) for key in keys])
@@ -56,7 +56,7 @@ class Timer:
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
         if sha is None:
-            sha = self._redis.script_load(script)
+            sha = self.redis.script_load(script)
             self._script2sha[script] = sha
         data = MessageToJson(message)
         self.new(key, data, sha, interval, loop)

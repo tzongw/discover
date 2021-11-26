@@ -48,7 +48,7 @@ class ProtoDispatcher(Dispatcher):
 class Receiver:
     def __init__(self, redis: Redis, group: str, consumer: str, batch=5):
         super().__init__()
-        self._redis = redis
+        self.redis = redis
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
@@ -77,7 +77,7 @@ class Receiver:
         def fanout_wakeup(id, data):
             logging.info(f'{id} {data}')
 
-        with self._redis.pipeline() as pipe:
+        with self.redis.pipeline() as pipe:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             unique_group = str(uuid.uuid4())
@@ -90,9 +90,9 @@ class Receiver:
 
     def stop(self):
         self._stopped = True
-        self._redis.xadd(self._waker, {'wake': 'up'})
+        self.redis.xadd(self._waker, {'wake': 'up'})
         gevent.joinall(self._workers)
-        with self._redis.pipeline() as pipe:
+        with self.redis.pipeline() as pipe:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
@@ -104,8 +104,8 @@ class Receiver:
         streams = {stream: '>' for stream in self._group_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self._redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0,
-                                                noack=True)
+                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0,
+                                               noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self._group_dispatcher.dispatch(stream, *message)
@@ -115,7 +115,7 @@ class Receiver:
         logging.info(f'group exit')
 
     def _fanout_run(self):
-        with self._redis.pipeline() as pipe:
+        with self.redis.pipeline() as pipe:
             stream_names = self._fanout_dispatcher.handlers.keys()
             for stream in stream_names:
                 pipe.xinfo_stream(stream)
@@ -128,7 +128,7 @@ class Receiver:
         streams = dict(zip(stream_names, last_ids))
         while not self._stopped:
             try:
-                result = self._redis.xread(streams, count=self._batch, block=0)
+                result = self.redis.xread(streams, count=self._batch, block=0)
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)
