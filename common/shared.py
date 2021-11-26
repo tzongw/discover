@@ -36,10 +36,12 @@ _mains = []
 
 
 def at_main(fun):
+    assert callable(fun)
     _mains.append(fun)
 
 
 def at_exit(fun):
+    assert callable(fun)
     _exits.append(fun)
 
 
