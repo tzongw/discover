@@ -89,6 +89,8 @@ class Receiver:
         self._workers = [gevent.spawn(self._group_run), gevent.spawn(self._fanout_run)]
 
     def stop(self):
+        if self._stopped:
+            return
         self._stopped = True
         self.redis.xadd(self._waker, {'wake': 'up'})
         gevent.joinall(self._workers)

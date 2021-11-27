@@ -2,7 +2,7 @@
 import pickle
 import uuid
 import logging
-from base.mq import Receiver
+from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import stream_name
 from .mq_pb2 import Task
@@ -21,15 +21,20 @@ class AsyncTask:
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.task_id}')
             receiver.redis.xtrim(stream_name(task), minid=id)
+            f = self.handlers.get(task.path)
+            if not f:  # versioning problem? throw back task, let new version process handle it
+                logging.warning(f'can not handle {id} {task.task_id}')
+                receiver.stop()
+                Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
+                return
             args = pickle.loads(task.args)
             kwargs = pickle.loads(task.kwargs)
-            f = self.handlers[task.path]
             self.task_data.task_id = task.task_id
             f(*args, **kwargs)
             self.task_data.task_id = None
 
     def __call__(self, f):
-        path = f'{f.__module__ }.{f.__name__}'
+        path = f'{f.__module__}.{f.__name__}'
         self.handlers[path] = f
 
         def wrapper(*args, **kwargs):
