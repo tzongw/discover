@@ -19,11 +19,11 @@ class AsyncTask:
     def register(self, receiver: Receiver):
         @receiver.group(Task)
         def handler(id, task: Task):
-            logging.debug(f'got task {id} {task.task_id}')
+            logging.debug(f'got task {id} {task.task_id} {task.path}')
             receiver.redis.xtrim(stream_name(task), minid=id)
             f = self.handlers.get(task.path)
             if not f:  # versioning problem? throw back task, let new version process handle it
-                logging.warning(f'can not handle {id} {task.task_id}, stop receive Task')
+                logging.warning(f'can not handle {id} {task.task_id} {task.path}, stop receive Task')
                 receiver.remove(Task)
                 Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
                 return
@@ -41,7 +41,7 @@ class AsyncTask:
             task = Task(task_id=str(uuid.uuid4()), path=path, args=pickle.dumps(args), kwargs=pickle.dumps(kwargs))
             return task
 
-        wrapper.__wrapped__ = f
+        wrapper.wrapped = f
         return wrapper
 
     def post(self, task: Task, interval, loop=False, task_id=None):
