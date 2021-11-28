@@ -41,6 +41,7 @@ class AsyncTask:
             task = Task(task_id=str(uuid.uuid4()), path=path, args=pickle.dumps(args), kwargs=pickle.dumps(kwargs))
             return task
 
+        wrapper.__wrapped__ = f
         return wrapper
 
     def post(self, task: Task, interval, loop=False, task_id=None):

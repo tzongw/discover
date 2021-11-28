@@ -135,7 +135,7 @@ class Receiver:
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)
-                        if stream in self._fanout_streams:  # may removed in dispath
+                        if stream in self._fanout_streams:  # may removed in dispatch
                             self._fanout_streams[stream] = message[0]  # update last id
             except Exception:
                 logging.exception(f'')
