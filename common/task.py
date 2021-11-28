@@ -23,8 +23,8 @@ class AsyncTask:
             receiver.redis.xtrim(stream_name(task), minid=id)
             f = self.handlers.get(task.path)
             if not f:  # versioning problem? throw back task, let new version process handle it
-                logging.warning(f'can not handle {id} {task.task_id}')
-                receiver.stop()
+                logging.warning(f'can not handle {id} {task.task_id}, stop receive Task')
+                receiver.remove(Task)
                 Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
                 return
             args = pickle.loads(task.args)

@@ -57,6 +57,8 @@ class Receiver:
             executor=Executor(max_workers=batch, queue_size=batch, name='group_dispatch'))
         self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=batch,
                                                                                 name='fanout_dispatch'))
+        self._group_streams = {}
+        self._fanout_streams = {}
         self._batch = batch
         self._workers = []
 
@@ -89,8 +91,6 @@ class Receiver:
         self._workers = [gevent.spawn(self._group_run), gevent.spawn(self._fanout_run)]
 
     def stop(self):
-        if self._stopped:
-            return
         self._stopped = True
         self.redis.xadd(self._waker, {'wake': 'up'})
         gevent.joinall(self._workers)
@@ -103,10 +103,11 @@ class Receiver:
         logging.info(f'delete {self._waker}')
 
     def _group_run(self):
-        streams = {stream: '>' for stream in self._group_dispatcher.handlers}
+        self._group_streams = {stream: '>' for stream in self._group_dispatcher.handlers}
         while not self._stopped:
             try:
-                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0,
+                result = self.redis.xreadgroup(self._group, self._consumer, self._group_streams, count=self._batch,
+                                               block=0,
                                                noack=True)
                 for stream, messages in result:
                     for message in messages:
@@ -127,15 +128,22 @@ class Receiver:
         # 2. xadd stream1 message1
         # 3. while handling message1, xadd stream2 message2
         # 4. xread stream1 stream2 $ $, message2 is missing
-        streams = dict(zip(stream_names, last_ids))
+        self._fanout_streams = dict(zip(stream_names, last_ids))
         while not self._stopped:
             try:
-                result = self.redis.xread(streams, count=self._batch, block=0)
+                result = self.redis.xread(self._fanout_streams, count=self._batch, block=0)
                 for stream, messages in result:
                     for message in messages:
                         self._fanout_dispatcher.dispatch(stream, *message)
-                        streams[stream] = message[0]  # update last id
+                        if stream in self._fanout_streams:  # may removed in dispath
+                            self._fanout_streams[stream] = message[0]  # update last id
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
         logging.info(f'fanout exit')
+
+    def remove(self, message_cls: Type[Message]):
+        stream = stream_name(message_cls())
+        self._group_streams.pop(stream, None)
+        self._fanout_streams.pop(stream, None)
+        self.redis.xadd(self._waker, {'wake': 'up'})
