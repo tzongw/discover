@@ -11,9 +11,9 @@ from .utils import stream_name
 class Timer:
     _PREFIX = 'TIMER'
 
-    def __init__(self, redis: Redis, cache=False):
+    def __init__(self, redis: Redis, cache_key=False):
         self.redis = redis
-        self.cache = cache
+        self.cache_key = cache_key
         self._script2sha = {}
 
     @classmethod
@@ -28,7 +28,7 @@ class Timer:
             params.append('LOOP')
         with self.redis.pipeline() as pipe:
             pipe.execute_command('TIMER.NEW', *params)
-            if self.cache:
+            if self.cache_key:
                 pipe.hset(self._key(key), mapping={
                     'data': data,
                     'sha': sha,
@@ -44,7 +44,7 @@ class Timer:
     def kill(self, *keys):
         with self.redis.pipeline() as pipe:
             pipe.execute_command('TIMER.KILL', *keys)
-            if self.cache:
+            if self.cache_key:
                 pipe.delete(*[self._key(key) for key in keys])
             res, *_ = pipe.execute()
         return res

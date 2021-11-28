@@ -37,7 +37,7 @@ def session_invalidate(key):
 
 
 @async_task
-def task(hello: str, repeat: int):
+def task(hello: str, repeat: int, **_):
     logging.info(hello * repeat)
     async_task.cancel()
 
