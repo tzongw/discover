@@ -46,7 +46,7 @@ def worker(i, wait):
 def main():
     # websocket.enableTrace(True)
     workers = []
-    for i in range(5000):
+    for i in range(3000):
         workers.append(gevent.spawn(worker, i, 0.01 * i))
     gevent.joinall(workers)
 
