@@ -25,22 +25,14 @@ def on_close(ws):
 
 
 def on_open(ws):
-    def run(*args):
-        for i in range(1000):
-            time.sleep(10)
-            ws.send("Hello %d" % i)
-        time.sleep(1)
-        ws.close()
-        print("thread terminating...")
-
-    gevent.spawn(run)
+    print("### open ###", ws.__uid)
 
 
 def worker(i, wait):
     uid = options.uid + i
     gevent.sleep(wait)
-    for _ in range(10):
-        ws = websocket.WebSocketApp(f'ws://dev.xc:35010/ws?token=pass&uid={uid}',
+    for _ in range(1):
+        ws = websocket.WebSocketApp(f'ws://tx:3389/ws?token=pass&uid={uid}',
                                     on_message=on_message,
                                     on_error=on_error,
                                     on_close=on_close)
@@ -48,31 +40,16 @@ def worker(i, wait):
         ws.__uid = uid
         ws.run_forever()
         gevent.sleep(10)
+        print('hahahahahah')
 
 
 def main():
     # websocket.enableTrace(True)
     workers = []
-    for i in range(100):
-        workers.append(gevent.spawn(worker, i, 0.1 * i))
-    for i in range(100):
-        workers.append(gevent.spawn(worker, i, 0.1 * i + 10))
+    for i in range(5000):
+        workers.append(gevent.spawn(worker, i, 0.01 * i))
     gevent.joinall(workers)
 
 
 if __name__ == '__main__':
-    from base.executor import Executor
-
-
-    def sleep_print(msg):
-        time.sleep(1)
-        print(msg)
-
-
-    exe = Executor(max_workers=2, queue_size=2, idle=5)
-    exe.submit(lambda: sleep_print('aaa'))
-    exe.submit(lambda: sleep_print('bbb'))
-    gevent.sleep(0.1)
-    exe.gather(lambda: sleep_print('ccc'), lambda: sleep_print('ddd'), lambda: sleep_print('eee'),
-               lambda: sleep_print('kkk'), lambda: sleep_print('mmm'))
-    gevent.sleep(5)
+    main()
