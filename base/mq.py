@@ -55,8 +55,8 @@ class Receiver:
         self._stopped = False
         self._group_dispatcher = ProtoDispatcher(
             executor=Executor(max_workers=batch, queue_size=batch, name='group_dispatch'))
-        self._fanout_dispatcher = ProtoDispatcher(multi=True, executor=Executor(max_workers=batch, queue_size=batch,
-                                                                                name='fanout_dispatch'))
+        self._fanout_dispatcher = ProtoDispatcher(executor=Executor(max_workers=batch, queue_size=batch,
+                                                                    name='fanout_dispatch'))
         self._group_streams = {}
         self._fanout_streams = {}
         self._batch = batch

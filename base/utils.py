@@ -51,10 +51,9 @@ wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:
-    def __init__(self, sep=None, multi=False, executor=None):
+    def __init__(self, sep=None, executor=None):
         self._handlers = defaultdict(list)
         self._sep = sep
-        self._multi = multi
         self._executor = executor or Executor(max_workers=1, queue_size=0, name='dispatch')
 
     def dispatch(self, key: str, *args, **kwargs):
@@ -66,7 +65,6 @@ class Dispatcher:
 
     def handler(self, key: str):
         def decorator(f):
-            assert self._multi or key not in self._handlers
             self._handlers[key].append(f)
             return f
 
