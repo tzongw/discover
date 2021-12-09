@@ -28,7 +28,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=300, name=''):
+    def __init__(self, max_workers=128, queue_size=None, idle=60, name=''):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
@@ -48,6 +48,9 @@ class Executor:
 
     def gather(self, *fns):
         return [fut.result() for fut in [self.submit(fn) for fn in fns]]
+
+    def map(self, fn, *args):
+        return self.gather(*[lambda arg=arg: fn(arg) for arg in args])
 
     def _adjust_workers(self):
         if self._unfinished > self._workers and self._workers < self._max_workers:
