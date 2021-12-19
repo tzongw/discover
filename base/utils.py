@@ -12,6 +12,7 @@ from werkzeug.routing import BaseConverter
 from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
+import gevent
 
 
 class LogSuppress(contextlib.suppress):
@@ -152,3 +153,9 @@ class SingleFlight:
 
 def stream_name(message: Message) -> str:
     return f'stream:{message.__class__.__name__}'
+
+
+def run_in_thread(fn, *args, **kwargs):
+    pool = gevent.get_hub().threadpool
+    result = pool.spawn(fn, *args, **kwargs).get()
+    return result
