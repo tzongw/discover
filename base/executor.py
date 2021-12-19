@@ -46,11 +46,13 @@ class Executor:
         self._items.put(item)
         return fut
 
-    def gather(self, *fns):
-        return [fut.result() for fut in [self.submit(fn) for fn in fns]]
+    def gather(self, *fns, block=True):
+        futures = [self.submit(fn) for fn in fns]
+        results = (fut.result() for fut in futures)
+        return list(results) if block else results
 
-    def map(self, fn, *args):
-        return self.gather(*[lambda arg=arg: fn(arg) for arg in args])
+    def map(self, fn, *args, block=True):
+        return self.gather(*[lambda arg=arg: fn(arg) for arg in args], block=block)
 
     def _adjust_workers(self):
         if self._unfinished > self._workers and self._workers < self._max_workers:
