@@ -43,8 +43,10 @@ class Invalidator:
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
                     self.sub.execute_command(command)
                     res = self.sub.parse_response()
-                    logging.info(f'TRACKING ON {client_id} {res}')
+                    logging.info(f'{command} {res}')
                     self.sub.subscribe('__redis__:invalidate')
+                    res = self.sub.parse_response()
+                    logging.info(res)
                     self._invalidate_all()
                 msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=None)
                 if msg is None:
