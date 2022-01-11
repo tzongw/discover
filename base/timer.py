@@ -11,9 +11,10 @@ from .utils import stream_name
 class Timer:
     _PREFIX = 'TIMER'
 
-    def __init__(self, redis: Redis, cache_key=False):
+    def __init__(self, redis: Redis, cache_key=False, hint=None):
         self.redis = redis
         self.cache_key = cache_key
+        self.hint = hint
         self._script2sha = {}
 
     @classmethod
@@ -53,7 +54,8 @@ class Timer:
         stream = stream_name(message)
         if key is None:
             key = stream if loop else str(uuid.uuid4())
-        script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', '*', '', ARGV[1])"
+        hint = f"'HINT', '{self.hint}', " if self.hint is not None else ''
+        script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', {hint} '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
         if sha is None:
             sha = self.redis.script_load(script)

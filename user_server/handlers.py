@@ -2,7 +2,7 @@
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
-    async_task
+    async_task, app_id
 from datetime import timedelta
 
 
@@ -48,6 +48,8 @@ def init():
         timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
+        if redis.info('server')['redis_version'] == '255.255.255':
+            timer.hint = app_id
         timer.create(Alarm(tip='one shot'), timedelta(seconds=2))
         tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(tid))
