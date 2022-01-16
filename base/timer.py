@@ -27,18 +27,19 @@ class Timer:
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')
+        key = self._key(key)
         with self.redis.pipeline() as pipe:
             pipe.execute_command('TIMER.NEW', *params)
             if self.cache_key:
-                pipe.hset(self._key(key), mapping={
+                pipe.hset(key, mapping={
                     'data': data,
                     'sha': sha,
                     'interval': interval
                 })
                 if loop:
-                    pipe.persist(self._key(key))
+                    pipe.persist(key)
                 else:
-                    pipe.pexpire(self._key(key), interval)
+                    pipe.pexpire(key, interval)
             res, *_ = pipe.execute()
         return res
 
@@ -63,3 +64,7 @@ class Timer:
         data = MessageToJson(message)
         self.new(key, data, sha, interval, loop)
         return key
+
+    def exists(self, key: str):
+        assert self.cache_key
+        return self.redis.exists(self._key(key))

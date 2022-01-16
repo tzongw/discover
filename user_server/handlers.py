@@ -50,9 +50,11 @@ def init():
     if redis.execute_command('MODULE LIST'):  # timer module loaded
         if redis.info('server')['redis_version'] == '255.255.255':
             timer.hint = app_id
-        timer.create(Alarm(tip='one shot'), timedelta(seconds=2))
-        tid = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
-        at_exit(lambda: timer.kill(tid))
+        oneshot_id = timer.create(Alarm(tip='oneshot'), timedelta(seconds=2))
+        at_exit(lambda: timer.kill(oneshot_id))
+        loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
+        at_exit(lambda: timer.kill(loop_id))
         async_task.register(receiver)
-        task_id = async_task.post(task('hello', 3), timedelta(seconds=2), task_id='task:hello', loop=True)
+        task_id = async_task.post(task('hello', 3), timedelta(seconds=3), task_id='task:hello', loop=True)
         at_exit(lambda: async_task.cancel(task_id))
+        logging.info(f'{timer.exists(oneshot_id)}, {timer.exists(loop_id)}, {timer.exists(task_id)}')
