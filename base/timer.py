@@ -9,7 +9,7 @@ from .utils import stream_name
 
 
 class Timer:
-    _PREFIX = 'TIMER'
+    _PREFIX = 'timer'
 
     def __init__(self, redis: Redis, cache_key=False, hint=None):
         self.redis = redis

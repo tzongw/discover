@@ -37,7 +37,7 @@ class AsyncTask:
         self.handlers[path] = f
 
         def wrapper(*args, **kwargs):
-            task = Task(task_id=str(uuid.uuid4()), path=path, args=pickle.dumps(args), kwargs=pickle.dumps(kwargs))
+            task = Task(path=path, args=pickle.dumps(args), kwargs=pickle.dumps(kwargs))
             return task
 
         wrapper.wrapped = f
@@ -46,6 +46,8 @@ class AsyncTask:
     def post(self, task: Task, interval, loop=False, task_id=None):
         if task_id:
             task.task_id = task_id
+        elif not task.task_id:
+            task.task_id = f'{stream_name(task)}:{task.path}' if loop else str(uuid.uuid4())
         return self.timer.create(task, interval, loop, key=task.task_id, maxlen=self.maxlen)
 
     def cancel(self, task_id=None):
