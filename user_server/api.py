@@ -145,7 +145,7 @@ def whoami():
       - account
     responses:
       200:
-        description: accout
+        description: account
     """
     account = Account(id=g.uid)
     return jsonify(account)

@@ -24,6 +24,7 @@ class Timer:
     def new(self, key: str, data: str, sha: str, interval: Union[int, timedelta], loop=False):
         if isinstance(interval, timedelta):
             interval = int(interval.total_seconds() * 1000)
+        assert interval >= 1
         params = [key, data, sha, interval]
         if loop:
             params.append('LOOP')

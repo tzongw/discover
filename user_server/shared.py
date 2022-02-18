@@ -13,7 +13,7 @@ app = Flask(__name__)
 receiver = Receiver(redis, app_name, str(app_id))
 at_exit(receiver.stop)
 
-async_task = AsyncTask(timer)
+async_task = AsyncTask(timer, receiver)
 
 
 def online_key(uid: int):

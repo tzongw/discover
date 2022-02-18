@@ -10,13 +10,12 @@ from gevent.local import local
 
 
 class AsyncTask:
-    def __init__(self, timer: Timer, maxlen=16384):
+    def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
         self.timer = timer
         self.maxlen = maxlen
         self.handlers = {}
         self.task_data = local()
 
-    def register(self, receiver: Receiver):
         @receiver.group(Task)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.task_id} {task.path}')
