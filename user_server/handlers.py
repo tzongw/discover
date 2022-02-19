@@ -46,7 +46,7 @@ def init():
     if registry.addresses(const.RPC_TIMER):
         timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)
         timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
-        at_exit(lambda: timer_service.remove_timer('welcome', const.RPC_USER))
+        at_exit(lambda: timer_service.remove_timer('welcome:2', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
         if redis.info('server')['redis_version'] == '255.255.255':
             timer.hint = app_id

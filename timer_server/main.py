@@ -115,7 +115,7 @@ class Handler:
         full_key = self._full_key(key, service_name)
         timer = self._timers.pop(full_key, None)
         if timer:
-            logging.warning(f'delete {key} {service_name}')
+            logging.info(f'delete {key} {service_name}')
             handle = timer[self._HANDLE]
             if isinstance(handle, Handle):
                 handle.cancel()

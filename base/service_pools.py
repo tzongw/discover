@@ -27,7 +27,7 @@ class ServicePools:
         now = time.time()
         good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
         local_host = ip_address()
-        local_ones = [addr for addr in good_ones if addr.host == local_host]
+        local_ones = [addr for addr in good_ones if Addr(addr).host == local_host]
         address = choice(local_ones or good_ones or tuple(addresses))  # type: str
         with self.address_connection(address) as conn:
             yield conn
