@@ -13,7 +13,7 @@ message Alarm {
 }
 
 message Task {
-    string task_id = 1;
+    string id = 1;
     string path = 2;
     bytes args = 3;
     bytes kwargs = 4;
