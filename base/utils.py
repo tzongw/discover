@@ -13,6 +13,7 @@ from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
 import gevent
+from boltons.cacheutils import LRU
 
 
 class LogSuppress(contextlib.suppress):
@@ -153,6 +154,19 @@ class SingleFlight:
             raise
         finally:
             self._futures.pop(key)
+
+
+class Cache:
+    def __init__(self, f, maxsize=8192):
+        self.single_flight = SingleFlight(f)
+        self.lru = LRU(max_size=maxsize)
+
+    def get(self, key, *args, **kwargs):
+        if key in self.lru:
+            return self.lru[key]
+        r = self.single_flight.get(key, *args, **kwargs)
+        self.lru[key] = r
+        return r
 
 
 def stream_name(message: Message) -> str:
