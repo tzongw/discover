@@ -7,12 +7,11 @@ from .utils import Dispatcher
 
 
 class Invalidator:
-    def __init__(self, redis: Redis, sep=':', batch=5):
+    def __init__(self, redis: Redis, sep=':'):
         self.redis = redis
         self.sub = None
         self.sep = sep
-        self.dispatcher = Dispatcher(sep=sep,
-                                     executor=Executor(max_workers=batch, queue_size=batch, name='invalidator'))
+        self.dispatcher = Dispatcher(sep=sep, executor=Executor(name='invalidator'))
 
     @property
     def handler(self):
