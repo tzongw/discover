@@ -15,7 +15,7 @@ from redis import Redis
 from base import utils
 from base.mq import Publisher
 from service import user
-from shared import timer_dispatcher, app, online_key, session_key
+from shared import dispatcher, app, online_key, session_key
 from config import options
 from base.utils import Parser
 
@@ -24,7 +24,7 @@ class Handler:
     def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
         self._redis = redis
         self._parser = Parser(redis)
-        self._timer_dispatcher = dispatcher
+        self._dispatcher = dispatcher
 
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
@@ -127,11 +127,11 @@ class Handler:
                 shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        self._timer_dispatcher.dispatch(key, key, data)
+        self._dispatcher.dispatch(key, key, data)
 
 
 def serve():
-    handler = Handler(shared.redis, timer_dispatcher)
+    handler = Handler(shared.redis, dispatcher)
     processor = user.Processor(handler)
     transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()

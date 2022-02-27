@@ -58,15 +58,18 @@ class Dispatcher:
         self._executor = executor or Executor(name='dispatch')
 
     def dispatch(self, key, *args, **kwargs):
-        if self._sep is not None:
+        if self._sep and isinstance(key, str):
             key = key.split(self._sep, maxsplit=1)[0]
         handlers = self._handlers.get(key) or []
         for handle in handlers:
             self._executor.submit(handle, *args, **kwargs)
 
+    def signal(self, event):
+        cls = event.__class__
+        self.dispatch(cls, event)
+
     def handler(self, key):
         def decorator(f):
-            assert self._sep is None or isinstance(key, str)
             self._handlers[key].append(f)
             return f
 

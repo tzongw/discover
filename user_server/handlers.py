@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
-from shared import timer_dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
+from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
     async_task, app_id
 from datetime import timedelta
+from dao import Account
 
 
-@timer_dispatcher.handler('welcome')
+@dispatcher.handler('welcome')
 def on_welcome(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-@timer_dispatcher.handler('notice')
+@dispatcher.handler('notice')
 def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
+
+
+@dispatcher.handler(Account)
+def on_register(account: Account):
+    logging.info(f'{account}')
 
 
 @receiver.group(Login)

@@ -28,7 +28,7 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 executor = Executor(name='shared')
 schedule = Schedule()
 unique_id = UniqueId(schedule, redis)
-timer_dispatcher = Dispatcher(sep=':')
+dispatcher = Dispatcher(sep=':')
 invalidator = Invalidator(redis)
 
 _exits = [registry.stop]

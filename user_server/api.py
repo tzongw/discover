@@ -5,7 +5,7 @@ from flask import jsonify, Blueprint, g
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
-from shared import app, parser
+from shared import app, parser, dispatcher
 import hash_pb2
 from gevent import pywsgi
 from config import options
@@ -89,6 +89,7 @@ def register(username: str, password: str):
     account = Account(id=uid, username=username, hashed=hashed)
     session.add(account)
     session.commit()
+    dispatcher.signal(account)
     return jsonify(account)
 
 
