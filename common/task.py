@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pickle
+import json
 import uuid
 import logging
 from base.mq import Receiver, Publisher
@@ -26,8 +26,8 @@ class AsyncTask:
                 receiver.remove(Task)
                 Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
                 return
-            args = pickle.loads(task.args)
-            kwargs = pickle.loads(task.kwargs)
+            args = json.loads(task.args)
+            kwargs = json.loads(task.kwargs)
             self.current_task.id = task.id
             f(*args, **kwargs)
             self.current_task.id = None
@@ -37,7 +37,7 @@ class AsyncTask:
         self.handlers[path] = f
 
         def wrapper(*args, **kwargs):
-            task = Task(path=path, args=pickle.dumps(args), kwargs=pickle.dumps(kwargs))
+            task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
             return task
 
         wrapper.wrapped = f

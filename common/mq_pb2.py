@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x08mq.proto\"\x14\n\x05Login\x12\x0b\n\x03uid\x18\x01 \x01(\x03\"\x15\n\x06Logout\x12\x0b\n\x03uid\x18\x01 \x01(\x03\"\x14\n\x05\x41larm\x12\x0b\n\x03tip\x18\x01 \x01(\t\">\n\x04Task\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04\x61rgs\x18\x03 \x01(\x0c\x12\x0e\n\x06kwargs\x18\x04 \x01(\x0c\x62\x06proto3'
+  serialized_pb=b'\n\x08mq.proto\"\x14\n\x05Login\x12\x0b\n\x03uid\x18\x01 \x01(\x03\"\x15\n\x06Logout\x12\x0b\n\x03uid\x18\x01 \x01(\x03\"\x14\n\x05\x41larm\x12\x0b\n\x03tip\x18\x01 \x01(\t\">\n\x04Task\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0c\n\x04\x61rgs\x18\x03 \x01(\t\x12\x0e\n\x06kwargs\x18\x04 \x01(\tb\x06proto3'
 )
 
 
@@ -145,15 +145,15 @@ _TASK = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='args', full_name='Task.args', index=2,
-      number=3, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"",
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='kwargs', full_name='Task.kwargs', index=3,
-      number=4, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"",
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),

@@ -15,6 +15,6 @@ message Alarm {
 message Task {
     string id = 1;
     string path = 2;
-    bytes args = 3;
-    bytes kwargs = 4;
+    string args = 3;
+    string kwargs = 4;
 }
