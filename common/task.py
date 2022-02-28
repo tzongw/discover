@@ -47,7 +47,7 @@ class AsyncTask:
         if task_id:
             task.id = task_id
         elif not task.id:
-            task.id = f'{stream_name(task)}:{task.path}' if loop else str(uuid.uuid4())
+            task.id = f'{stream_name(task)}:{task.path}:{task.args}:{task.kwargs}' if loop else str(uuid.uuid4())
         return self.timer.create(task, interval, loop, key=task.id, maxlen=self.maxlen)
 
     def cancel(self, task_id=None):
