@@ -5,15 +5,14 @@ from flask import jsonify, Blueprint, g
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
-from shared import app, parser, dispatcher
+from shared import app, parser, dispatcher, id_generator
 import hash_pb2
 from gevent import pywsgi
 from config import options
 from const import CONTEXT_UID, CONTEXT_TOKEN
 import gevent
 import logging
-from base import snowflake
-from shared import app_id, session_key
+from shared import session_key
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized
 from base.utils import ListConverter
 from flasgger import Swagger
@@ -21,8 +20,6 @@ from hashlib import sha1
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
-
-user_id = snowflake.IdGenerator(options.datacenter, app_id)
 
 
 def serve():
@@ -84,7 +81,7 @@ def register(username: str, password: str):
         description: account
     """
     session = Session()
-    uid = user_id.gen()
+    uid = id_generator.gen()
     hashed = hash_password(uid, password)
     account = Account(id=uid, username=username, hashed=hashed)
     session.add(account)

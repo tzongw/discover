@@ -4,9 +4,11 @@ from base.mq import Receiver
 from base.snowflake import max_worker_id
 from flask import Flask
 from common.task import AsyncTask
+from base import snowflake
 
 app_name = const.APP_USER
 app_id = unique_id.gen(app_name, range(max_worker_id))
+id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 
 app = Flask(__name__)
 
