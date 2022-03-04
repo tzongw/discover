@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import time
 
 # twitter's snowflake parameters
@@ -49,26 +49,35 @@ def melt(snowflake_id):
 
 def local_datetime(timestamp_ms):
     """convert millisecond timestamp to local datetime object."""
-    return datetime.datetime.fromtimestamp(timestamp_ms // 1000)
+    return datetime.fromtimestamp(timestamp_ms / 1000)
+
+
+def extract_datetime(snowflake_id):
+    return local_datetime(melt(snowflake_id)[0])
+
+
+def from_datetime(dt: datetime):
+    timestamp_ms = int(dt.timestamp() * 1000)
+    return make_snowflake(timestamp_ms, 0, 0, 0)
 
 
 class IdGenerator:
     def __init__(self, datacenter_id: int, worker_id: int):
         self._datacenter_id = datacenter_id
         self._worker_id = worker_id
-        self._timestamp = 0
+        self._timestamp_ms = 0
         self._sequence_id = 0
 
     def gen(self) -> int:
-        timestamp = time.time_ns() // 1_000_000
-        if timestamp < self._timestamp:
-            raise ValueError(f'clock go backwards {timestamp} < {self._timestamp}')
-        if timestamp == self._timestamp:
+        timestamp_ms = time.time_ns() // 1_000_000
+        if timestamp_ms < self._timestamp_ms:
+            raise ValueError(f'clock go backwards {timestamp_ms} < {self._timestamp_ms}')
+        if timestamp_ms == self._timestamp_ms:
             self._sequence_id += 1
         else:
             self._sequence_id = 0
-        self._timestamp = timestamp
-        return make_snowflake(timestamp, self._datacenter_id, self._worker_id, self._sequence_id)
+        self._timestamp_ms = timestamp_ms
+        return make_snowflake(timestamp_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
 
 if __name__ == '__main__':
@@ -77,7 +86,7 @@ if __name__ == '__main__':
     args = (t0, 12, 23, 34)
     assert melt(make_snowflake(*args)) == args
     g = IdGenerator(datacenter_id=1, worker_id=2)
-    for _ in range(100):
+    for _ in range(1000):
         uid = g.gen()
         args = melt(uid)
         print(local_datetime(args[0]), args)
