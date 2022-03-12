@@ -52,11 +52,12 @@ class Timer:
             res, *_ = pipe.execute()
         return res
 
-    def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096):
+    def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
+               do_hint=True):
         stream = stream_name(message)
         if key is None:
             key = stream if loop else str(uuid.uuid4())
-        hint = f"'HINT', '{self.hint}', " if self.hint is not None else ''
+        hint = f"'HINT', '{self.hint}', " if do_hint and self.hint else ''
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', {hint} '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
         if sha is None:
