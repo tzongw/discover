@@ -9,6 +9,12 @@ from gevent.local import local
 
 
 class AsyncTask:
+    """
+    Make sure new version handler is compatible with old version arguments, that means:
+    1. can not remove an argument, instead add a new handler
+    2. add new argument at the end and set a default value
+    """
+
     def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
         self.timer = timer
         self.maxlen = maxlen
@@ -19,17 +25,30 @@ class AsyncTask:
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.id} {task.path}')
             receiver.redis.xtrim(stream_name(task), minid=id)
-            f = self.handlers.get(task.path)
-            if not f:  # versioning problem? throw back task, let new version process handle it
+
+            def throw_back():
+                # versioning problem? throw back task, let new version process handle it
                 logging.warning(f'can not handle {id} {task.id} {task.path}, stop receive Task')
                 receiver.remove(Task)
                 Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
+
+            f = self.handlers.get(task.path)
+            if not f:
+                throw_back()
                 return
             args = json.loads(task.args)
             kwargs = json.loads(task.kwargs)
             self.current_task.id = task.id
-            f(*args, **kwargs)
-            self.current_task.id = None
+            try:
+                f(*args, **kwargs)
+            except TypeError as e:
+                name = task.path.split('.')[-1]
+                if f'{name}()' in str(e):
+                    # f is the reason, not called yet, can safely throw back task
+                    throw_back()
+                raise
+            finally:
+                self.current_task.id = None
 
     def __call__(self, f):
         path = f'{f.__module__}.{f.__name__}'
