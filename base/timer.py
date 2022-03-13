@@ -2,7 +2,6 @@
 from redis import Redis
 from google.protobuf.message import Message
 from google.protobuf.json_format import MessageToJson
-import uuid
 from datetime import timedelta
 from typing import Union
 from .utils import stream_name
@@ -55,15 +54,15 @@ class Timer:
     def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
                do_hint=True):
         stream = stream_name(message)
+        data = MessageToJson(message)
         if key is None:
-            key = stream if loop else str(uuid.uuid4())
+            key = f'stream:{data}'
         hint = f"'HINT', '{self.hint}', " if do_hint and self.hint else ''
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', {hint} '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
         if sha is None:
             sha = self.redis.script_load(script)
             self._script2sha[script] = sha
-        data = MessageToJson(message)
         self.new(key, data, sha, interval, loop)
         return key
 

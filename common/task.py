@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import uuid
 import logging
 from base.mq import Receiver, Publisher
 from base.timer import Timer
@@ -47,7 +46,7 @@ class AsyncTask:
         if task_id:
             task.id = task_id
         elif not task.id:
-            task.id = f'{stream_name(task)}:{task.path}:{task.args}:{task.kwargs}' if loop else str(uuid.uuid4())
+            task.id = f'{stream_name(task)}:{task.path}:{task.args}:{task.kwargs}'
         return self.timer.create(task, interval, loop, key=task.id, maxlen=self.maxlen, do_hint=do_hint)
 
     def cancel(self, task_id=None):
