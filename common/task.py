@@ -46,6 +46,7 @@ class AsyncTask:
                 if f'{name}()' in str(e):
                     # f is the reason, not called yet, can safely throw back task
                     throw_back()
+                    return
                 raise
             finally:
                 self.current_task.id = None
