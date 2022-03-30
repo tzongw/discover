@@ -56,7 +56,7 @@ class Timer:
         stream = stream_name(message)
         data = MessageToJson(message)
         if key is None:
-            key = f'stream:{data}'
+            key = f'{stream}:{data}'
         hint = f"'HINT', '{self.hint}', " if do_hint and self.hint else ''
         script = f"return redis.call('XADD', '{stream}', 'MAXLEN', '~', '{maxlen}', {hint} '*', '', ARGV[1])"
         sha = self._script2sha.get(script)
