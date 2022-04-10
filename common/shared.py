@@ -1,5 +1,6 @@
 import signal
 from typing import Union
+from weakref import WeakSet
 import gevent
 from redis import Redis
 from . import const
@@ -34,6 +35,9 @@ invalidator = Invalidator(redis)
 _exits = [registry.stop]
 _mains = []
 
+exiting = False  # grace exiting, stop receive new tasks
+workers = WeakSet()  # heavy task workers, try join all before exit
+
 
 def at_main(fun):
     assert callable(fun)
@@ -51,9 +55,13 @@ def init_main():
 
 def _sig_handler(sig, frame):
     def grace_exit():
+        global exiting
+        exiting = True
         with LogSuppress(Exception):
             executor.gather(*_exits)
         gevent.sleep(1)
+        greenlets = list(workers)
+        gevent.joinall(greenlets, timeout=30, raise_error=False)  # try finish all jobs
         unique_id.stop()
         sys.exit(0)
 
