@@ -46,7 +46,7 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, batch=5):
+    def __init__(self, redis: Redis, group: str, consumer: str, batch=10):
         super().__init__()
         self.redis = redis
         self._group = group
@@ -54,8 +54,8 @@ class Receiver:
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
         self._group_dispatcher = ProtoDispatcher(
-            executor=Executor(max_workers=batch, queue_size=batch, name='group_dispatch'))
-        self._fanout_dispatcher = ProtoDispatcher(executor=Executor(max_workers=batch, queue_size=batch,
+            executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
+        self._fanout_dispatcher = ProtoDispatcher(executor=Executor(max_workers=batch, queue_size=0,
                                                                     name='fanout_dispatch'))
         self._group_streams = {}
         self._fanout_streams = {}
@@ -100,7 +100,7 @@ class Receiver:
             pipe.delete(self._waker)
             pipe.execute()
         logging.info(f'delete consumers {self._group_dispatcher.handlers.keys()}')
-        logging.info(f'delete {self._waker}')
+        logging.info(f'delete waker {self._waker}')
 
     def _group_run(self):
         self._group_streams = {stream: '>' for stream in self._group_dispatcher.handlers}
