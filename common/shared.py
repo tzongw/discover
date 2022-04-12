@@ -55,10 +55,10 @@ def init_main():
 
 def _sig_handler(sig, frame):
     def grace_exit():
-        global exiting
-        exiting = True
         with LogSuppress(Exception):
             executor.gather(*_exits)
+        global exiting
+        exiting = True
         gevent.sleep(1)
         greenlets = list(workers)
         gevent.joinall(greenlets, timeout=30, raise_error=False)  # try finish all jobs
