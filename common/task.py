@@ -20,7 +20,7 @@ class AsyncTask:
         self.receiver = receiver
         self.maxlen = maxlen
         self.handlers = {}
-        self.locals = local()
+        self.local = local()
 
         @receiver.group(Task)
         def handler(id, task: Task):
@@ -39,7 +39,7 @@ class AsyncTask:
                 return
             args = json.loads(task.args)
             kwargs = json.loads(task.kwargs)
-            self.locals.task = task
+            self.local.task = task
             try:
                 f(*args, **kwargs)
             except TypeError as e:
@@ -50,7 +50,7 @@ class AsyncTask:
                     return
                 raise
             finally:
-                self.locals.task = None
+                del self.local.task
 
     def __call__(self, f):
         path = f'{f.__module__}.{f.__name__}'
@@ -68,7 +68,7 @@ class AsyncTask:
 
     @property
     def current_task(self):
-        return self.locals.task
+        return self.local.task
 
     def cancel(self, task_id=None):
         return self.timer.kill(task_id or self.current_task.id)
