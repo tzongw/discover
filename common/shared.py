@@ -55,14 +55,14 @@ def init_main():
 
 def _sig_handler(sig, frame):
     def grace_exit():
-        with LogSuppress(Exception):
-            executor.gather(*_exits)
         global exiting
         exiting = True
-        gevent.sleep(1)
-        greenlets = list(workers)
-        gevent.joinall(greenlets, timeout=30, raise_error=False)  # try finish all jobs
-        unique_id.stop()
+        with LogSuppress(Exception):
+            executor.gather(*_exits)
+            gevent.sleep(1)
+            greenlets = list(workers)
+            gevent.joinall(greenlets, timeout=30, raise_error=False)  # try finish all jobs
+            unique_id.stop()
         sys.exit(0)
 
     gevent.spawn(grace_exit)
