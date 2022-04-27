@@ -3,6 +3,7 @@ import logging
 import socket
 from functools import lru_cache
 import sys
+from typing import TypeVar, Optional
 from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
@@ -81,6 +82,9 @@ class Dispatcher:
         return self._handlers
 
 
+M = TypeVar('M', bound=Message)
+
+
 class Parser:
     def __init__(self, redis: Redis):
         self._redis = redis
@@ -106,7 +110,7 @@ class Parser:
                     pipe.expire(name, expire)
                     pipe.execute()
 
-    def hget(self, name: str, message: Message, return_none=False):
+    def hget(self, name: str, message: M, return_none=False) -> Optional[M]:
         def converter(mapping):
             return ParseDict(mapping, message, ignore_unknown_fields=True) \
                 if mapping or not return_none else None

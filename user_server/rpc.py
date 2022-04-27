@@ -37,6 +37,9 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
+            session = self._parser.hget(session_key(uid), Session())
+            if token != session.token:
+                raise ValueError("token error")
             key = online_key(uid)
             with self._redis.pipeline() as pipe:
                 parser = Parser(pipe)
