@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from tornado.log import LogFormatter
-from tornado.options import define, parse_config_file
+from tornado.options import define, parse_config_file, options
 
 LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
 channel = logging.StreamHandler()

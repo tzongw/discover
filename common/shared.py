@@ -4,6 +4,7 @@ from weakref import WeakSet
 import gevent
 from redis import Redis
 from . import const
+from .config import options
 import service
 from base.registry import Registry
 from .rpc_service import UserService, GateService, TimerService
@@ -14,7 +15,6 @@ from base.unique import UniqueId
 from base.utils import Dispatcher, LogSuppress, Parser
 from base.mq import Publisher
 from base.timer import Timer
-from tornado.options import options
 from base.invalidator import Invalidator
 
 redis = Redis.from_url(options.redis, decode_responses=True)
