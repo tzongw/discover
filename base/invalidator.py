@@ -9,7 +9,6 @@ from .utils import Dispatcher
 class Invalidator:
     def __init__(self, redis: Redis, sep=':'):
         self.redis = redis
-        self.sub = None
         self.sep = sep
         self.dispatcher = Dispatcher(sep=sep, executor=Executor(name='invalidator'))
 
@@ -32,22 +31,23 @@ class Invalidator:
             self.dispatcher.dispatch(prefix, '')
 
     def _run(self):
+        sub = None
         while True:
             try:
-                if not self.sub:
-                    self.sub = self.redis.pubsub()
-                    self.sub.execute_command('CLIENT ID')
-                    client_id = self.sub.parse_response()
+                if not sub:
+                    sub = self.redis.pubsub()
+                    sub.execute_command('CLIENT ID')
+                    client_id = sub.parse_response()
                     prefixes = ' '.join([f'PREFIX {prefix}{self.sep}' for prefix in self.prefixes])
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
-                    self.sub.execute_command(command)
-                    res = self.sub.parse_response()
+                    sub.execute_command(command)
+                    res = sub.parse_response()
                     logging.info(f'{command} {res}')
-                    self.sub.subscribe('__redis__:invalidate')
-                    res = self.sub.parse_response()
+                    sub.subscribe('__redis__:invalidate')
+                    res = sub.parse_response()
                     logging.info(res)
                     self._invalidate_all()
-                msg = self.sub.get_message(ignore_subscribe_messages=True, timeout=None)
+                msg = sub.get_message(ignore_subscribe_messages=True, timeout=None)
                 if msg is None:
                     continue
                 logging.debug(f'got {msg}')
@@ -62,5 +62,5 @@ class Invalidator:
                     self.dispatcher.dispatch(key, key)
             except Exception:
                 logging.exception(f'')
-                self.sub = None
+                sub = None
                 gevent.sleep(1)
