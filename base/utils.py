@@ -162,15 +162,21 @@ class SingleFlight:
 
 
 class Cache:
+    placeholder = object()
+
     def __init__(self, f, maxsize=8192):
         self.single_flight = SingleFlight(f)
         self.lru = LRU(max_size=maxsize)
 
     def get(self, key, *args, **kwargs):
-        if key in self.lru:
-            return self.lru[key]
+        # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
+        value = self.lru.get(key, self.placeholder)
+        if value is not self.placeholder:
+            return value
+        self.lru[key] = self.placeholder
         r = self.single_flight.get(key, *args, **kwargs)
-        self.lru[key] = r
+        if key in self.lru:
+            self.lru[key] = r
         return r
 
     def listen(self, invalidator: Invalidator, prefix: str):
