@@ -15,6 +15,7 @@ from concurrent.futures import Future
 from collections import defaultdict
 import gevent
 from boltons.cacheutils import LRU
+from .invalidator import Invalidator
 
 
 class LogSuppress(contextlib.suppress):
@@ -171,6 +172,14 @@ class Cache:
         r = self.single_flight.get(key, *args, **kwargs)
         self.lru[key] = r
         return r
+
+    def listen(self, invalidator: Invalidator, prefix: str):
+        @invalidator.handler(prefix)
+        def invalidate(key: str):
+            if not key:
+                self.lru.clear()
+            else:
+                self.lru.pop(key, None)
 
 
 def stream_name(message: Message) -> str:
