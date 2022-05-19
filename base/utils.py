@@ -14,7 +14,7 @@ from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
 import gevent
-from boltons.cacheutils import LRU
+from cachetools import LRUCache
 from .invalidator import Invalidator
 
 
@@ -120,9 +120,9 @@ class Parser:
 
 
 class ListConverter(BaseConverter):
-    def __init__(self, map, type='str', sep=','):
+    def __init__(self, map, type=str, sep=','):
         super().__init__(map)
-        self.type = eval(type)
+        self.type = type
         self.sep = sep
 
     def to_python(self, value):
@@ -166,7 +166,7 @@ class Cache:
 
     def __init__(self, f, maxsize=8192):
         self.single_flight = SingleFlight(f)
-        self.lru = LRU(max_size=maxsize)
+        self.lru = LRUCache(max_size=maxsize)
 
     def get(self, key, *args, **kwargs):
         # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
