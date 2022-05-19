@@ -3,14 +3,14 @@ from redis import Redis
 import gevent
 import logging
 from .executor import Executor
-from .utils import Dispatcher
+from . import utils
 
 
 class Invalidator:
     def __init__(self, redis: Redis, sep=':'):
         self.redis = redis
         self.sep = sep
-        self.dispatcher = Dispatcher(sep=sep, executor=Executor(name='invalidator'))
+        self.dispatcher = utils.Dispatcher(sep=sep, executor=Executor(name='invalidator'))
 
     @property
     def handler(self):
