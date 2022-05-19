@@ -15,7 +15,6 @@ from concurrent.futures import Future
 from collections import defaultdict
 import gevent
 from cachetools import LRUCache
-from .invalidator import Invalidator
 
 
 class LogSuppress(contextlib.suppress):
@@ -179,7 +178,7 @@ class Cache:
             self.lru[key] = r
         return r
 
-    def listen(self, invalidator: Invalidator, prefix: str):
+    def listen(self, invalidator, prefix: str):
         @invalidator.handler(prefix)
         def invalidate(key: str):
             if not key:
