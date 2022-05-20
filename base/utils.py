@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import socket
+import time
 from functools import lru_cache
 import sys
 from typing import TypeVar, Optional
@@ -12,7 +13,7 @@ from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
 from concurrent.futures import Future
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import gevent
 from cachetools import LRUCache
 
@@ -55,14 +56,14 @@ wildcard = '' if sys.platform == 'darwin' else '*'
 
 class Dispatcher:
     def __init__(self, sep=None, executor=None):
-        self._handlers = defaultdict(list)
-        self._sep = sep
+        self.handlers = defaultdict(list)
+        self.sep = sep
         self._executor = executor or Executor(name='dispatch')
 
     def dispatch(self, key, *args, **kwargs):
-        if self._sep and isinstance(key, str):
-            key = key.split(self._sep, maxsplit=1)[0]
-        handlers = self._handlers.get(key) or []
+        if self.sep and isinstance(key, str):
+            key = key.split(self.sep, maxsplit=1)[0]
+        handlers = self.handlers.get(key) or []
         for handle in handlers:
             self._executor.submit(handle, *args, **kwargs)
 
@@ -72,14 +73,10 @@ class Dispatcher:
 
     def handler(self, key):
         def decorator(f):
-            self._handlers[key].append(f)
+            self.handlers[key].append(f)
             return f
 
         return decorator
-
-    @property
-    def handlers(self):
-        return self._handlers
 
 
 M = TypeVar('M', bound=Message)
@@ -184,7 +181,22 @@ class Cache:
             if not key:
                 self.lru.clear()
             else:
+                key = key.split(invalidator.sep, maxsplit=1)[1]
                 self.lru.pop(key, None)
+
+
+class TTLCache(Cache):
+    Pair = namedtuple('Pair', ['value', 'expire_at'])
+
+    def get(self, key, *args, **kwargs):
+        pair = self.lru.get(key, self.placeholder)
+        if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
+            return pair.value
+        self.lru[key] = self.placeholder
+        value, ttl = self.single_flight.get(key, *args, **kwargs)
+        if key in self.lru:
+            self.lru[key] = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
+        return value
 
 
 def stream_name(message: Message) -> str:
