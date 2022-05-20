@@ -5,6 +5,8 @@ from base.snowflake import max_worker_id
 from flask import Flask
 from common.task import AsyncTask
 from base import snowflake
+from base.utils import TTLCache
+from hash_pb2 import Session
 
 app_name = const.APP_USER
 app_id = unique_id.gen(app_name, range(max_worker_id))
@@ -24,3 +26,16 @@ def online_key(uid: int):
 
 def session_key(uid: int):
     return f'session:{uid}'
+
+
+def session(uid: int):
+    key = session_key(uid)
+    with redis.pipeline() as pipe:
+        parser = Parser(pipe)
+        parser.hget(key, Session())
+        pipe.ttl(key)
+        return pipe.execute()
+
+
+session_cache = TTLCache(session)
+session_cache.listen(invalidator, 'session')

@@ -8,24 +8,17 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import shared
 import const
-from hash_pb2 import Online, Session
+from hash_pb2 import Online
 from common.mq_pb2 import Login, Logout
 from redis.client import Pipeline
-from redis import Redis
-from base import utils
 from base.mq import Publisher
 from service import user
-from shared import dispatcher, app, online_key, session_key
+from shared import dispatcher, app, online_key, redis, parser, session_cache
 from config import options
-from base.utils import Parser
+from base.utils import Parser, wildcard
 
 
 class Handler:
-    def __init__(self, redis: Redis, dispatcher: utils.Dispatcher):
-        self._redis = redis
-        self._parser = Parser(redis)
-        self._dispatcher = dispatcher
-
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
@@ -37,11 +30,11 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
-            session = self._parser.hget(session_key(uid), Session())
+            session = session_cache.get(uid)
             if token != session.token:
                 raise ValueError("token error")
             key = online_key(uid)
-            with self._redis.pipeline() as pipe:
+            with redis.pipeline() as pipe:
                 parser = Parser(pipe)
                 parser.hget(key, Online(), return_none=True)
                 parser.hset(key, Online(address=address, conn_id=conn_id), expire=const.CLIENT_TTL)
@@ -70,10 +63,10 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
             key = online_key(uid)
-            online = self._parser.hget(key, Online())
+            online = parser.hget(key, Online())
             if conn_id != online.conn_id:
                 raise ValueError(f'{online} {conn_id}')
-            self._redis.expire(key, const.CLIENT_TTL)
+            redis.expire(key, const.CLIENT_TTL)
         except Exception as e:
             logging.warning(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
@@ -95,7 +88,7 @@ class Handler:
                 pipe.delete(key)
                 Publisher(pipe).publish(Logout(uid=uid))
 
-        self._redis.transaction(unset_login_status, key)
+        redis.transaction(unset_login_status, key)
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
@@ -127,13 +120,13 @@ class Handler:
                 shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        self._dispatcher.dispatch(key, key, data)
+        dispatcher.dispatch(key, key, data)
 
 
 def serve():
-    handler = Handler(shared.redis, dispatcher)
+    handler = Handler()
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
+    transport = TSocket.TServerSocket(wildcard, options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
