@@ -165,7 +165,7 @@ class Cache:
 
     def __init__(self, f, maxsize=8192):
         self.single_flight = SingleFlight(f)
-        self.lru = LRUCache(max_size=maxsize)
+        self.lru = LRUCache(maxsize=maxsize)
 
     def get(self, key, *args, **kwargs):
         # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
