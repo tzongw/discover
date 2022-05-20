@@ -5,7 +5,7 @@ from flask import jsonify, Blueprint, g
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
-from shared import app, parser, dispatcher, id_generator
+from shared import app, parser, dispatcher, id_generator, session_cache
 import hash_pb2
 from gevent import pywsgi
 from config import options
@@ -130,7 +130,7 @@ bp = Blueprint('/', __name__)
 @bp.before_request
 def before_request():
     uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
-    if not uid or not token or token != parser.hget(session_key(uid), hash_pb2.Session()).token:
+    if not uid or not token or token != session_cache.get(uid).token:
         raise Unauthorized()
     g.uid = uid
 

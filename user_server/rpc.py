@@ -8,12 +8,12 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import shared
 import const
-from hash_pb2 import Online
+from hash_pb2 import Online, Session
 from common.mq_pb2 import Login, Logout
 from redis.client import Pipeline
 from base.mq import Publisher
 from service import user
-from shared import dispatcher, app, online_key, redis, parser, session_cache
+from shared import dispatcher, app, online_key, redis, session_key
 from config import options
 from base.utils import Parser, wildcard
 
@@ -30,7 +30,7 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
-            session = session_cache.get(uid)
+            session = shared.parser.hget(session_key(uid), Session())
             if token != session.token:
                 raise ValueError("token error")
             key = online_key(uid)
@@ -63,7 +63,7 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CONTEXT_UID])
             key = online_key(uid)
-            online = parser.hget(key, Online())
+            online = shared.parser.hget(key, Online())
             if conn_id != online.conn_id:
                 raise ValueError(f'{online} {conn_id}')
             redis.expire(key, const.CLIENT_TTL)
