@@ -180,8 +180,9 @@ class Cache:
         def invalidate(key: str):
             if not key:
                 self.lru.clear()
-            else:
+            elif self.lru:
                 key = key.split(invalidator.sep, maxsplit=1)[1]
+                key = type(next(iter(self.lru)))(key)
                 self.lru.pop(key, None)
 
 
