@@ -13,9 +13,8 @@ from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
 from concurrent.futures import Future
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 import gevent
-from cachetools import LRUCache
 
 
 class LogSuppress(contextlib.suppress):
@@ -165,18 +164,27 @@ class Cache(Generic[T]):
 
     def __init__(self, f, maxsize=8192):
         self.single_flight = SingleFlight(f)
-        self.lru = LRUCache(maxsize=maxsize)
+        self.lru = OrderedDict()
+        self.maxsize = maxsize
 
     def get(self, key, *args, **kwargs) -> Optional[T]:
         # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
         value = self.lru.get(key, self.placeholder)
         if value is not self.placeholder:
+            if key in self.lru:
+                self.lru.move_to_end(key)
             return value
-        self.lru[key] = self.placeholder
-        r = self.single_flight.get(key, *args, **kwargs)
+        self.set(key, self.placeholder)
+        value = self.single_flight.get(key, *args, **kwargs)
         if key in self.lru:
-            self.lru[key] = r
-        return r
+            self.set(key, value)
+        return value
+
+    def set(self, key, value):
+        self.lru[key] = value
+        self.lru.move_to_end(key)  # in case replace
+        if self.maxsize and len(self.lru) > self.maxsize:
+            self.lru.popitem(last=False)
 
     def listen(self, invalidator, prefix: str):
         @invalidator.handler(prefix)
@@ -195,11 +203,14 @@ class TTLCache(Cache[T]):
     def get(self, key, *args, **kwargs) -> Optional[T]:
         pair = self.lru.get(key, self.placeholder)
         if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
+            if key in self.lru:
+                self.lru.move_to_end(key)
             return pair.value
-        self.lru[key] = self.placeholder
+        self.set(key, self.placeholder)
         value, ttl = self.single_flight.get(key, *args, **kwargs)
         if key in self.lru:
-            self.lru[key] = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
+            pair = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
+            self.set(key, pair)
         return value
 
 

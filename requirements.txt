@@ -1,5 +1,4 @@
 attrs==20.3.0
-cachetools==5.1.0
 Click==7.0
 Deprecated==1.2.13
 flasgger==0.9.5
