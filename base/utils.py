@@ -4,7 +4,7 @@ import socket
 import time
 from functools import lru_cache
 import sys
-from typing import TypeVar, Optional
+from typing import TypeVar, Optional, Generic
 from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
@@ -157,14 +157,17 @@ class SingleFlight:
             self._futures.pop(key)
 
 
-class Cache:
+T = TypeVar('T')
+
+
+class Cache(Generic[T]):
     placeholder = object()
 
     def __init__(self, f, maxsize=8192):
         self.single_flight = SingleFlight(f)
         self.lru = LRUCache(maxsize=maxsize)
 
-    def get(self, key, *args, **kwargs):
+    def get(self, key, *args, **kwargs) -> Optional[T]:
         # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
         value = self.lru.get(key, self.placeholder)
         if value is not self.placeholder:
@@ -186,10 +189,10 @@ class Cache:
                 self.lru.pop(key, None)
 
 
-class TTLCache(Cache):
+class TTLCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
-    def get(self, key, *args, **kwargs):
+    def get(self, key, *args, **kwargs) -> Optional[T]:
         pair = self.lru.get(key, self.placeholder)
         if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
             return pair.value
