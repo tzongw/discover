@@ -5,7 +5,7 @@ from base.snowflake import max_worker_id
 from flask import Flask
 from common.task import AsyncTask
 from base import snowflake
-from base.utils import TTLCache
+from base.cache import TTLCache
 from hash_pb2 import Session
 
 app_name = const.APP_USER
