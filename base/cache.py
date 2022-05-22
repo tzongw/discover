@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 from collections import namedtuple, OrderedDict
-from typing import TypeVar, Optional, Generic
+from typing import TypeVar, Optional, Generic, Callable
 
 from .utils import SingleFlight
 from .invalidator import Invalidator
@@ -35,14 +35,17 @@ class Cache(Generic[T]):
         if self.maxsize and len(self.lru) > self.maxsize:
             self.lru.popitem(last=False)
 
-    def listen(self, invalidator: Invalidator, prefix: str):
+    def listen(self, invalidator: Invalidator, prefix: str, converter: Optional[Callable] = None):
         @invalidator.handler(prefix)
         def invalidate(key: str):
             if not key:
                 self.lru.clear()
             elif self.lru:
-                key = key.split(invalidator.sep, maxsplit=1)[1]
-                key = type(next(iter(self.lru)))(key)
+                if converter:
+                    key = converter(key)
+                else:
+                    key = key.split(invalidator.sep, maxsplit=1)[1]
+                    key = type(next(iter(self.lru)))(key)
                 self.lru.pop(key, None)
 
 
