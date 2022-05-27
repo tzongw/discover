@@ -31,7 +31,7 @@ class Handler:
             uid = int(params[const.CONTEXT_UID])
             token = params[const.CONTEXT_TOKEN]
             session = shared.parser.hget(session_key(uid), Session())
-            if token != session.token:
+            if token != session.token and options.env != const.Environment.DEV:
                 raise ValueError("token error")
             key = online_key(uid)
             with redis.pipeline() as pipe:
