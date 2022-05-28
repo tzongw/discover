@@ -47,9 +47,8 @@ class ServicePools:
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
                     self._update_addresses()
                     raise
-            else:
-                if self._cool_down.pop(address, None):
-                    self._update_addresses()
+            if self._cool_down.pop(address, None):
+                self._update_addresses()
 
     def _clean_pools(self):
         available = self.addresses()
