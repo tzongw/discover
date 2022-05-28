@@ -16,6 +16,8 @@ class ServicePools:
         self._pools = {}  # type: Dict[str, ThriftPool]
         self._cool_down = {}  # type: Dict[str, float]
         self._settings = settings
+        self._local_addresses = []
+        self._good_addresses = []
         registry.add_callback(self._clean_pools)
 
     def addresses(self):
@@ -23,12 +25,7 @@ class ServicePools:
 
     @contextlib.contextmanager
     def connection(self) -> ContextManager[TProtocolBase]:
-        addresses = self.addresses()
-        now = time.time()
-        good_ones = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
-        local_host = ip_address()
-        local_ones = [addr for addr in good_ones if Addr(addr).host == local_host]
-        address = choice(local_ones or good_ones or tuple(addresses))  # type: str
+        address = choice(self._local_addresses or self._good_addresses or tuple(self.addresses()))  # type: str
         with self.address_connection(address) as conn:
             yield conn
 
@@ -48,7 +45,11 @@ class ServicePools:
             except Exception as e:
                 if not ThriftPool.acceptable(e):
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
-                raise
+                    self._update_addresses()
+                    raise
+            else:
+                if self._cool_down.pop(address, None):
+                    self._update_addresses()
 
     def _clean_pools(self):
         available = self.addresses()
@@ -58,3 +59,11 @@ class ServicePools:
             self._cool_down.pop(removed, None)
             pool = self._pools.pop(removed)
             pool.close_all()
+        self._update_addresses()
+
+    def _update_addresses(self):
+        addresses = self.addresses()
+        now = time.time()
+        self._good_addresses = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
+        local_host = ip_address()
+        self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
