@@ -14,6 +14,7 @@ from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
 import gevent
+from gevent.local import local
 
 
 class LogSuppress(contextlib.suppress):
@@ -163,3 +164,24 @@ def run_in_thread(fn, *args, **kwargs):
     pool = gevent.get_hub().threadpool
     result = pool.spawn(fn, *args, **kwargs).get()
     return result
+
+
+defer_local = local()
+
+
+def deferrable(f):
+    def inner(*args, **kwargs):
+        if not hasattr(defer_local, 'stacks'):
+            defer_local.stacks = []
+        stacks = defer_local.stacks
+        with contextlib.ExitStack() as stack:
+            stacks.append(stack)
+            stack.callback(stacks.pop)
+            f(*args, **kwargs)
+
+    return inner
+
+
+def defer(f, *args, **kwargs):
+    stack = defer_local.stacks[-1]
+    stack.callback(f, *args, **kwargs)
