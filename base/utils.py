@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 import socket
 from functools import lru_cache
@@ -170,6 +171,7 @@ defer_local = local()
 
 
 def deferrable(f):
+    @functools.wraps
     def inner(*args, **kwargs):
         if not hasattr(defer_local, 'stacks'):
             defer_local.stacks = []
