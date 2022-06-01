@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+from inspect import signature
+from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import stream_name
 from .mq_pb2 import Task
-from gevent.local import local
 
 
 class AsyncTask:
@@ -27,28 +28,24 @@ class AsyncTask:
             logging.debug(f'got task {id} {task.id} {task.path}')
             receiver.redis.xtrim(stream_name(task), minid=id)
 
-            def throw_back():
+            f = self.handlers.get(task.path)
+            if not f:
                 # version problem? throw back task, let new version process handle it
                 logging.warning(f'can not handle {id} {task.id} {task.path}, stop receive Task')
                 receiver.remove(Task)
                 Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
-
-            f = self.handlers.get(task.path)
-            if not f:
-                throw_back()
                 return
-            args = json.loads(task.args)
-            kwargs = json.loads(task.kwargs)
+            args = json.loads(task.args)  # type: list
+            kwargs = json.loads(task.kwargs)  # type: dict
             self.local.task = task
+
             try:
+                params = signature(f).parameters
+                if len(args) + len(kwargs) > len(params):
+                    logging.warning(f'params not compatible {id} {task.id} {task.path}, try to strip')
+                    args = args[:len(params)]
+                    kwargs = {k: v for k, v in kwargs.items() if k in params}
                 f(*args, **kwargs)
-            except TypeError as e:
-                name = task.path.split('.')[-1]
-                if f'{name}()' in str(e):
-                    # f is the reason, not called yet, can safely throw back task
-                    throw_back()
-                    return
-                raise
             finally:
                 del self.local.task
 
