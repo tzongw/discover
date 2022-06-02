@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
-from inspect import signature
+from inspect import signature, Parameter
 from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
@@ -41,9 +41,9 @@ class AsyncTask:
 
             try:
                 params = signature(f).parameters
-                if len(args) + len(kwargs) > len(params):
-                    logging.warning(f'params not compatible {id} {task.id} {task.path}, try to strip')
+                if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
                     args = args[:len(params)]
+                if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
                     kwargs = {k: v for k, v in kwargs.items() if k in params}
                 f(*args, **kwargs)
             finally:

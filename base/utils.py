@@ -185,5 +185,6 @@ def deferrable(f):
 
 
 def defer(f, *args, **kwargs):
+    assert callable(f)
     stack = defer_local.stacks[-1]
     stack.callback(f, *args, **kwargs)
