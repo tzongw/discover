@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+from collections import namedtuple
 from inspect import signature, Parameter
 from gevent.local import local
 from base.mq import Receiver, Publisher
@@ -15,6 +16,7 @@ class AsyncTask:
     1. can not remove an argument, instead add a new handler
     2. add new argument at the end and set a default value
     """
+    Handler = namedtuple('Handler', ['func', 'params'])
 
     def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
         self.timer = timer
@@ -28,8 +30,8 @@ class AsyncTask:
             logging.debug(f'got task {id} {task.id} {task.path}')
             receiver.redis.xtrim(stream_name(task), minid=id)
 
-            f = self.handlers.get(task.path)
-            if not f:
+            h = self.handlers.get(task.path)
+            if not h:
                 # version problem? throw back task, let new version process handle it
                 logging.warning(f'can not handle {id} {task.id} {task.path}, stop receive Task')
                 receiver.remove(Task)
@@ -40,18 +42,19 @@ class AsyncTask:
             self.local.task = task
 
             try:
-                params = signature(f).parameters
+                params = h.params
+                func = h.func
                 if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
                     args = args[:len(params)]
                 if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
                     kwargs = {k: v for k, v in kwargs.items() if k in params}
-                f(*args, **kwargs)
+                func(*args, **kwargs)
             finally:
                 del self.local.task
 
     def __call__(self, f):
         path = f'{f.__module__}.{f.__name__}'
-        self.handlers[path] = f
+        self.handlers[path] = AsyncTask.Handler(f, signature(f).parameters)
 
         def wrapper(*args, **kwargs):
             task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
