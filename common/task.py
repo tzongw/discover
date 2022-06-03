@@ -3,6 +3,8 @@ import json
 import logging
 from collections import namedtuple
 from inspect import signature, Parameter
+from typing import TypeVar, Callable
+
 from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
@@ -17,6 +19,7 @@ class AsyncTask:
     2. add new argument at the end and set a default value
     """
     Handler = namedtuple('Handler', ['func', 'params'])
+    F = TypeVar('F', bound=Callable)
 
     def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
         self.timer = timer
@@ -52,11 +55,11 @@ class AsyncTask:
             finally:
                 del self.local.task
 
-    def __call__(self, f):
+    def __call__(self, f: F) -> F:
         path = f'{f.__module__}.{f.__name__}'
         self.handlers[path] = AsyncTask.Handler(f, signature(f).parameters)
 
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Task:
             task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
             task.id = f'{stream_name(task)}:{task.path}:{task.args}:{task.kwargs}'
             return task

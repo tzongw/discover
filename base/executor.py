@@ -51,7 +51,7 @@ class Executor:
         results = (fut.result() for fut in futures)
         return list(results) if block else results
 
-    def map(self, fn, *args, block=True):
+    def map(self, fn: Callable, *args, block=True):
         return self.gather(*[lambda arg=arg: fn(arg) for arg in args], block=block)
 
     def _adjust_workers(self):

@@ -4,7 +4,7 @@ import logging
 import socket
 from functools import lru_cache
 import sys
-from typing import TypeVar, Optional
+from typing import TypeVar, Optional, Callable
 from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
@@ -184,7 +184,7 @@ def deferrable(f):
     return inner
 
 
-def defer(f, *args, **kwargs):
+def defer(f: Callable, *args, **kwargs):
     assert callable(f)
     stack = defer_local.stacks[-1]
     stack.callback(f, *args, **kwargs)

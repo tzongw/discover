@@ -13,7 +13,7 @@ from .utils import LogSuppress
 class Handle:
     __slots__ = ["when", "callback"]
 
-    def __init__(self, callback, when):
+    def __init__(self, callback: Callable, when):
         assert callback is not None
         self.callback = callback
         self.when = when
