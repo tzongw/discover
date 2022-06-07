@@ -46,7 +46,7 @@ class ServicePools:
                 if not ThriftPool.acceptable(e):
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
                     self._update_addresses()
-                    raise
+                raise
             if self._cool_down.pop(address, None):
                 self._update_addresses()
 
