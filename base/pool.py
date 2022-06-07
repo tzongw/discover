@@ -1,6 +1,5 @@
 import abc
 import contextlib
-import logging
 from gevent.queue import Queue
 
 
@@ -39,7 +38,6 @@ class Pool:
         try:
             new_item = self.create_connection()
         except Exception:
-            logging.exception(f'')
             self._size -= 1
             raise
         return new_item
@@ -67,7 +65,6 @@ class Pool:
             if self._acceptable(e):
                 return_conn()
             else:
-                logging.exception(f'')
                 close_conn()
             raise
         else:
