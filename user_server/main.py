@@ -6,6 +6,7 @@ from config import options
 import shared
 import const
 import rpc
+# noinspection PyUnresolvedReferences
 import handlers
 import api
 from shared import app_name, app_id, init_main
@@ -20,7 +21,6 @@ def main():
     setproctitle(f'{app_name}-{app_id}-{options.http_address}-{options.rpc_address}')
     shared.registry.start({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
     shared.invalidator.start()
-    handlers.init()
     init_main()
     shared.receiver.start()
     gevent.joinall(workers, raise_error=True)

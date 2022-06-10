@@ -85,8 +85,7 @@ M = TypeVar('M', bound=Message)
 class Parser:
     def __init__(self, redis: Redis):
         self._redis = redis
-        if redis.response_callbacks['HGETALL'] is Redis.RESPONSE_CALLBACKS['HGETALL']:
-            redis.response_callbacks['HGETALL'] = self.hgetall_callback
+        redis.response_callbacks['HGETALL'] = self.hgetall_callback
 
     @staticmethod
     def hgetall_callback(response, converter=None):

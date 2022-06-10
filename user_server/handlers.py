@@ -2,7 +2,7 @@
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
-    async_task, app_id
+    async_task, app_id, at_main
 from datetime import timedelta
 from dao import Account
 
@@ -62,3 +62,6 @@ def init():
         task_id = async_task.post(task('hello', 3), timedelta(seconds=3), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
         logging.info(f'{timer.exists(oneshot_id)}, {timer.exists(loop_id)}, {timer.exists(task_id)}')
+
+
+at_main(init)
