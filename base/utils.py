@@ -170,7 +170,7 @@ defer_local = local()
 
 
 def deferrable(f):
-    @functools.wraps
+    @functools.wraps(f)
     def inner(*args, **kwargs):
         if not hasattr(defer_local, 'stacks'):
             defer_local.stacks = []
@@ -178,7 +178,7 @@ def deferrable(f):
         with contextlib.ExitStack() as stack:
             stacks.append(stack)
             stack.callback(stacks.pop)
-            f(*args, **kwargs)
+            return f(*args, **kwargs)
 
     return inner
 
