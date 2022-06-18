@@ -1,10 +1,9 @@
 import contextlib
-import functools
 import logging
 import socket
 from functools import lru_cache
 import sys
-from typing import TypeVar, Optional, Callable
+from typing import TypeVar, Optional
 from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
@@ -15,7 +14,6 @@ from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
 import gevent
-from gevent.local import local
 
 
 class LogSuppress(contextlib.suppress):
@@ -164,26 +162,3 @@ def run_in_thread(fn, *args, **kwargs):
     pool = gevent.get_hub().threadpool
     result = pool.spawn(fn, *args, **kwargs).get()
     return result
-
-
-defer_local = local()
-
-
-def deferrable(f):
-    @functools.wraps(f)
-    def inner(*args, **kwargs):
-        if not hasattr(defer_local, 'stacks'):
-            defer_local.stacks = []
-        stacks = defer_local.stacks
-        with contextlib.ExitStack() as stack:
-            stacks.append(stack)
-            stack.callback(stacks.pop)
-            return f(*args, **kwargs)
-
-    return inner
-
-
-def defer(f: Callable, *args, **kwargs):
-    assert callable(f)
-    stack = defer_local.stacks[-1]
-    stack.callback(f, *args, **kwargs)
