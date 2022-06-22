@@ -39,8 +39,8 @@ class Timer:
         params += keys_and_args
         return self.redis.execute_command('TIMER.NEW', *params)
 
-    def kill(self, *keys):
-        return self.redis.delete(*keys)
+    def kill(self, key):
+        return self.redis.execute_command('TIMER.KILL', key)
 
     def exists(self, key: str):
         return self.redis.exists(key)
