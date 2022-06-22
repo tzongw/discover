@@ -45,6 +45,12 @@ class Timer:
     def exists(self, key: str):
         return self.redis.exists(key)
 
+    def info(self, key: str):
+        res = self.redis.execute_command('TIMER.INFO', key)
+        if isinstance(res, list):
+            return dict(zip(res[::2], res[1::2]))
+        return res
+
     def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
                do_hint=True):
         if not self.registered:

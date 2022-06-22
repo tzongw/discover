@@ -61,7 +61,9 @@ def init():
         at_exit(lambda: timer.kill(loop_id))
         task_id = async_task.post(task('hello', 3), timedelta(seconds=3), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
-        logging.info(f'{timer.exists(oneshot_id)}, {timer.exists(loop_id)}, {timer.exists(task_id)}')
+        logging.info(timer.info(oneshot_id))
+        logging.info(timer.info(loop_id))
+        logging.info(timer.info(task_id))
 
 
 at_main(init)
