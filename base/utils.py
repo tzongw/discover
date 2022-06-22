@@ -158,6 +158,10 @@ def stream_name(message: Message) -> str:
     return f'stream:{message.__class__.__name__}'
 
 
+def timer_name(message: Message) -> str:
+    return f'timer:{message.__class__.__name__}'
+
+
 def run_in_thread(fn, *args, **kwargs):
     pool = gevent.get_hub().threadpool
     result = pool.spawn(fn, *args, **kwargs).get()

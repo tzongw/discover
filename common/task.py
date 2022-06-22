@@ -8,7 +8,7 @@ from typing import TypeVar, Callable
 from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
-from base.utils import stream_name
+from base.utils import stream_name, timer_name
 from .mq_pb2 import Task
 
 
@@ -61,7 +61,7 @@ class AsyncTask:
 
         def wrapper(*args, **kwargs) -> Task:
             task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
-            task.id = f'{stream_name(task)}:{task.path}:{task.args}:{task.kwargs}'
+            task.id = f'{timer_name(task)}:{task.path}:{task.args}:{task.kwargs}'
             return task
 
         return wrapper

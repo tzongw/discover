@@ -21,7 +21,7 @@ redis = Redis.from_url(options.redis, decode_responses=True)
 registry = Registry(redis)
 publisher = Publisher(redis)
 parser = Parser(redis)
-timer = Timer(redis, cache_key=True)
+timer = Timer(redis)
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]
