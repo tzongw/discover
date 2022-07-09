@@ -134,9 +134,10 @@ class Proxy:
 
 
 class SingleFlight:
-    def __init__(self, f):
-        self._f = f
-        self._futures = {}
+    def __init__(self, get, mget=None):
+        self._get = get
+        self._mget = mget
+        self._futures = {}  # type: dict[any, Future]
 
     def get(self, key, *args, **kwargs):
         if key in self._futures:
@@ -144,7 +145,7 @@ class SingleFlight:
         fut = Future()
         self._futures[key] = fut
         try:
-            r = self._f(key, *args, **kwargs)
+            r = self._get(key, *args, **kwargs)
             fut.set_result(r)
             return r
         except Exception as e:
@@ -152,6 +153,31 @@ class SingleFlight:
             raise
         finally:
             self._futures.pop(key)
+
+    def mget(self, keys, *args, **kwargs):
+        futures = []
+        new_keys = []
+        for key in keys:
+            if key in self._futures:
+                futures.append(self._futures[key])
+            else:
+                fut = Future()
+                self._futures[key] = fut
+                futures.append(fut)
+                new_keys.append(key)
+        if new_keys:
+            try:
+                values = self._mget(new_keys, *args, **kwargs)
+                assert len(new_keys) == len(values)
+                for key, value in zip(new_keys, values):
+                    self._futures[key].set_result(value)
+            except Exception as e:
+                for key in new_keys:
+                    self._futures[key].set_exception(e)
+            finally:
+                for key in new_keys:
+                    self._futures.pop(key)
+        return [fut.result() for fut in futures]
 
 
 def stream_name(message: Message) -> str:
