@@ -194,3 +194,12 @@ def run_in_thread(fn, *args, **kwargs):
     pool = gevent.get_hub().threadpool
     result = pool.spawn(fn, *args, **kwargs).get()
     return result
+
+
+class DefaultDict(defaultdict):
+    def __missing__(self, key):
+        if not self.default_factory:
+            return super().__missing__(key)
+        value = self.default_factory(key)
+        self[key] = value
+        return value
