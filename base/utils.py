@@ -133,8 +133,14 @@ class Proxy:
         return getattr(choice(self._targets), name)
 
 
+def make_key(key, *args, **kwargs):
+    if not args and not kwargs:
+        return key
+    return key, *args, *kwargs.items()
+
+
 class SingleFlight:
-    def __init__(self, get=None, mget=None):
+    def __init__(self, *, get=None, mget=None):
         assert get or mget
         if mget is None:
             # simulate mget to reuse code
@@ -152,11 +158,12 @@ class SingleFlight:
         futures = []
         new_keys = []
         for key in keys:
-            if key in self._futures:
-                futures.append(self._futures[key])
+            made_key = make_key(key, *args, **kwargs)
+            if made_key in self._futures:
+                futures.append(self._futures[made_key])
             else:
                 fut = Future()
-                self._futures[key] = fut
+                self._futures[made_key] = fut
                 futures.append(fut)
                 new_keys.append(key)
         if new_keys:
@@ -164,13 +171,14 @@ class SingleFlight:
                 values = self._mget(new_keys, *args, **kwargs)
                 assert len(new_keys) == len(values)
                 for key, value in zip(new_keys, values):
-                    self._futures[key].set_result(value)
+                    made_key = make_key(key, *args, **kwargs)
+                    fut = self._futures.pop(made_key)
+                    fut.set_result(value)
             except Exception as e:
                 for key in new_keys:
-                    self._futures[key].set_exception(e)
-            finally:
-                for key in new_keys:
-                    self._futures.pop(key)
+                    made_key = make_key(key, *args, **kwargs)
+                    fut = self._futures.pop(made_key)
+                    fut.set_exception(e)
         return [fut.result() for fut in futures]
 
 
