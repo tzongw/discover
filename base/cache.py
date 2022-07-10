@@ -10,23 +10,16 @@ T = TypeVar('T')
 
 
 class Cache(Generic[T]):
+    # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, get, mget=None, maxsize=8192):
+    def __init__(self, get=None, mget=None, maxsize=8192):
         self.single_flight = SingleFlight(get, mget)
         self.lru = OrderedDict()
         self.maxsize = maxsize
 
     def get(self, key, *args, **kwargs) -> Optional[T]:
-        # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
-        value = self.lru.get(key, self.placeholder)
-        if value is not self.placeholder:
-            self.lru.move_to_end(key)
-            return value
-        self.set(key, self.placeholder)
-        value = self.single_flight.get(key, *args, **kwargs)
-        if key in self.lru:
-            self.lru[key] = value
+        value, = self.mget([key], *args, **kwargs)
         return value
 
     def set(self, key, value):
@@ -44,9 +37,10 @@ class Cache(Generic[T]):
                 self.lru.move_to_end(key)
                 results[key] = value
             else:
-                self.set(key, self.placeholder)
                 new_keys.append(key)
         if new_keys:
+            for key in new_keys:
+                self.set(key, self.placeholder)
             values = self.single_flight.mget(new_keys, *args, **kwargs)
             for key, value in zip(new_keys, values):
                 results[key] = value
@@ -71,18 +65,6 @@ class Cache(Generic[T]):
 class TTLCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
-    def get(self, key, *args, **kwargs) -> Optional[T]:
-        pair = self.lru.get(key, self.placeholder)
-        if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
-            self.lru.move_to_end(key)
-            return pair.value
-        self.set(key, self.placeholder)
-        value, ttl = self.single_flight.get(key, *args, **kwargs)
-        if key in self.lru:
-            pair = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
-            self.lru[key] = pair
-        return value
-
     def mget(self, keys, *args, **kwargs):
         results = {}
         new_keys = []
@@ -92,9 +74,10 @@ class TTLCache(Cache[T]):
                 self.lru.move_to_end(key)
                 results[key] = pair.value
             else:
-                self.set(key, self.placeholder)
                 new_keys.append(key)
         if new_keys:
+            for key in new_keys:
+                self.set(key, self.placeholder)
             tuples = self.single_flight.mget(new_keys, *args, **kwargs)
             for key, (value, ttl) in zip(new_keys, tuples):
                 results[key] = value

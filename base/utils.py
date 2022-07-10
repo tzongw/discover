@@ -134,25 +134,19 @@ class Proxy:
 
 
 class SingleFlight:
-    def __init__(self, get, mget=None):
-        self._get = get
+    def __init__(self, get=None, mget=None):
+        assert get or mget
+        if mget is None:
+            # simulate mget to reuse code
+            def mget(keys, *args, **kwargs):
+                assert len(keys) == 1
+                return [get(key, *args, **kwargs) for key in keys]
         self._mget = mget
         self._futures = {}  # type: dict[any, Future]
 
     def get(self, key, *args, **kwargs):
-        if key in self._futures:
-            return self._futures[key].result()
-        fut = Future()
-        self._futures[key] = fut
-        try:
-            r = self._get(key, *args, **kwargs)
-            fut.set_result(r)
-            return r
-        except Exception as e:
-            fut.set_exception(e)
-            raise
-        finally:
-            self._futures.pop(key)
+        value, = self.mget([key], *args, **kwargs)
+        return value
 
     def mget(self, keys, *args, **kwargs):
         futures = []
