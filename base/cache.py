@@ -102,6 +102,12 @@ class FullCache(Cache[T]):
         super().__init__(mget=mget, maxsize=None)
         self.get_keys = get_keys
         self.fut = None  # type: Optional[Future]
+        self._version = 0
+
+    @property
+    def version(self):
+        self.values()
+        return self._version
 
     def values(self, *args, **kwargs):
         if self.fut:
@@ -114,6 +120,7 @@ class FullCache(Cache[T]):
             keys = self.get_keys()
             self.mget(keys, *args, **kwargs)
             values = self.lru.values()
+            self._version += 1
             self.fut.set_result(values)
             return values
         except Exception as e:
