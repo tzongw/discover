@@ -2,6 +2,7 @@
 import time
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable
+from concurrent.futures import Future
 
 from .utils import SingleFlight, make_key
 from .invalidator import Invalidator
@@ -13,10 +14,11 @@ class Cache(Generic[T]):
     # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, *, get=None, mget=None, maxsize=8192):
+    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 8192):
         self.single_flight = SingleFlight(get=get, mget=mget)
         self.lru = OrderedDict()
         self.maxsize = maxsize
+        self.full_cached = False
 
     def get(self, key, *args, **kwargs) -> Optional[T]:
         value, = self.mget([key], *args, **kwargs)
@@ -54,6 +56,7 @@ class Cache(Generic[T]):
     def listen(self, invalidator: Invalidator, prefix: str, converter: Optional[Callable] = None):
         @invalidator.handler(prefix)
         def invalidate(key: str):
+            self.full_cached = False
             if not key:
                 self.lru.clear()
             elif self.lru:
@@ -91,3 +94,31 @@ class TTLCache(Cache[T]):
                     pair = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
                     self.lru[made_key] = pair
         return [results[key] for key in keys]
+
+
+class FullCache(Cache[T]):
+
+    def __init__(self, *, mget, get_keys):
+        super().__init__(mget=mget, maxsize=None)
+        self.get_keys = get_keys
+        self.fut = None  # type: Optional[Future]
+
+    def values(self, *args, **kwargs):
+        if self.fut:
+            return self.fut.result()
+        if self.full_cached:
+            return self.lru.values()
+        self.fut = Future()
+        self.full_cached = True
+        try:
+            keys = self.get_keys()
+            self.mget(keys, *args, **kwargs)
+            values = self.lru.values()
+            self.fut.set_result(values)
+            return values
+        except Exception as e:
+            self.fut.set_exception(e)
+            self.full_cached = False
+            raise
+        finally:
+            self.fut = None

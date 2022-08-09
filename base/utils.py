@@ -179,6 +179,7 @@ class SingleFlight:
                     made_key = make_key(key, *args, **kwargs)
                     fut = self._futures.pop(made_key)
                     fut.set_exception(e)
+                raise
         return [fut.result() for fut in futures]
 
 
