@@ -35,7 +35,7 @@ class Client:
     schedule = shared.schedule
     ping_message = object()
 
-    __slots__ = ["conn_id", "context", "ws", "messages", "groups"]
+    __slots__ = ["conn_id", "context", "ws", "messages", "groups", "writing"]
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -43,19 +43,22 @@ class Client:
         self.ws = ws
         self.messages = queue.Queue()
         self.groups = set()
+        self.writing = False
 
     def __del__(self):
         logging.debug(f'del {self}')
 
-    def __repr__(self):
+    def __str__(self):
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
         self.messages.put_nowait(message)
+        if not self.writing:
+            self.writing = True
+            gevent.spawn(self._writer)
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.CLIENT_TTL)
-        gevent.spawn(self._writer)
         pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL)
         try:
             while not self.ws.closed:
@@ -74,24 +77,34 @@ class Client:
         shared.user_service.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
-        logging.info(f'start {self}')
+        logging.debug(f'start {self}')
+        idle_timeout = False
         try:
             while True:
-                message = self.messages.get()
+                idle_timeout = False
+                message = self.messages.get(timeout=const.PING_INTERVAL / 2)
                 if message is None:
                     break
                 if message is self.ping_message:
                     self.ws.send_frame('', WebSocket.OPCODE_PING)
                 else:
                     self.ws.send(message)
+        except queue.Empty:
+            logging.debug(f'writer idle exit')
+            idle_timeout = True
         except (WebSocketError, OSError) as e:
-            logging.info(f'peer closed {self} {e}')
+            logging.debug(f'peer closed {self} {e}')
         except Exception:
             logging.exception(f'{self}')
         else:
-            logging.info(f'exit {self}')
+            logging.debug(f'exit {self}')
         finally:
-            self.ws.close()
+            self.writing = False
+            if not idle_timeout:
+                self.ws.close()
+            elif not self.messages.empty():  # race condition, spawn again
+                logging.warning(f'idle exiting wrongly {self}')
+                self.send(self.ping_message)
 
     def stop(self):
         self.messages.put_nowait(None)
