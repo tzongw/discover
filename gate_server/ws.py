@@ -102,8 +102,7 @@ class Client:
             self.writing = False
             if not idle_timeout:
                 self.ws.close()
-            elif not self.messages.empty():  # race condition, spawn again
-                logging.warning(f'idle exiting wrongly {self}')
+            elif not self.messages.empty():  # race condition, do again
                 self.send(self.ping_message)
 
     def stop(self):
