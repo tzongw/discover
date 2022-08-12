@@ -32,7 +32,6 @@ def serve():
 
 
 class Client:
-    schedule = shared.schedule
     ping_message = object()
 
     __slots__ = ["conn_id", "context", "ws", "messages", "groups", "writing"]
@@ -55,11 +54,14 @@ class Client:
         self.messages.put_nowait(message)
         if not self.writing:
             self.writing = True
-            gevent.spawn(self._writer)
+            if message is self.ping_message:
+                shared.executor.submit(self._writer, 0)
+            else:
+                gevent.spawn(self._writer, const.PING_INTERVAL / 2)
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.CLIENT_TTL)
-        pc = PeriodicCallback(self.schedule, self._ping, const.PING_INTERVAL)
+        pc = PeriodicCallback(shared.schedule, self._ping, const.PING_INTERVAL)
         try:
             while not self.ws.closed:
                 message = self.ws.receive()
@@ -74,13 +76,13 @@ class Client:
         self.send(self.ping_message)
         shared.user_service.ping(options.rpc_address, self.conn_id, self.context)
 
-    def _writer(self):
+    def _writer(self, timeout):
         logging.debug(f'start {self}')
         idle_timeout = False
         try:
             while True:
                 idle_timeout = False
-                message = self.messages.get(timeout=const.PING_INTERVAL / 2)
+                message = self.messages.get(timeout=timeout)
                 if message is None:
                     break
                 if message is self.ping_message:
