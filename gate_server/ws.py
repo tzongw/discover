@@ -67,8 +67,6 @@ class Client:
                     shared.user_service.recv_binary(options.rpc_address, self.conn_id, self.context, message)
                 elif isinstance(message, str):
                     shared.user_service.recv_text(options.rpc_address, self.conn_id, self.context, message)
-                else:
-                    logging.warning(f'receive {message}')
         finally:
             pc.stop()
 
