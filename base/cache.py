@@ -26,27 +26,27 @@ class Cache(Generic[T]):
 
     def _set(self, key, value):
         self.lru[key] = value
-        self.lru.move_to_end(key)  # in case replace
-        if self.maxsize and len(self.lru) > self.maxsize:
-            self.lru.popitem(last=False)
+        if self.maxsize is not None:
+            self.lru.move_to_end(key)  # in case replace
+            if len(self.lru) > self.maxsize:
+                self.lru.popitem(last=False)
 
     def mget(self, keys, *args, **kwargs):
         results = {}
-        new_keys = []
+        missed_keys = []
         for key in keys:
             made_key = make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
-                self.lru.move_to_end(made_key)
                 results[key] = value
+                if self.maxsize is not None:
+                    self.lru.move_to_end(made_key)
             else:
-                new_keys.append(key)
-        if new_keys:
-            for key in new_keys:
-                made_key = make_key(key, *args, **kwargs)
+                missed_keys.append(key)
                 self._set(made_key, self.placeholder)
-            values = self.single_flight.mget(new_keys, *args, **kwargs)
-            for key, value in zip(new_keys, values):
+        if missed_keys:
+            values = self.single_flight.mget(missed_keys, *args, **kwargs)
+            for key, value in zip(missed_keys, values):
                 results[key] = value
                 made_key = make_key(key, *args, **kwargs)
                 if made_key in self.lru:
@@ -73,21 +73,20 @@ class TTLCache(Cache[T]):
 
     def mget(self, keys, *args, **kwargs):
         results = {}
-        new_keys = []
+        missed_keys = []
         for key in keys:
             made_key = make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
-                self.lru.move_to_end(made_key)
                 results[key] = pair.value
+                if self.maxsize is not None:
+                    self.lru.move_to_end(made_key)
             else:
-                new_keys.append(key)
-        if new_keys:
-            for key in new_keys:
-                made_key = make_key(key, *args, **kwargs)
+                missed_keys.append(key)
                 self._set(made_key, self.placeholder)
-            tuples = self.single_flight.mget(new_keys, *args, **kwargs)
-            for key, (value, ttl) in zip(new_keys, tuples):
+        if missed_keys:
+            tuples = self.single_flight.mget(missed_keys, *args, **kwargs)
+            for key, (value, ttl) in zip(missed_keys, tuples):
                 results[key] = value
                 made_key = make_key(key, *args, **kwargs)
                 if made_key in self.lru:

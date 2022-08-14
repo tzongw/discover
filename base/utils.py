@@ -156,7 +156,7 @@ class SingleFlight:
 
     def mget(self, keys, *args, **kwargs):
         futures = []
-        new_keys = []
+        missed_keys = []
         for key in keys:
             made_key = make_key(key, *args, **kwargs)
             if made_key in self._futures:
@@ -165,17 +165,17 @@ class SingleFlight:
                 fut = Future()
                 self._futures[made_key] = fut
                 futures.append(fut)
-                new_keys.append(key)
-        if new_keys:
+                missed_keys.append(key)
+        if missed_keys:
             try:
-                values = self._mget(new_keys, *args, **kwargs)
-                assert len(new_keys) == len(values)
-                for key, value in zip(new_keys, values):
+                values = self._mget(missed_keys, *args, **kwargs)
+                assert len(missed_keys) == len(values)
+                for key, value in zip(missed_keys, values):
                     made_key = make_key(key, *args, **kwargs)
                     fut = self._futures.pop(made_key)
                     fut.set_result(value)
             except Exception as e:
-                for key in new_keys:
+                for key in missed_keys:
                     made_key = make_key(key, *args, **kwargs)
                     fut = self._futures.pop(made_key)
                     fut.set_exception(e)
