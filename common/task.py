@@ -35,10 +35,11 @@ class AsyncTask:
 
             h = self.handlers.get(task.path)
             if not h:
-                # version problem? throw back task, let new version process handle it
-                logging.warning(f'can not handle {id} {task.id} {task.path}, stop receive Task')
-                receiver.remove(Task)
-                Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
+                task.ttl -= 1
+                logging.warning(f'can not handle {id} {task.id} {task.path} {task.ttl}')
+                if task.ttl > 0:
+                    # throw back task, let other process handle it
+                    Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
                 return
             args = json.loads(task.args)  # type: list
             kwargs = json.loads(task.kwargs)  # type: dict
@@ -60,7 +61,7 @@ class AsyncTask:
         self.handlers[path] = AsyncTask.Handler(f, signature(f).parameters)
 
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
+            task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs), ttl=10)
             task.id = f'{timer_name(task)}:{task.path}:{task.args}:{task.kwargs}'
             return task
 

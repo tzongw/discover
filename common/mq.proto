@@ -17,4 +17,5 @@ message Task {
     string path = 2;
     string args = 3;
     string kwargs = 4;
+    int32 ttl = 5;
 }
