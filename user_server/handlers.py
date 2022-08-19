@@ -2,7 +2,7 @@
 import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
-    async_task, app_id, at_main
+    async_task, app_id, at_main, publisher
 from datetime import timedelta
 from dao import Account
 
@@ -55,6 +55,7 @@ def init():
         at_exit(lambda: timer_service.remove_timer('welcome:2', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
         timer.hint = app_id
+        publisher.hint = app_id
         oneshot_id = timer.create(Alarm(tip='oneshot'), timedelta(seconds=2))
         at_exit(lambda: timer.kill(oneshot_id))
         loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)

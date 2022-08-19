@@ -22,8 +22,10 @@ class AsyncTask:
     F = TypeVar('F', bound=Callable)
 
     def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
+        assert timer.redis is receiver.redis
         self.timer = timer
         self.receiver = receiver
+        self.publisher = Publisher(receiver.redis, hint=timer.hint)
         self.maxlen = maxlen
         self.handlers = {}
         self.local = local()
@@ -39,7 +41,7 @@ class AsyncTask:
                 logging.warning(f'can not handle {id} {task.id} {task.path} {task.ttl}')
                 if task.ttl > 0:
                     # throw back task, let other process handle it
-                    Publisher(receiver.redis).publish(task, maxlen=self.maxlen)
+                    self.publish(task, do_hint=False)
                 return
             args = json.loads(task.args)  # type: list
             kwargs = json.loads(task.kwargs)  # type: dict
@@ -77,5 +79,6 @@ class AsyncTask:
     def cancel(self, task_id=None):
         return self.timer.kill(task_id or self.current_task.id)
 
-    def publish(self, task=None):
-        Publisher(self.receiver.redis).publish(task or self.current_task, maxlen=self.maxlen)
+    def publish(self, task=None, do_hint=True):
+        self.publisher.publish(task or self.current_task, maxlen=self.maxlen,
+                               do_hint=do_hint)

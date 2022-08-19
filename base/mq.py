@@ -11,13 +11,18 @@ from google.protobuf.json_format import Parse, MessageToJson
 
 
 class Publisher:
-    def __init__(self, redis: Redis):
-        self._redis = redis
+    def __init__(self, redis: Redis, hint=None):
+        self.redis = redis
+        self.hint = hint
 
-    def publish(self, message: Message, maxlen=4096):
+    def publish(self, message: Message, maxlen=4096, do_hint=True):
         stream = stream_name(message)
         json = MessageToJson(message)
-        return self._redis.xadd(stream, {'': json}, maxlen=maxlen)
+        params = [stream, 'MAXLEN', '~', maxlen]
+        if do_hint and self.hint:
+            params += ['HINT', self.hint]
+        params += ['*', '', json]
+        return self.redis.execute_command('XADD', *params)
 
 
 class ProtoDispatcher(Dispatcher):
