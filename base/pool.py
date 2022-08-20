@@ -4,7 +4,7 @@ from gevent.queue import Queue
 
 
 class Pool:
-    def __init__(self, maxsize=128, timeout=1, acceptable=lambda e: False):
+    def __init__(self, maxsize=64, timeout=1, acceptable=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
@@ -32,7 +32,7 @@ class Pool:
     def _get(self):
         pool = self._pool
         if not pool.empty() or self._size >= self._maxsize:
-            return pool.get(self._timeout)
+            return pool.get(timeout=self._timeout)
 
         self._size += 1
         try:
