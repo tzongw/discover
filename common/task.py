@@ -33,8 +33,6 @@ class AsyncTask:
         @receiver.group(Task)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.id} {task.path}')
-            receiver.redis.xtrim(stream_name(task), minid=id)
-
             h = self.handlers.get(task.path)
             if not h:
                 task.ttl -= 1
