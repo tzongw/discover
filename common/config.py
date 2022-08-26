@@ -7,7 +7,8 @@ from tornado.options import options
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 from .const import Environment
 
-LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d]%(end_color)s %(message)s"
+LOG_FORMAT = "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d %(process)d]%(end_color)s " \
+             "%(message)s"
 
 
 def config_logging():
