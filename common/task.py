@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import random
 from collections import namedtuple
 from inspect import signature, Parameter
 from typing import TypeVar, Callable
@@ -29,11 +30,16 @@ class AsyncTask:
         self.maxlen = maxlen
         self.handlers = {}
         self.local = local()
+        self.received = 0
+        quarter = maxlen // 4
+        rand = random.randrange(quarter)
 
         @receiver.group(Task)
         def handler(id, task: Task):
-            logging.debug(f'got task {id} {task.id} {task.path}')
-            receiver.redis.xtrim(stream_name(task), minid=id)
+            self.received += 1
+            logging.debug(f'got task {id} {task.id} {task.path} {self.received}')
+            if (self.received + rand) % quarter == 0:
+                receiver.redis.xtrim(stream_name(task), minid=id)
 
             h = self.handlers.get(task.path)
             if not h:
