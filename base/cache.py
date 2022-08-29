@@ -108,6 +108,7 @@ class FullCache(Cache[T]):
         self.get_keys = get_keys
         self.fut = None  # type: Optional[Future]
         self._version = 0
+        self._values = []
 
     @property
     def version(self):
@@ -118,16 +119,15 @@ class FullCache(Cache[T]):
         if self.fut:
             return self.fut.result()
         if self.full_cached:
-            return self.lru.values()
+            return self._values
         self.fut = Future()
         self.full_cached = True
         try:
             keys = self.get_keys()
-            self.mget(keys, *args, **kwargs)
-            values = self.lru.values()
+            self._values = self.mget(keys, *args, **kwargs)
             self._version += 1
-            self.fut.set_result(values)
-            return values
+            self.fut.set_result(self._values)
+            return self._values
         except Exception as e:
             self.fut.set_exception(e)
             self.full_cached = False
