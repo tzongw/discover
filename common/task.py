@@ -8,7 +8,7 @@ from typing import TypeVar, Callable
 from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
-from base.utils import stream_name, timer_name
+from base.utils import timer_name
 from .mq_pb2 import Task
 
 
