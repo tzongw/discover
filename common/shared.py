@@ -1,4 +1,5 @@
 import signal
+import logging
 from typing import Union
 from weakref import WeakSet
 import sys
@@ -35,7 +36,7 @@ invalidator = Invalidator(redis)
 _exits = [registry.stop]
 _mains = []
 
-exiting = False  # grace exiting, stop receive new tasks
+exited = False  # stop receive new tasks
 workers = WeakSet()  # heavy task workers, try join all before exit
 
 
@@ -54,20 +55,24 @@ def init_main():
 
 
 def _sig_handler(sig, frame):
-    def grace_exit():
-        global exiting
-        exiting = True
+    def graceful_exit():
+        global exited
+        exited = True
+        logging.info(f'exit {sig} {frame}')
         with LogSuppress(Exception):
             executor.gather(*_exits)
+            _exits.clear()
             gevent.sleep(1)
-            greenlets = list(workers)
-            gevent.joinall(greenlets, timeout=30, raise_error=False)  # try finish all jobs
+            doing = list(workers)
+            gevent.joinall(doing, timeout=30, raise_error=False)  # try finish all jobs
             unique_id.stop()
-        sys.exit(0)
+        if sig != signal.SIGUSR1:
+            sys.exit(0)
 
-    gevent.spawn(grace_exit)
+    gevent.spawn(graceful_exit)
 
 
 signal.signal(signal.SIGTERM, _sig_handler)
 signal.signal(signal.SIGINT, _sig_handler)
 signal.signal(signal.SIGQUIT, _sig_handler)
+signal.signal(signal.SIGUSR1, _sig_handler)
