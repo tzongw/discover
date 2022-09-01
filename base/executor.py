@@ -41,7 +41,6 @@ class Executor:
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
         self._unfinished += 1
-        logging.debug(f'+job {self}')
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
@@ -74,7 +73,6 @@ class Executor:
                 if time.time() - start > self._slow_log:
                     logging.warning(f'slow task {self} {item.fn} {item.args} {item.kwargs}')
                 self._unfinished -= 1
-                logging.debug(f'-job {self}')
         except queue.Empty:
             logging.debug(f'worker idle exit')
         finally:
