@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import time
 from concurrent.futures import Future
 from gevent import queue
 import gevent
@@ -28,12 +29,13 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=60, name=''):
+    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=1, name=''):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
         self._items = queue.Channel() if queue_size == 0 else queue.Queue(queue_size)
         self._idle = idle
+        self._slow_log = slow_log
         self._name = name
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
@@ -67,7 +69,10 @@ class Executor:
         try:
             while True:
                 item = self._items.get(timeout=self._idle)  # type: _WorkItem
+                start = time.time()
                 item.run()
+                if time.time() - start > self._slow_log:
+                    logging.warning(f'slow task {self} {item.fn} {item.args} {item.kwargs}')
                 self._unfinished -= 1
                 logging.debug(f'-job {self}')
         except queue.Empty:
