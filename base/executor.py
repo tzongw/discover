@@ -44,7 +44,10 @@ class Executor:
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
+        start = time.time()
         self._items.put(item)
+        if time.time() - start > self._slow_log:
+            logging.warning(f'slow put {self} {item.fn} {item.args} {item.kwargs}')
         return fut
 
     def gather(self, *fns, block=True):
