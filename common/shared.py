@@ -36,22 +36,28 @@ invalidator = Invalidator(redis)
 _exits = [registry.stop]
 _mains = []
 
-exited = False  # stop receive new tasks
+inited = False
+exited = False
 workers = WeakSet()  # heavy task workers, try join all before exit
 
 
 def at_main(fun):
-    assert callable(fun)
+    assert callable(fun) and not inited
     _mains.append(fun)
+    return fun
 
 
 def at_exit(fun):
-    assert callable(fun)
+    assert callable(fun) and not exited
     _exits.append(fun)
+    return fun
 
 
 def init_main():
+    global inited
+    inited = True
     executor.gather(*_mains)
+    _mains.clear()
 
 
 def _sig_handler(sig, frame):

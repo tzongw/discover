@@ -48,6 +48,7 @@ def task(hello: str, repeat: int):
     async_task.cancel()
 
 
+@at_main
 def init():
     if registry.addresses(const.RPC_TIMER):
         timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)
@@ -65,6 +66,3 @@ def init():
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
-
-
-at_main(init)
