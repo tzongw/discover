@@ -45,10 +45,13 @@ class ServicePools:
                 yield conn
             except Exception as e:
                 if not ThriftPool.acceptable(e):
+                    count = len(self._cool_down)
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
-                    logging.warning(f'+ cool down {self._name} {address}')
-                    self._update_addresses()
-                    gevent.spawn_later(Registry.COOL_DOWN, self._update_addresses)
+                    if len(self._cool_down) > count:
+                        logging.warning(f'+ cool down {self._name} {address}')
+                        if not count:
+                            gevent.spawn(self._clean_cool_down)
+                        self._update_addresses()
                 raise
 
     def _clean_pools(self):
@@ -72,3 +75,8 @@ class ServicePools:
         self._good_addresses = [addr for addr in addresses if addr not in self._cool_down]
         local_host = ip_address()
         self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
+
+    def _clean_cool_down(self):
+        while self._cool_down:
+            time.sleep(1)
+            self._update_addresses()
