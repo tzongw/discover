@@ -46,6 +46,7 @@ class ServicePools:
             except Exception as e:
                 if not ThriftPool.acceptable(e):
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
+                    logging.warning(f'+ cool down {self._name} {address}')
                     self._update_addresses()
                     gevent.spawn_later(Registry.COOL_DOWN, self._update_addresses)
                 raise
@@ -64,6 +65,8 @@ class ServicePools:
         addresses = self.addresses()
         now = time.time()
         expire = [addr for addr, cd in self._cool_down.items() if now > cd]
+        if expire:
+            logging.info(f'- cool down {self._name} {expire}')
         for addr in expire:
             self._cool_down.pop(addr)
         self._good_addresses = [addr for addr in addresses if addr not in self._cool_down]
