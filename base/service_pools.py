@@ -1,6 +1,7 @@
 import contextlib
 from random import choice
 from typing import Dict, ContextManager
+import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
 from .thrift_pool import ThriftPool
@@ -46,9 +47,8 @@ class ServicePools:
                 if not ThriftPool.acceptable(e):
                     self._cool_down[address] = time.time() + Registry.COOL_DOWN
                     self._update_addresses()
+                    gevent.spawn_later(Registry.COOL_DOWN, self._update_addresses)
                 raise
-            if self._cool_down.pop(address, None):
-                self._update_addresses()
 
     def _clean_pools(self):
         available = self.addresses()
@@ -63,6 +63,9 @@ class ServicePools:
     def _update_addresses(self):
         addresses = self.addresses()
         now = time.time()
-        self._good_addresses = [addr for addr in addresses if now > self._cool_down.get(addr, 0)]
+        expire = [addr for addr, cd in self._cool_down.items() if now > cd]
+        for addr in expire:
+            self._cool_down.pop(addr)
+        self._good_addresses = [addr for addr in addresses if addr not in self._cool_down]
         local_host = ip_address()
         self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
