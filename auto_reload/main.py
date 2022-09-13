@@ -18,7 +18,7 @@ def is_api(name: str):
 
 def reload_nginx():
     for name in changed:
-        addrs = addr_map[name]
+        addrs = sorted(addr_map[name])
         logging.info(f'updating: {name} {addrs}')
         with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
             f.write('\n'.join([f'server {l};' for l in addrs]))
