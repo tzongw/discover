@@ -2,7 +2,6 @@ import contextlib
 import logging
 import socket
 from functools import lru_cache
-import sys
 from typing import TypeVar, Optional
 from .executor import Executor
 from redis import Redis
@@ -47,9 +46,6 @@ def ip_address(ipv6=False):
     with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.connect(('8.8.8.8', 9))
         return sock.getsockname()[0]
-
-
-wildcard = '' if sys.platform == 'darwin' else '*'
 
 
 class Dispatcher:

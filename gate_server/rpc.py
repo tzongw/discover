@@ -78,7 +78,7 @@ class Handler:
 def serve():
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket(utils.wildcard, options.rpc_port)
+    transport = TSocket.TServerSocket(port=options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)

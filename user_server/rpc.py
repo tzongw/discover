@@ -15,7 +15,7 @@ from base.mq import Publisher
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key
 from config import options
-from base.utils import Parser, wildcard
+from base.utils import Parser
 
 
 class Handler:
@@ -126,7 +126,7 @@ class Handler:
 def serve():
     handler = Handler()
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(wildcard, options.rpc_port)
+    transport = TSocket.TServerSocket(port=options.rpc_port)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
