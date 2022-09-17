@@ -22,7 +22,7 @@ sockets = Sockets(app)
 
 
 def serve():
-    server = pywsgi.WSGIServer(('', options.ws_port), app, handler_class=WebSocketHandler)
+    server = pywsgi.WSGIServer(options.ws_port, app, handler_class=WebSocketHandler)
     g = gevent.spawn(server.serve_forever)
     gevent.sleep(0.1)
     if not options.ws_port:
