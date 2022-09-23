@@ -3,6 +3,7 @@ import time
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable
 from concurrent.futures import Future
+import functools
 
 from .utils import SingleFlight, make_key
 from .invalidator import Invalidator
@@ -134,3 +135,17 @@ class FullCache(Cache[T]):
             raise
         finally:
             self.fut = None
+
+    def cached(self, maxsize=128, typed=False):
+        def decorator(f):
+            @functools.lru_cache(maxsize, typed)
+            def inner(version, *args, **kwargs):
+                return f(*args, **kwargs)
+
+            @functools.wraps(f)
+            def wrapper(*args, **kwargs):
+                return inner(self.version, *args, **kwargs)
+
+            return wrapper
+
+        return decorator
