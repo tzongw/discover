@@ -36,7 +36,7 @@ class AsyncTask:
             h = self.handlers.get(task.path)
             if not h:
                 task.ttl -= 1
-                logging.warning(f'can not handle {id} {task.id} {task.path} {task.ttl}')
+                logging.error(f'can not handle {id} {task.id} {task.path} {task.ttl}')
                 if task.ttl > 0:
                     # throw back task, let other process handle it
                     self.publish(task, do_hint=False)

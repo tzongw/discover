@@ -6,7 +6,6 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from thrift.transport import TSocket
 from thrift.transport import TTransport
-from base import utils
 from ws import clients, Client, remove_from_group, groups
 from config import options
 
@@ -17,32 +16,24 @@ class Handler:
         if client:
             logging.debug(f'{client} {key} {value}')
             client.set_context(key, value)
-        else:
-            logging.warning(f'not found {conn_id} {key} {value}')
 
     def unset_context(self, conn_id, key, value):
         client = clients.get(conn_id)
         if client:
             logging.debug(f'{client} {key} {value}')
             client.unset_context(key, value)
-        else:
-            logging.warning(f'not found {conn_id} {key} {value}')
 
     def remove_conn(self, conn_id):
         client = clients.get(conn_id)
         if client:
-            logging.info(f'{client}')
+            logging.debug(f'{client}')
             client.stop()
-        else:
-            logging.warning(f'not found {conn_id}')
 
     def _send_message(self, conn_id, message):
         client = clients.get(conn_id)
         if client:
             logging.debug(f'{client} {message}')
             client.send(message)
-        else:
-            logging.warning(f'not found {conn_id} {message}')
 
     send_text = _send_message
     send_binary = _send_message
@@ -50,20 +41,16 @@ class Handler:
     def join_group(self, conn_id, group):
         client = clients.get(conn_id)
         if client:
-            logging.info(f'{client} {group}')
+            logging.debug(f'{client} {group}')
             client.groups.add(group)
             groups[group].add(client)
-        else:
-            logging.warning(f'not found {conn_id} {group}')
 
     def leave_group(self, conn_id, group):
         client = clients.get(conn_id)
         if client:
-            logging.info(f'{client} {group}')
+            logging.debug(f'{client} {group}')
             client.groups.discard(group)
             remove_from_group(client, group)
-        else:
-            logging.warning(f'not found {conn_id} {group}')
 
     def _broadcast_message(self, group, exclude, message):
         logging.debug(f'{group} {exclude} {message} {groups}')
