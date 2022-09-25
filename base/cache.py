@@ -36,7 +36,7 @@ class Cache(Generic[T]):
         results = []
         missed_keys = []
         indexes = []
-        for key in keys:
+        for index, key in enumerate(keys):
             made_key = make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
@@ -45,7 +45,7 @@ class Cache(Generic[T]):
                     self.lru.move_to_end(made_key)
             else:
                 missed_keys.append(key)
-                indexes.append(len(results))
+                indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
         if missed_keys:
