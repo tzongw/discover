@@ -129,10 +129,13 @@ class Proxy:
         return getattr(choice(self._targets), name)
 
 
+_kw_mark = object()
+
+
 def make_key(key, *args, **kwargs):
     if not args and not kwargs:
         return key
-    return key, *args, *kwargs.items()
+    return key, *args, _kw_mark, *kwargs.items()
 
 
 class SingleFlight:
