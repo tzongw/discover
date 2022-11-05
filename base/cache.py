@@ -36,10 +36,12 @@ class Cache(Generic[T]):
         return value
 
     def _set(self, key, value):
+        replace = key in self.lru
         self.lru[key] = value
         if self.maxsize is not None:
-            self.lru.move_to_end(key)  # in case replace
-            if len(self.lru) > self.maxsize:
+            if replace:
+                self.lru.move_to_end(key)
+            elif len(self.lru) > self.maxsize:
                 self.lru.popitem(last=False)
 
     def mget(self, keys, *args, **kwargs):
@@ -114,8 +116,8 @@ class TTLCache(Cache[T]):
 
 class FullCache(Cache[T]):
 
-    def __init__(self, *, mget, get_keys, get_expire=None):
-        super().__init__(mget=mget, maxsize=None)
+    def __init__(self, *, mget, get_keys, get_expire=None, maxsize: Optional[int] = 8192):
+        super().__init__(mget=mget, maxsize=maxsize)
         self.get_keys = get_keys
         self.get_expire = get_expire
         self._fut = None  # type: Optional[Future]
@@ -125,9 +127,11 @@ class FullCache(Cache[T]):
 
     @property
     def version(self):
-        self.values()
+        # noinspection PyStatementEffect
+        self.values
         return self._version
 
+    @property
     def values(self):
         if self._fut:
             return self._fut.result()
@@ -153,6 +157,7 @@ class FullCache(Cache[T]):
 
     def cached(self, maxsize=128, typed=False):
         def decorator(f):
+            # noinspection PyUnusedLocal
             @functools.lru_cache(maxsize, typed)
             def inner(version, *args, **kwargs):
                 return f(*args, **kwargs)
