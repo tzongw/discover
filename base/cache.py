@@ -79,7 +79,7 @@ class TTLCache(Cache[T]):
         results = []
         missed_keys = []
         indexes = []
-        for key in keys:
+        for index, key in enumerate(keys):
             made_key = make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
@@ -88,7 +88,7 @@ class TTLCache(Cache[T]):
                     self.lru.move_to_end(made_key)
             else:
                 missed_keys.append(key)
-                indexes.append(len(results))
+                indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
         if missed_keys:
@@ -104,37 +104,41 @@ class TTLCache(Cache[T]):
 
 class FullCache(Cache[T]):
 
-    def __init__(self, *, mget, get_keys):
+    def __init__(self, *, mget, get_keys, get_expire=None):
         super().__init__(mget=mget, maxsize=None)
         self.get_keys = get_keys
-        self.fut = None  # type: Optional[Future]
+        self.get_expire = get_expire
+        self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
+        self._expire = None
 
     @property
     def version(self):
         self.values()
         return self._version
 
-    def values(self, *args, **kwargs):
-        if self.fut:
-            return self.fut.result()
-        if self.full_cached:
+    def values(self):
+        if self._fut:
+            return self._fut.result()
+        if self.full_cached and (self._expire is None or self._expire > time.time()):
             return self._values
-        self.fut = Future()
+        self._fut = Future()
         self.full_cached = True
         try:
             keys = self.get_keys()
-            self._values = self.mget(keys, *args, **kwargs)
+            self._values = self.mget(keys)
+            if self.get_expire:
+                self._expire = self.get_expire(self._values)
             self._version += 1
-            self.fut.set_result(self._values)
+            self._fut.set_result(self._values)
             return self._values
         except Exception as e:
-            self.fut.set_exception(e)
+            self._fut.set_exception(e)
             self.full_cached = False
             raise
         finally:
-            self.fut = None
+            self._fut = None
 
     def cached(self, maxsize=128, typed=False):
         def decorator(f):
