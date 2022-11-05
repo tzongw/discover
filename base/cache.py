@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import time
+from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable
 from concurrent.futures import Future
@@ -9,6 +9,16 @@ from .utils import SingleFlight, make_key
 from .invalidator import Invalidator
 
 T = TypeVar('T')
+
+
+def expire_at(expire):
+    if expire is None or isinstance(expire, datetime):
+        return expire
+    if isinstance(expire, (int, float)):
+        return None if expire < 0 else datetime.now() + timedelta(seconds=expire)
+    if isinstance(expire, timedelta):
+        return datetime.now() + expire
+    raise ValueError(f'{expire} not valid')
 
 
 class Cache(Generic[T]):
@@ -82,7 +92,7 @@ class TTLCache(Cache[T]):
         for index, key in enumerate(keys):
             made_key = make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
-            if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > time.time()):
+            if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
                 results.append(pair.value)
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
@@ -93,11 +103,11 @@ class TTLCache(Cache[T]):
                 self._set(made_key, self.placeholder)
         if missed_keys:
             tuples = self.single_flight.mget(missed_keys, *args, **kwargs)
-            for key, (value, ttl), index in zip(missed_keys, tuples, indexes):
+            for key, (value, expire), index in zip(missed_keys, tuples, indexes):
                 results[index] = value
                 made_key = make_key(key, *args, **kwargs)
                 if made_key in self.lru:
-                    pair = TTLCache.Pair(value, time.time() + ttl if ttl >= 0 else None)
+                    pair = TTLCache.Pair(value, expire_at(expire))
                     self.lru[made_key] = pair
         return results
 
@@ -111,7 +121,7 @@ class FullCache(Cache[T]):
         self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
-        self._expire = None
+        self._expire_at = None
 
     @property
     def version(self):
@@ -121,7 +131,7 @@ class FullCache(Cache[T]):
     def values(self):
         if self._fut:
             return self._fut.result()
-        if self.full_cached and (self._expire is None or self._expire > time.time()):
+        if self.full_cached and (self._expire_at is None or self._expire_at > datetime.now()):
             return self._values
         self._fut = Future()
         self.full_cached = True
@@ -129,7 +139,8 @@ class FullCache(Cache[T]):
             keys = self.get_keys()
             self._values = self.mget(keys)
             if self.get_expire:
-                self._expire = self.get_expire(self._values)
+                expire = self.get_expire(self._values)
+                self._expire_at = expire_at(expire)
             self._version += 1
             self._fut.set_result(self._values)
             return self._values
