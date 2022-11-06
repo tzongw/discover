@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .cache import Cache, TTLCache
+from .cache import Cache, TTLCache, FullCache
 from .chunk import chunks
 from .defer import deferrable, defer_if, defer
 from .executor import Executor
