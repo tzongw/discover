@@ -30,6 +30,11 @@ class Cache(Generic[T]):
         self.lru = OrderedDict()
         self.maxsize = maxsize
         self.full_cached = False
+        self.hits = 0
+        self.misses = 0
+
+    def __str__(self):
+        return f'hits: {self.hits} misses: {self.misses} size: {len(self.lru)} maxsize: {self.maxsize}'
 
     def get(self, key, *args, **kwargs) -> Optional[T]:
         value, = self.mget([key], *args, **kwargs)
@@ -52,10 +57,12 @@ class Cache(Generic[T]):
             made_key = make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
+                self.hits += 1
                 results.append(value)
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
+                self.misses += 1
                 missed_keys.append(key)
                 indexes.append(index)
                 results.append(self.placeholder)
@@ -95,10 +102,12 @@ class TTLCache(Cache[T]):
             made_key = make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
+                self.hits += 1
                 results.append(pair.value)
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
+                self.misses += 1
                 missed_keys.append(key)
                 indexes.append(index)
                 results.append(self.placeholder)
@@ -124,6 +133,11 @@ class FullCache(Cache[T]):
         self._version = 0
         self._values = []
         self._expire_at = None
+        self.full_hits = 0
+        self.full_misses = 0
+
+    def __str__(self):
+        return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
 
     @property
     def version(self):
@@ -134,9 +148,12 @@ class FullCache(Cache[T]):
     @property
     def values(self):
         if self._fut:
+            self.full_misses += 1
             return self._fut.result()
         if self.full_cached and (self._expire_at is None or self._expire_at > datetime.now()):
+            self.full_hits += 1
             return self._values
+        self.full_misses += 1
         self._fut = Future()
         self.full_cached = True
         try:
@@ -160,6 +177,7 @@ class FullCache(Cache[T]):
             # noinspection PyUnusedLocal
             @functools.lru_cache(maxsize, typed)
             def inner(version, *args, **kwargs):
+                self.full_hits -= 1  # full_hits will incr by 1 in f redundantly
                 return f(*args, **kwargs)
 
             @functools.wraps(f)

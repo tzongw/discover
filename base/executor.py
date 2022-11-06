@@ -29,7 +29,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=1, name=''):
+    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=1, name='unnamed'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
@@ -65,7 +65,7 @@ class Executor:
             logging.debug(f'+worker {self}')
 
     def __str__(self):
-        return f'{self._name or "unnamed"}: unfinished: {self._unfinished}, workers: {self._workers}'
+        return f'{self._name}: unfinished: {self._unfinished}, workers: {self._workers}'
 
     def _worker(self):
         try:
