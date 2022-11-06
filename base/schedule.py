@@ -2,7 +2,8 @@
 from __future__ import annotations
 import time
 import threading
-from typing import List
+from datetime import timedelta, datetime
+from typing import List, Union
 import gevent
 from .executor import Executor
 import heapq
@@ -36,13 +37,17 @@ class Schedule:
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
-    def call_later(self, callback: Callable, delay) -> Handle:
+    def call_later(self, callback: Callable, delay: Union[int, float, timedelta]) -> Handle:
+        if isinstance(delay, timedelta):
+            delay = delay.total_seconds()
         return self.call_at(callback, time.time() + delay)
 
-    def call_at(self, callback: Callable, at) -> Handle:
+    def call_at(self, callback: Callable, when: Union[int, float, datetime]) -> Handle:
         assert callable(callback)
+        if isinstance(when, datetime):
+            when = when.timestamp()
         with self._cond:
-            handle = Handle(callback, at)
+            handle = Handle(callback, when)
             heapq.heappush(self._handles, handle)
             if self._handles[0] is handle:  # wakeup
                 self._cond.notify()
@@ -56,14 +61,14 @@ class Schedule:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
                         self._executor.submit(handle.callback)
-                timeout = (self._handles[0].when - now) if self._handles else None
+                timeout = self._handles[0].when - now if self._handles else None
                 self._cond.wait(timeout)
 
 
 class PeriodicCallback:
     __slots__ = ["_schedule", "_callback", "_period", "_handle"]
 
-    def __init__(self, schedule: Schedule, callback: Callable, period):
+    def __init__(self, schedule: Schedule, callback: Callable, period: Union[int, float, timedelta]):
         assert callable(callback) and period > 0
         self._schedule = schedule
         self._callback = callback
