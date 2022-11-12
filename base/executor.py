@@ -5,6 +5,7 @@ from concurrent.futures import Future
 from gevent import queue
 import gevent
 from typing import Callable
+from functools import partial
 
 
 class _WorkItem:
@@ -56,7 +57,7 @@ class Executor:
         return list(results) if block else results
 
     def map(self, fn: Callable, *args, block=True):
-        return self.gather(*[lambda arg=arg: fn(arg) for arg in args], block=block)
+        return self.gather(*[partial(fn, arg) for arg in args], block=block)
 
     def _adjust_workers(self):
         if self._unfinished > self._workers and self._workers < self._max_workers:
