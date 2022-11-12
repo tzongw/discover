@@ -16,5 +16,6 @@ WS_GATE = f'ws_{APP_GATE}'
 
 class Environment(Enum):
     DEV = 'dev'
+    TEST = 'test'
     STAGING = 'staging'
     PROD = 'prod'

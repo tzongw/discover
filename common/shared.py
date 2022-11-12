@@ -9,7 +9,7 @@ from base import Registry
 from base import Executor
 from base import Schedule
 from base import UniqueId
-from base import Dispatcher, LogSuppress, Parser
+from base import Dispatcher, Parser
 from base import Publisher
 from base import Timer
 from base import Invalidator
@@ -38,7 +38,7 @@ _mains = []
 
 inited = False
 exited = False
-workers = WeakSet()  # heavy task workers, try join all before exit
+workers = WeakSet()  # task workers, try to join all before exiting
 
 
 def at_main(fun):
@@ -65,14 +65,13 @@ def _sig_handler(sig, frame):
         global exited
         exited = True
         logging.info(f'exit {sig} {frame}')
-        with LogSuppress(Exception):
-            executor.gather(*_exits)
-            _exits.clear()
-            gevent.sleep(1)
-            doing = list(workers)
-            gevent.joinall(doing, timeout=30, raise_error=False)  # try finish all jobs
-            unique_id.stop()
+        executor.gather(*_exits)
+        _exits.clear()
         if sig != signal.SIGUSR1:
+            seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
+            gevent.sleep(seconds)  # wait for requests & messages
+            gevent.joinall(workers, timeout=60)  # try to finish all tasks
+            unique_id.stop()
             sys.exit(0)
 
     gevent.spawn(graceful_exit)
