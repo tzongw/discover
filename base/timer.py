@@ -52,11 +52,11 @@ class Timer:
         return res
 
     def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
-               do_hint=True):
+               do_hint=True, stream=None):
         if not self.registered:
             self.redis.function_load(self._SCRIPT, replace=True)
             self.registered = True
-        stream = stream_name(message)
+        stream = stream or stream_name(message)
         data = MessageToJson(message)
         if key is None:
             key = f'{timer_name(message)}:{data}'

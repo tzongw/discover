@@ -74,9 +74,10 @@ class Executor:
                 item = self._items.get(timeout=self._idle)  # type: _WorkItem
                 start = time.time()
                 item.run()
-                if time.time() - start > self._slow_log:
+                t = time.time() - start
+                if t > self._slow_log:
                     fn = f'{item.fn.__module__}.{item.fn.__name__}'
-                    logging.warning(f'slow task {self} {fn} {item.args} {item.kwargs}')
+                    logging.warning(f'slow task {t} {self} {fn} {item.args} {item.kwargs}')
                 self._unfinished -= 1
         except queue.Empty:
             logging.debug(f'worker idle exit')

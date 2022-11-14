@@ -15,8 +15,8 @@ class Publisher:
         self.redis = redis
         self.hint = hint
 
-    def publish(self, message: Message, maxlen=4096, do_hint=True):
-        stream = stream_name(message)
+    def publish(self, message: Message, maxlen=4096, do_hint=True, stream=None):
+        stream = stream or stream_name(message)
         json = MessageToJson(message)
         params = [stream, 'MAXLEN', '~', maxlen]
         if do_hint and self.hint:
@@ -26,13 +26,13 @@ class Publisher:
 
 
 class ProtoDispatcher(Dispatcher):
-    def handler(self, key_or_cls):
+    def handler(self, key_or_cls, stream=None):
         if isinstance(key_or_cls, str):
             return super().handler(key_or_cls)
 
         assert issubclass(key_or_cls, Message)
         message_cls = key_or_cls  # type: Type[Message]
-        key = stream_name(message_cls())
+        key = stream or stream_name(message_cls())
         super_handler = super().handler
 
         def decorator(f):
@@ -147,8 +147,7 @@ class Receiver:
                 gevent.sleep(1)
         logging.info(f'fanout exit')
 
-    def remove(self, message_cls: Type[Message]):
-        stream = stream_name(message_cls())
+    def remove(self, stream):
         self._group_streams.pop(stream, None)
         self._fanout_streams.pop(stream, None)
         self.redis.xadd(self._waker, {'wake': 'up'})

@@ -21,7 +21,7 @@ class AsyncTask:
     Handler = namedtuple('Handler', ['func', 'params'])
     F = TypeVar('F', bound=Callable)
 
-    def __init__(self, timer: Timer, receiver: Receiver, maxlen=16384):
+    def __init__(self, timer: Timer, receiver: Receiver, maxlen=4096):
         assert timer.redis is receiver.redis
         self.timer = timer
         self.receiver = receiver
@@ -30,17 +30,20 @@ class AsyncTask:
         self.handlers = {}
         self.local = local()
 
-        @receiver.group(Task)
+    @staticmethod
+    def stream_name(task: Task):
+        from base.utils import stream_name
+        return f'{stream_name(task)}:{task.path}'
+
+    def __call__(self, f: F) -> F:
+        path = f'{f.__module__}.{f.__name__}'
+        self.handlers[path] = AsyncTask.Handler(f, signature(f).parameters)
+        stream = self.stream_name(Task(path=path))
+
+        @self.receiver.group(Task, stream)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.id} {task.path}')
             h = self.handlers.get(task.path)
-            if not h:
-                logging.error(f'can not handle {id} {task.id} {task.path} {task.ttl}')
-                task.ttl -= 1
-                if task.ttl > 0:
-                    # throw back task, let other process handle it
-                    self.publish(task, do_hint=False)
-                return
             args = json.loads(task.args)  # type: list
             kwargs = json.loads(task.kwargs)  # type: dict
             self.local.task = task
@@ -56,10 +59,6 @@ class AsyncTask:
             finally:
                 del self.local.task
 
-    def __call__(self, f: F) -> F:
-        path = f'{f.__module__}.{f.__name__}'
-        self.handlers[path] = AsyncTask.Handler(f, signature(f).parameters)
-
         def wrapper(*args, **kwargs) -> Task:
             task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs), ttl=10)
             task.id = f'{timer_name(task)}:{task.path}:{task.args}:{task.kwargs}'
@@ -68,7 +67,8 @@ class AsyncTask:
         return wrapper
 
     def post(self, task: Task, interval, loop=False, do_hint=True):
-        return self.timer.create(task, interval, loop, key=task.id, maxlen=self.maxlen, do_hint=do_hint)
+        stream = self.stream_name(task)
+        return self.timer.create(task, interval, loop, key=task.id, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 
     @property
     def current_task(self):
@@ -78,5 +78,6 @@ class AsyncTask:
         return self.timer.kill(task_id or self.current_task.id)
 
     def publish(self, task=None, do_hint=True):
-        self.publisher.publish(task or self.current_task, maxlen=self.maxlen,
-                               do_hint=do_hint)
+        task = task or self.current_task
+        stream = self.stream_name(task)
+        self.publisher.publish(task, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
