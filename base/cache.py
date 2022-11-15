@@ -174,15 +174,20 @@ class FullCache(Cache[T]):
 
     def cached(self, maxsize=128, typed=False):
         def decorator(f):
-            # noinspection PyUnusedLocal
             @functools.lru_cache(maxsize, typed)
-            def inner(version, *args, **kwargs):
-                self.full_hits -= 1  # full_hits will incr by 1 in f redundantly
+            def inner(*args, **kwargs):
+                self.full_hits -= 1  # full_hits will +1 in f redundantly
                 return f(*args, **kwargs)
+
+            inner.version = 0
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
-                return inner(self.version, *args, **kwargs)
+                v = self.version
+                if inner.version != v:
+                    inner.version = v
+                    inner.cache_clear()
+                return inner(*args, **kwargs)
 
             return wrapper
 
