@@ -60,7 +60,7 @@ class AsyncTask:
                 del self.local.task
 
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs), ttl=10)
+            task = Task(path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
             task.id = f'{timer_name(task)}:{task.path}:{task.args}:{task.kwargs}'
             return task
 
