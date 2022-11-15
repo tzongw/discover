@@ -4,6 +4,7 @@ from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable
 from concurrent.futures import Future
 import functools
+import logging
 
 from .utils import SingleFlight, make_key
 from .invalidator import Invalidator
@@ -185,6 +186,8 @@ class FullCache(Cache[T]):
             def wrapper(*args, **kwargs):
                 v = self.version
                 if inner.version != v:
+                    if inner.version > 0:
+                        logging.info(f'{f.__module__}.{f.__name__} {inner.cache_info()}')
                     inner.version = v
                     inner.cache_clear()
                 return inner(*args, **kwargs)
