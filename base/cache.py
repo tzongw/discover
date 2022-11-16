@@ -76,18 +76,22 @@ class Cache(Generic[T]):
                     self.lru[made_key] = value
         return results
 
-    def listen(self, invalidator: Invalidator, prefix: str, converter: Optional[Callable] = None):
+    def listen(self, invalidator: Invalidator, prefix: str, handler: Optional[Callable] = None):
         @invalidator.handler(prefix)
         def invalidate(key: str):
             self.full_cached = False
+            if not self.lru:
+                return
             if not key:
                 self.lru.clear()
-            elif self.lru:
-                if converter:
-                    key = converter(key)
-                else:
-                    key = key.split(invalidator.sep, maxsplit=1)[1]
-                    key = type(next(iter(self.lru)))(key)
+                return
+            key = key.split(invalidator.sep, maxsplit=1)[1]
+            if handler:
+                key = handler(key)
+                if key is not None:
+                    self.lru.pop(key, None)
+            else:
+                key = type(next(iter(self.lru)))(key)
                 self.lru.pop(key, None)
 
 
