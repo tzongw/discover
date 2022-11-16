@@ -25,16 +25,18 @@ class Cache(Generic[T]):
     # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 8192):
+    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096):
         self.single_flight = SingleFlight(get=get, mget=mget)
         self.lru = OrderedDict()
         self.maxsize = maxsize
         self.full_cached = False
         self.hits = 0
         self.misses = 0
+        self.invalids = 0
 
     def __str__(self):
-        return f'hits: {self.hits} misses: {self.misses} size: {len(self.lru)} maxsize: {self.maxsize}'
+        return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids} ' \
+               f'size: {len(self.lru)} maxsize: {self.maxsize}'
 
     def get(self, key, *args, **kwargs) -> Optional[T]:
         value, = self.mget([key], *args, **kwargs)
@@ -80,6 +82,7 @@ class Cache(Generic[T]):
         @invalidator.handler(prefix)
         def invalidate(key: str):
             self.full_cached = False
+            self.invalids += 1
             if not self.lru:
                 return
             if not key:
