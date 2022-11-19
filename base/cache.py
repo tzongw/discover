@@ -130,9 +130,11 @@ class TTLCache(Cache[T]):
         return results
 
 
-class FullCache(Cache[T]):
+class FullMixin:
+    full_cached: bool
+    mget: Callable
 
-    def __init__(self, *, mget, get_keys, get_expire=None, maxsize: Optional[int] = 8192):
+    def __init__(self, *, mget, get_keys, get_expire=None, maxsize: Optional[int] = 4096):
         super().__init__(mget=mget, maxsize=maxsize)
         self.get_keys = get_keys
         self.get_expire = get_expire
@@ -201,3 +203,11 @@ class FullCache(Cache[T]):
             return wrapper
 
         return decorator
+
+
+class FullCache(FullMixin, Cache[T]):
+    pass
+
+
+class FullTTLCache(FullMixin, TTLCache[T]):
+    pass
