@@ -23,15 +23,15 @@ class Invalidator:
     def start(self):
         gevent.spawn(self._run)
 
-    def invalidate(self, key, publish=False):
-        if publish:
-            self.redis.publish('__redis__:invalidate', key)
-        else:
-            self.dispatcher.dispatch(key, key)
+    def invalidate(self, key, *args, **kwargs):
+        self.dispatcher.dispatch(key, *args, **kwargs)
 
     def invalidate_all(self):
         for prefix in self.prefixes:
             self.dispatcher.dispatch(prefix, '')
+
+    def publish(self, key):
+        self.redis.publish('__redis__:invalidate', key)
 
     def _run(self):
         sub = None
