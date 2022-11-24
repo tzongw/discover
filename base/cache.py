@@ -80,7 +80,7 @@ class Cache(Generic[T]):
 
     def listen(self, invalidator: Invalidator, prefix: str, handler: Optional[Callable] = None):
         @invalidator.handler(prefix)
-        def invalidate(key: str):
+        def invalidate(key: str, *args, **kwargs):
             self.full_cached = False
             self.invalids += 1
             if not self.lru:
@@ -90,7 +90,7 @@ class Cache(Generic[T]):
                 return
             key = key.split(invalidator.sep, maxsplit=1)[1]
             if handler:
-                key = handler(key)
+                key = handler(key, *args, **kwargs)
                 if key is not None:
                     self.lru.pop(key, None)
             else:
