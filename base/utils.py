@@ -1,7 +1,9 @@
 import contextlib
 import logging
 import socket
-from functools import lru_cache
+from typing import Callable
+from inspect import signature, Parameter
+from functools import lru_cache, wraps
 from typing import TypeVar, Optional
 from .executor import Executor
 from redis import Redis
@@ -48,6 +50,20 @@ def ip_address(ipv6=False):
         return sock.getsockname()[0]
 
 
+def var_args(f: Callable):
+    params = signature(f).parameters
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
+            args = args[:len(params)]
+        if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
+            kwargs = {k: v for k, v in kwargs.items() if k in params}
+        f(*args, **kwargs)
+
+    return wrapper
+
+
 class Dispatcher:
     def __init__(self, sep=None, executor=None):
         self.handlers = defaultdict(list)
@@ -67,7 +83,7 @@ class Dispatcher:
 
     def handler(self, key):
         def decorator(f):
-            self.handlers[key].append(f)
+            self.handlers[key].append(var_args(f))
             return f
 
         return decorator

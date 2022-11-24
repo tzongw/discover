@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
-from collections import namedtuple
-from inspect import signature, Parameter
 from typing import TypeVar, Callable
-
 from gevent.local import local
 from base.mq import Receiver, Publisher
 from base.timer import Timer
-from base.utils import timer_name
+from base.utils import timer_name, var_args
 from .mq_pb2 import Task
 
 
@@ -36,7 +33,7 @@ class AsyncTask:
     def __call__(self, f: F) -> F:
         path = f'{f.__module__}.{f.__name__}'
         stream = self.stream_name(Task(path=path))
-        params = signature(f).parameters
+        vf = var_args(f)
 
         @self.receiver.group(Task, stream)
         def handler(id, task: Task):
@@ -46,11 +43,7 @@ class AsyncTask:
             self.local.task = task
 
             try:
-                if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
-                    args = args[:len(params)]
-                if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
-                    kwargs = {k: v for k, v in kwargs.items() if k in params}
-                f(*args, **kwargs)
+                vf(*args, **kwargs)
             finally:
                 del self.local.task
 
