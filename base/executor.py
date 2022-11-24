@@ -28,6 +28,9 @@ class _WorkItem:
         else:
             self.future.set_result(result)
 
+    def __str__(self):
+        return f'{self.fn.__module__}.{self.fn.__name__} {self.args} {self.kwargs}'
+
 
 class Executor:
     def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=1, name='unnamed'):
@@ -38,6 +41,7 @@ class Executor:
         self._idle = idle
         self._slow_log = slow_log
         self._name = name
+        self._overload = False
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
@@ -45,10 +49,14 @@ class Executor:
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
+        if not self._overload and self._unfinished >= self._max_workers * 1.5:
+            self._overload = True
+            logging.warning(f'overload {self} {item}')
         start = time.time()
         self._items.put(item)
-        if time.time() - start > self._slow_log:
-            logging.warning(f'slow put {self} {item.fn} {item.args} {item.kwargs}')
+        t = time.time() - start
+        if t > self._slow_log:
+            logging.warning(f'slow put {t} {self} {item}')
         return fut
 
     def gather(self, *fns, block=True):
@@ -76,9 +84,11 @@ class Executor:
                 item.run()
                 t = time.time() - start
                 if t > self._slow_log:
-                    fn = f'{item.fn.__module__}.{item.fn.__name__}'
-                    logging.warning(f'slow task {t} {self} {fn} {item.args} {item.kwargs}')
+                    logging.warning(f'slow task {t} {self} {item}')
                 self._unfinished -= 1
+                if self._overload and self._unfinished <= self._max_workers / 2:
+                    self._overload = False
+                    logging.warning(f'underload {self} {item}')
         except queue.Empty:
             logging.debug(f'worker idle exit')
         finally:
