@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import functools
+import time
 import uuid
+from collections import OrderedDict
+
 import flask
 from flask import jsonify, Blueprint, g
 from webargs import fields
@@ -13,7 +17,7 @@ from const import CONTEXT_UID, CONTEXT_TOKEN
 import gevent
 import logging
 from shared import session_key
-from werkzeug.exceptions import UnprocessableEntity, Unauthorized
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests
 from base.utils import ListConverter
 from flasgger import Swagger
 from hashlib import sha1
@@ -128,14 +132,40 @@ bp = Blueprint('/', __name__)
 
 
 @bp.before_request
-def before_request():
+def authorize():
     uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
     if not uid or not token or token != session_cache.get(uid).token:
-        raise Unauthorized()
+        raise Unauthorized
     g.uid = uid
 
 
+def user_limiter(cooldown):
+    def decorator(f):
+        current = OrderedDict()
+
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            if current.get(g.uid, 0) > now:
+                raise TooManyRequests
+            if current:
+                uid = next(iter(current))
+                expire = current[uid]
+                if expire < now:
+                    current.pop(uid)
+            try:
+                current[g.uid] = float('inf')  # not reentrant
+                return f(*args, **kwargs)
+            finally:
+                current[g.uid] = now + cooldown
+
+        return wrapper
+
+    return decorator
+
+
 @bp.route('/whoami')
+@user_limiter(cooldown=5)
 def whoami():
     """whoami
     ---
