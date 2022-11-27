@@ -9,11 +9,10 @@ from flask import jsonify, Blueprint, g
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
-from shared import app, parser, dispatcher, id_generator, session_cache
+from shared import app, parser, dispatcher, id_generator, session_cache, ctx
 import hash_pb2
 import gevent
 from gevent import pywsgi
-from gevent.local import local
 from config import options
 from const import CONTEXT_UID, CONTEXT_TOKEN
 from shared import session_key
@@ -24,7 +23,6 @@ from hashlib import sha1
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
-ctx = local()
 
 
 def serve():
@@ -35,6 +33,11 @@ def serve():
         options.http_port = server.address[1]
     logging.info(f'Starting http server {options.http_address} ...')
     return g
+
+
+@app.before_request
+def init_trace():
+    ctx.trace = id_generator.gen()
 
 
 @app.route('/hello/<list:names>')
@@ -134,7 +137,6 @@ bp = Blueprint('/', __name__)
 
 @bp.before_request
 def authorize():
-    ctx.trace = id_generator.gen()
     uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
     if not uid or not token or token != session_cache.get(uid).token:
         raise Unauthorized
