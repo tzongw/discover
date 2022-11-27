@@ -134,6 +134,7 @@ bp = Blueprint('/', __name__)
 
 @bp.before_request
 def authorize():
+    ctx.trace = id_generator.gen()
     uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
     if not uid or not token or token != session_cache.get(uid).token:
         raise Unauthorized
