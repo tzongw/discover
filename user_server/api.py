@@ -3,7 +3,7 @@ import functools
 import time
 import uuid
 from collections import OrderedDict
-
+import logging
 import flask
 from flask import jsonify, Blueprint, g
 from webargs import fields
@@ -11,11 +11,11 @@ from webargs.flaskparser import use_kwargs
 from dao import Account, Session
 from shared import app, parser, dispatcher, id_generator, session_cache
 import hash_pb2
+import gevent
 from gevent import pywsgi
+from gevent.local import local
 from config import options
 from const import CONTEXT_UID, CONTEXT_TOKEN
-import gevent
-import logging
 from shared import session_key
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests
 from base.utils import ListConverter
@@ -24,6 +24,7 @@ from hashlib import sha1
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
+ctx = local()
 
 
 def serve():
@@ -136,7 +137,7 @@ def authorize():
     uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
     if not uid or not token or token != session_cache.get(uid).token:
         raise Unauthorized
-    g.uid = uid
+    ctx.uid = g.uid = uid
 
 
 def user_limiter(cooldown):
@@ -175,6 +176,7 @@ def whoami():
       200:
         description: account
     """
+    logging.info(f'{ctx.__dict__}')
     account = Account(id=g.uid)
     return jsonify(account)
 
