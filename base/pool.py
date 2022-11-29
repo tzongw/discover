@@ -4,7 +4,7 @@ from gevent.queue import Queue
 
 
 class Pool:
-    def __init__(self, maxsize=64, timeout=1, acceptable=lambda e: False):
+    def __init__(self, maxsize=128, timeout=1, acceptable=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
@@ -16,11 +16,11 @@ class Pool:
 
     @abc.abstractmethod
     def create_connection(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abc.abstractmethod
     def close_connection(self, conn):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def close_all(self):
         self._maxsize = 0
