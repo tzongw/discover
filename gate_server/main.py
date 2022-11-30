@@ -16,7 +16,7 @@ import logging
 def main():
     logging.info(f'app id: {app_id}')
     workers = [ws.serve(), rpc.serve()]
-    setproctitle(f'{app_name}-{app_id}-{options.ws_address}-{options.rpc_address}')
+    setproctitle(f'{app_name}-{app_id}-{options.ws_port}-{options.rpc_port}')
     shared.registry.start({const.WS_GATE: options.ws_address, const.RPC_GATE: options.rpc_address})
     gevent.joinall(workers, raise_error=True)
 

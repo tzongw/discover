@@ -18,7 +18,7 @@ import gevent
 def main():
     logging.info(f'app id: {app_id}')
     workers = [rpc.serve(), api.serve()]
-    setproctitle(f'{app_name}-{app_id}-{options.http_address}-{options.rpc_address}')
+    setproctitle(f'{app_name}-{app_id}-{options.http_port}-{options.rpc_port}')
     shared.registry.start({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
     shared.invalidator.start()
     init_main()
