@@ -4,7 +4,7 @@ import socket
 from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
-from typing import TypeVar, Optional
+from typing import TypeVar, Optional, Type, Union
 from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
@@ -198,12 +198,14 @@ class SingleFlight:
         return [fut.result() for fut in futures]
 
 
-def stream_name(message: Message) -> str:
-    return f'stream:{message.__class__.__name__}'
+def stream_name(message_or_cls: Union[Message, Type[Message]]) -> str:
+    cls = message_or_cls if issubclass(message_or_cls, Message) else message_or_cls.__class__
+    return f'stream:{cls.__name__}'
 
 
-def timer_name(message: Message) -> str:
-    return f'timer:{message.__class__.__name__}'
+def timer_name(message_or_cls: Union[Message, Type[Message]]) -> str:
+    cls = message_or_cls if issubclass(message_or_cls, Message) else message_or_cls.__class__
+    return f'timer:{cls.__name__}'
 
 
 def run_in_thread(fn, *args, **kwargs):

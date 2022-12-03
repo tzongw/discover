@@ -32,7 +32,7 @@ class ProtoDispatcher(Dispatcher):
 
         assert issubclass(key_or_cls, Message)
         message_cls = key_or_cls  # type: Type[Message]
-        key = stream or stream_name(message_cls())
+        key = stream or stream_name(message_cls)
         super_handler = super().handler
 
         def decorator(f):
