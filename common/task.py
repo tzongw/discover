@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import time
+from importlib import import_module
 from typing import TypeVar, Callable
 from gevent.local import local
 from google.protobuf.json_format import MessageToJson, Parse
@@ -55,6 +57,7 @@ class AsyncTask:
                         kwargs=json.dumps(kwargs))
             return task
 
+        wrapper.wrapped = f
         return wrapper
 
     def post(self, task: Task, interval, loop=False, do_hint=True):
@@ -81,11 +84,13 @@ class HeavyTask:
 
     def __call__(self, f: F) -> F:
         path = f'{f.__module__}.{f.__name__}'
+        assert not path.startswith('__main__')
 
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
             return task
 
+        wrapper.wrapped = f
         return wrapper
 
     def push(self, task: Task):
@@ -95,8 +100,19 @@ class HeavyTask:
     def pop(self, *, timeout=0, block=True):
         r = self.redis.blpop(self.key, timeout) if block else self.redis.lpop(self.key)
         if r is None:
-            return None
+            return
         value = r[1] if isinstance(r, (list, tuple)) else r
         task = Parse(value, Task(), ignore_unknown_fields=True)
         logging.info(f'-task {task.id} {task.path}')
         return task
+
+    def exec(self, task: Task):
+        logging.info(f'doing task {task.id} {task.path}')
+        index = task.path.rindex('.')
+        module = import_module(task.path[:index])
+        func = getattr(module, task.path[index + 1:]).wrapped
+        args = json.loads(task.args)  # type: list
+        kwargs = json.loads(task.kwargs)  # type: dict
+        start = time.time()
+        func(*args, **kwargs)
+        logging.info(f'done task {task.id} {task.path} {time.time() - start}')
