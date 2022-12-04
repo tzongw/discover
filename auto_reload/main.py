@@ -44,6 +44,7 @@ def update_upstreams():
 def main():
     shared.registry.add_callback(update_upstreams)
     shared.registry.start()
+    shared.init_main()
     while True:
         gevent.sleep(3600)
 

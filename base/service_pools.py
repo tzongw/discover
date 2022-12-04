@@ -46,7 +46,7 @@ class ServicePools:
             except Exception as e:
                 if not ThriftPool.acceptable(e):
                     count = len(self._cool_down)
-                    self._cool_down[address] = time.time() + Registry.COOL_DOWN
+                    self._cool_down[address] = time.time() + Registry.COOLDOWN
                     if len(self._cool_down) > count:
                         logging.warning(f'+ cool down {self._name} {address}')
                         if not count:

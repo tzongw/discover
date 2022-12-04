@@ -9,9 +9,9 @@ from .utils import LogSuppress
 
 class Registry:
     _PREFIX = 'service'
-    _REFRESH_INTERVAL = 3
-    _TTL = 3 * _REFRESH_INTERVAL
-    COOL_DOWN = _TTL + _REFRESH_INTERVAL
+    _INTERVAL = 3
+    _TTL = 3 * _INTERVAL
+    COOLDOWN = _TTL + _INTERVAL
 
     @classmethod
     def _key_prefix(cls, name):
@@ -37,16 +37,18 @@ class Registry:
     def add_callback(self, cb):
         self._callbacks.append(cb)
 
-    def start(self, services=None):
-        logging.info(f'start {services}')
-        self._services.update(services or {})
-        self._unregister()  # in case process restart
+    def start(self):
         self._refresh()
-        gevent.spawn_later(0.5, self._run)  # wait unregister publish & socket listen
+        gevent.spawn(self._run)
 
     def stop(self):
         logging.info(f'stop {self._services}')
         self._stopped = True
+        self._unregister()
+
+    def register(self, services):
+        logging.info(f'register {services}')
+        self._services.update(services)
         self._unregister()
 
     def _unregister(self):
@@ -95,10 +97,10 @@ class Registry:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
                 self._refresh()
-                msg = sub.get_message(ignore_subscribe_messages=True, timeout=self._REFRESH_INTERVAL)
+                msg = sub.get_message(ignore_subscribe_messages=True, timeout=self._INTERVAL)
                 if msg is not None:
                     logging.info(f'got {msg}')
             except Exception:
                 logging.exception(f'')
                 sub = None
-                gevent.sleep(self._REFRESH_INTERVAL)
+                gevent.sleep(self._INTERVAL)

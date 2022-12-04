@@ -15,7 +15,6 @@ from service import timer
 from typing import Dict
 from base.registry import Registry
 from redis import Redis
-from base import utils
 from base.schedule import Handle, PeriodicCallback, Schedule
 from base.service_pools import ServicePools
 from service import timeout
@@ -140,8 +139,10 @@ def rpc_serve(handler):
 def main():
     handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
-    shared.registry.start({const.RPC_TIMER: f'{options.rpc_address}'})
     setproctitle(f'{shared.app_name}-{options.rpc_port}')
+    shared.registry.start()
+    shared.init_main()
+    shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
     handler.load_timers()
     gevent.joinall([g], raise_error=True)
 

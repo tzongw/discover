@@ -59,7 +59,7 @@ class Invalidator:
                     logging.warning(f'db flush all')
                     self.invalidate_all()
                     continue
-                if isinstance(data, str):
+                if isinstance(data, (bytes, str)):
                     data = [data]
                 for key in data:
                     self.dispatcher.dispatch(key, key)
