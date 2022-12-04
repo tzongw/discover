@@ -15,7 +15,7 @@ import gevent
 from gevent import pywsgi
 from config import options
 from const import CONTEXT_UID, CONTEXT_TOKEN
-from shared import session_key
+from shared import session_key, heavy_task
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests
 from base.utils import ListConverter
 from flasgger import Swagger
@@ -40,6 +40,13 @@ def init_trace():
     ctx.trace = id_generator.gen()
 
 
+@heavy_task
+def log(message):
+    for i in range(5):
+        logging.info(f'{message} {i}')
+        gevent.sleep(1)
+
+
 @app.route('/hello/<list:names>')
 def hello(names):
     """say hello
@@ -55,6 +62,7 @@ def hello(names):
       200:
         description: hello
     """
+    heavy_task.push(log('processing'))
     return f'say hello {names}'
 
 

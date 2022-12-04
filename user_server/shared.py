@@ -3,7 +3,7 @@ from common.shared import *
 from base.mq import Receiver
 from base.snowflake import max_worker_id
 from flask import Flask
-from common.task import AsyncTask
+from common.task import AsyncTask, HeavyTask
 from base import snowflake
 from base.cache import TTLCache
 from hash_pb2 import Session
@@ -20,6 +20,7 @@ receiver = Receiver(redis, app_name, str(app_id))
 at_exit(receiver.stop)
 
 async_task = AsyncTask(timer, receiver)
+heavy_task = HeavyTask(redis, 'heavy_tasks')
 
 
 def online_key(uid: int):

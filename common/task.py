@@ -106,7 +106,8 @@ class HeavyTask:
         logging.info(f'-task {task.id} {task.path}')
         return task
 
-    def exec(self, task: Task):
+    @staticmethod
+    def exec(task: Task):
         logging.info(f'doing task {task.id} {task.path}')
         index = task.path.rindex('.')
         module = import_module(task.path[:index])
