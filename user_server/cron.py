@@ -2,8 +2,9 @@
 from gevent import monkey
 
 monkey.patch_all()
-# noinspection PyUnresolvedReferences
-from config import options
+import time
+from importlib import import_module
+from config import options, remaining
 import shared
 from shared import app_name, app_id, init_main
 from setproctitle import setproctitle
@@ -15,7 +16,14 @@ def main():
     shared.registry.start()
     shared.invalidator.start()
     init_main()
-    if task := shared.heavy_task.pop(block=False):
+    if entry := options.entry:
+        setproctitle(f'{app_name}-{app_id}-{entry}')
+        module = import_module(entry)
+        options.parse_command_line(remaining, final=False)
+        start = time.time()
+        getattr(module, 'main')()
+        logging.info(f'cron task {entry} {time.time() - start}')
+    elif task := shared.heavy_task.pop(block=False):
         setproctitle(f'{app_name}-{app_id}-{task.path}')
         shared.heavy_task.exec(task)
 
