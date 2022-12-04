@@ -21,8 +21,9 @@ def main():
         module = import_module(entry)
         options.parse_command_line(remaining, final=False)
         start = time.time()
+        logging.info(f'doing task {entry}')
         getattr(module, 'main')()
-        logging.info(f'cron task {entry} {time.time() - start}')
+        logging.info(f'done task {entry} {time.time() - start}')
     elif task := shared.heavy_task.pop(block=False):
         setproctitle(f'{app_name}-{app_id}-{task.path}')
         shared.heavy_task.exec(task)
