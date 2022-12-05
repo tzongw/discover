@@ -9,6 +9,7 @@ import shared
 from shared import app_name, app_id, init_main
 from setproctitle import setproctitle
 import logging
+from base import LogSuppress
 
 
 def main():
@@ -30,4 +31,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with LogSuppress(Exception):
+        main()

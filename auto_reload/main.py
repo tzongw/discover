@@ -7,6 +7,7 @@ import gevent
 import os
 from common import shared
 import logging
+from base import LogSuppress
 
 addr_map = {}
 changed = set()
@@ -50,4 +51,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with LogSuppress(Exception):
+        main()

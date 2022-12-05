@@ -11,6 +11,7 @@ from shared import app_name, app_id
 from setproctitle import setproctitle
 import gevent
 import logging
+from base import LogSuppress
 
 
 def main():
@@ -24,4 +25,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with LogSuppress(Exception):
+        main()
