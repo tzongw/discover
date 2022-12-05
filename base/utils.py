@@ -19,9 +19,10 @@ import gevent
 
 class LogSuppress(contextlib.suppress):
     def __exit__(self, exctype, excinst, exctb):
-        if excinst:
+        suppress = super().__exit__(exctype, excinst, exctb)
+        if suppress:
             logging.exception(f'')
-        return super().__exit__(exctype, excinst, exctb)
+        return suppress
 
 
 class Addr:
