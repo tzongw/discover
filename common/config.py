@@ -14,7 +14,7 @@ LOG_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(l
 def config_logging():
     channel = ConcurrentRotatingFileHandler(filename=options.log_file, maxBytes=options.log_file_max_size,
                                             backupCount=options.log_file_num_backups,
-                                            encoding='utf-8', ) if options.log_file else logging.StreamHandler()
+                                            encoding='utf-8') if options.log_file else logging.StreamHandler()
     channel.setFormatter(LogFormatter(fmt=LOG_FORMAT, datefmt='', color=not options.log_file))
     logger = logging.getLogger()
     logger.addHandler(channel)
