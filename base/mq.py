@@ -103,7 +103,7 @@ class Receiver:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
-            pipe.execute()
+            pipe.execute(raise_on_error=False)
         logging.info(f'delete consumers {self._group_dispatcher.handlers.keys()}')
         logging.info(f'delete waker {self._waker}')
 
