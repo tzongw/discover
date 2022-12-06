@@ -1,6 +1,7 @@
 import signal
 import logging
 import time
+import atexit
 from typing import Union
 from weakref import WeakSet
 import sys
@@ -61,6 +62,20 @@ def init_main():
     _mains.clear()
 
 
+atexit.register(unique_id.stop)  # after cleanup
+
+
+def _cleanup():
+    global exited
+    exited = True
+    with LogSuppress(Exception):
+        executor.gather(*_exits)
+    _exits.clear()
+
+
+atexit.register(_cleanup)  # unexpected exit
+
+
 def spawn_worker(f, *args, **kwargs):
     def worker():
         start = time.time()
@@ -76,19 +91,14 @@ def spawn_worker(f, *args, **kwargs):
 
 def _sig_handler(sig, frame):
     def graceful_exit():
-        global exited
-        exited = True
         logging.info(f'exit {sig} {frame}')
-        with LogSuppress(Exception):
-            executor.gather(*_exits)
-        _exits.clear()
+        _cleanup()
         if sig != signal.SIGUSR1:
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
             gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
             if _workers:
                 logging.error(f'workers not finish {_workers}')
-            unique_id.stop()
             sys.exit(0)
 
     gevent.spawn(graceful_exit)
