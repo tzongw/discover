@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import socket
+import time
 from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
@@ -61,6 +62,19 @@ def var_args(f: Callable):
         if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
             kwargs = {k: v for k, v in kwargs.items() if k in params}
         f(*args, **kwargs)
+
+    return wrapper
+
+
+def log_exception(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        with LogSuppress(Exception):
+            f(*args, **kwargs)
+        t = time.time() - start
+        if t > 30:
+            logging.warning(f'slow func {t} {f.__module__}.{f.__name__}')
 
     return wrapper
 

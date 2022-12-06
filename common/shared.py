@@ -5,7 +5,7 @@ from weakref import WeakSet
 import sys
 import gevent
 from redis import Redis
-from base import Registry
+from base import Registry, LogSuppress
 from base import Executor
 from base import Schedule
 from base import UniqueId
@@ -65,12 +65,15 @@ def _sig_handler(sig, frame):
         global exited
         exited = True
         logging.info(f'exit {sig} {frame}')
-        executor.gather(*_exits)
+        with LogSuppress(Exception):
+            executor.gather(*_exits)
         _exits.clear()
         if sig != signal.SIGUSR1:
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
-            gevent.joinall(workers, timeout=60)  # try to finish all tasks
+            gevent.joinall(workers, timeout=30)  # try to finish all tasks
+            if workers:
+                logging.error(f'workers not finish {workers}')
             unique_id.stop()
             sys.exit(0)
 

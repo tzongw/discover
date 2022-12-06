@@ -38,6 +38,7 @@ class Registry:
         self._callbacks.append(cb)
 
     def start(self):
+        logging.info(f'start')
         self._refresh()
         gevent.spawn(self._run)
 

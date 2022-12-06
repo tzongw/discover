@@ -27,7 +27,7 @@ class UniqueId:
         for id in range_chain:
             key = self._key(biz, id)
             if not self._redis.set(key, '', self._TTL, nx=True):
-                logging.debug(f'{biz} conflict id {id}, retry next')
+                logging.info(f'{biz} conflict id {id}, retry next')
                 continue
             logging.info(f'{biz} got unique id {id}')
             self._keys.add(key)
