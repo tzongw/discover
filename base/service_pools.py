@@ -15,7 +15,7 @@ class ServicePools:
         self._name = name
         self._registry = registry
         self._pools = {}  # type: Dict[str, ThriftPool]
-        self._cool_down = {}  # type: Dict[str, float]
+        self._cooldown = {}  # type: Dict[str, float]
         self._settings = settings
         self._local_addresses = []
         self._good_addresses = []
@@ -45,13 +45,14 @@ class ServicePools:
                 yield conn
             except Exception as e:
                 if not ThriftPool.acceptable(e):
-                    count = len(self._cool_down)
-                    self._cool_down[address] = time.time() + Registry.COOLDOWN
-                    if len(self._cool_down) > count:
+                    count = len(self._cooldown)
+                    self._cooldown[address] = time.time() + Registry.COOLDOWN
+                    if len(self._cooldown) > count:
                         logging.warning(f'+ cool down {self._name} {address}')
                         if not count:
-                            gevent.spawn(self._clean_cool_down)
-                        self._update_addresses()
+                            gevent.spawn(self._clean_cooldown)
+                        else:
+                            self._update_addresses()
                 raise
 
     def _clean_pools(self):
@@ -59,7 +60,7 @@ class ServicePools:
         holding = set(self._pools.keys())
         for removed in (holding - available):
             logging.info(f'clean {self._name} {removed}')
-            self._cool_down.pop(removed, None)
+            self._cooldown.pop(removed, None)
             pool = self._pools.pop(removed)
             pool.close_all()
         self._update_addresses()
@@ -67,16 +68,16 @@ class ServicePools:
     def _update_addresses(self):
         addresses = self.addresses()
         now = time.time()
-        expire = [addr for addr, cd in self._cool_down.items() if now > cd]
-        if expire:
-            logging.info(f'- cool down {self._name} {expire}')
-        for addr in expire:
-            self._cool_down.pop(addr)
-        self._good_addresses = [addr for addr in addresses if addr not in self._cool_down]
+        expires = [addr for addr, cd in self._cooldown.items() if now >= cd]
+        if expires:
+            logging.info(f'- cool down {self._name} {expires}')
+        for addr in expires:
+            self._cooldown.pop(addr)
+        self._good_addresses = [addr for addr in addresses if addr not in self._cooldown]
         local_host = ip_address()
         self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
+        return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire
 
-    def _clean_cool_down(self):
-        while self._cool_down:
-            time.sleep(1)
-            self._update_addresses()
+    def _clean_cooldown(self):
+        while expire := self._update_addresses():
+            gevent.sleep(expire)
