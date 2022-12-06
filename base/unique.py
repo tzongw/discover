@@ -9,8 +9,8 @@ from typing import Optional
 
 class UniqueId:
     _PREFIX = 'unique'
-    _REFRESH_INTERVAL = 10
-    _TTL = 1800
+    _INTERVAL = 10
+    _TTL = 300
 
     def __init__(self, schedule: Schedule, redis: Redis):
         self._schedule = schedule
@@ -26,14 +26,14 @@ class UniqueId:
         range_chain = chain(range(partition, r.stop), range(r.start, partition))
         for id in range_chain:
             key = self._key(biz, id)
-            if not self._redis.set(key, '', self._TTL, nx=True):
+            if not self._redis.set(key, '', ex=self._TTL, nx=True):
                 logging.info(f'{biz} conflict id {id}, retry next')
                 continue
             logging.info(f'{biz} got unique id {id}')
             self._keys.add(key)
             if not self._pc:
                 logging.info(f'start')
-                self._pc = PeriodicCallback(self._schedule, self._refresh, self._REFRESH_INTERVAL)
+                self._pc = PeriodicCallback(self._schedule, self._refresh, self._INTERVAL)
             return id
         raise ValueError('no id')
 
@@ -49,5 +49,5 @@ class UniqueId:
     def _refresh(self):
         with self._redis.pipeline() as pipe:
             for key in self._keys:
-                pipe.set(key, '', self._TTL)
+                pipe.set(key, '', ex=self._TTL)
             pipe.execute()
