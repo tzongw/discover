@@ -77,23 +77,20 @@ class Registry:
                     cb()
 
     def _run(self):
-        published = False
         sub = None
-        while not self._stopped:
+        while True:
             try:
-                if self._services:
+                if self._services and not self._stopped:
                     with self._redis.pipeline() as pipe:
                         for name, address in self._services.items():
                             key = self._full_key(name, address)
-                            pipe.set(key, '', self._TTL)
-                        pipe.execute()
+                            pipe.set(key, '', ex=self._TTL, get=True)
+                        values = pipe.execute()
                     if self._stopped:  # race
                         self._unregister()
-                        return
-                    if not published:
+                    elif any(v is None for v in values):
                         logging.info(f'publish {self._services}')
                         self._redis.publish(self._PREFIX, 'register')
-                        published = True
                 if not sub:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
