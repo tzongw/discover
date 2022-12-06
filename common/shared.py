@@ -1,5 +1,6 @@
 import signal
 import logging
+import time
 from typing import Union
 from weakref import WeakSet
 import sys
@@ -38,7 +39,7 @@ _mains = []
 
 inited = False
 exited = False
-workers = WeakSet()  # task workers, try to join all before exiting
+_workers = WeakSet()  # task workers, try to join all before exiting
 
 
 def at_main(fun):
@@ -60,6 +61,19 @@ def init_main():
     _mains.clear()
 
 
+def spawn_worker(f, *args, **kwargs):
+    def worker():
+        start = time.time()
+        with LogSuppress(Exception):
+            f(*args, **kwargs)
+        t = time.time() - start
+        if t > const.SLOW_WORKER:
+            logging.warning(f'slow worker {t} {f.__module__}.{f.__name__}')
+
+    g = gevent.spawn(worker, *args, **kwargs)
+    _workers.add(g)
+
+
 def _sig_handler(sig, frame):
     def graceful_exit():
         global exited
@@ -71,9 +85,9 @@ def _sig_handler(sig, frame):
         if sig != signal.SIGUSR1:
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
-            gevent.joinall(workers, timeout=30)  # try to finish all tasks
-            if workers:
-                logging.error(f'workers not finish {workers}')
+            gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
+            if _workers:
+                logging.error(f'workers not finish {_workers}')
             unique_id.stop()
             sys.exit(0)
 
