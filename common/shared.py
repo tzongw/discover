@@ -3,7 +3,7 @@ import logging
 import time
 import atexit
 from typing import Union
-from weakref import WeakSet
+from weakref import WeakKeyDictionary
 import sys
 import gevent
 from redis import Redis
@@ -40,7 +40,7 @@ _mains = []
 
 inited = False
 exited = False
-_workers = WeakSet()  # task workers, try to join all before exiting
+_workers = WeakKeyDictionary()  # task workers, try to join all before exiting
 
 
 def at_main(fun):
@@ -77,16 +77,18 @@ atexit.register(_cleanup)  # unexpected exit
 
 
 def spawn_worker(f, *args, **kwargs):
+    path = f'{f.__module__}.{f.__name__}'
+
     def worker():
         start = time.time()
         with LogSuppress(Exception):
             f(*args, **kwargs)
         t = time.time() - start
         if t > const.SLOW_WORKER:
-            logging.warning(f'slow worker {t} {f.__module__}.{f.__name__}')
+            logging.warning(f'slow worker {t} {path}')
 
     g = gevent.spawn(worker, *args, **kwargs)
-    _workers.add(g)
+    _workers[g] = path
 
 
 def _sig_handler(sig, frame):
@@ -97,8 +99,9 @@ def _sig_handler(sig, frame):
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
             gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
-            if _workers:
-                logging.error(f'workers not finish {_workers}')
+            for worker, path in _workers.items():
+                if worker:  # still active
+                    logging.error(f'worker {path} not finish')
             sys.exit(0)
 
     gevent.spawn(graceful_exit)
