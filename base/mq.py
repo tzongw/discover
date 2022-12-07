@@ -96,6 +96,7 @@ class Receiver:
         self._workers = [gevent.spawn(self._group_run), gevent.spawn(self._fanout_run)]
 
     def stop(self):
+        logging.info(f'stop')
         self._stopped = True
         self.redis.xadd(self._waker, {'wake': 'up'})
         gevent.joinall(self._workers)
@@ -120,7 +121,7 @@ class Receiver:
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        logging.info(f'group exit')
+        logging.info(f'group exit {self._group_streams.keys()}')
 
     def _fanout_run(self):
         with self.redis.pipeline() as pipe:
@@ -145,7 +146,7 @@ class Receiver:
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        logging.info(f'fanout exit')
+        logging.info(f'fanout exit {self._fanout_streams.keys()}')
 
     def remove(self, stream):
         self._group_streams.pop(stream, None)
