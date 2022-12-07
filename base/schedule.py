@@ -29,6 +29,10 @@ class Handle:
     def __lt__(self, other: Handle):
         return self.when < other.when
 
+    def __call__(self, *args, **kwargs):
+        if cb := self.callback:
+            cb(*args, **kwargs)
+
 
 class Schedule:
     def __init__(self, executor=None):
@@ -60,7 +64,7 @@ class Schedule:
                 while self._handles and self._handles[0].when <= now:
                     handle = heapq.heappop(self._handles)  # type: Handle
                     if not handle.cancelled:
-                        self._executor.submit(handle.callback)
+                        self._executor.submit(handle)
                 timeout = self._handles[0].when - now if self._handles else None
                 self._cond.wait(timeout)
 
