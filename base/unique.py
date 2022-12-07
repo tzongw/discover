@@ -38,7 +38,7 @@ class UniqueId:
         raise ValueError('no id')
 
     def stop(self):
-        logging.info(f'stop')
+        logging.info(f'stop {self._keys}')
         if self._pc:
             self._pc.stop()
             self._pc = None
