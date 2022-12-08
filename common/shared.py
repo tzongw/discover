@@ -65,15 +65,13 @@ def init_main():
 atexit.register(unique_id.stop)  # after cleanup
 
 
+@atexit.register
 def _cleanup():
     global exited
     exited = True
     with LogSuppress(Exception):
         executor.gather(*_exits)
     _exits.clear()
-
-
-atexit.register(_cleanup)  # unexpected exit
 
 
 def spawn_worker(f, *args, **kwargs):
