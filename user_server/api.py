@@ -161,8 +161,7 @@ def user_limiter(cooldown):
             if current.get(g.uid, 0) > now:
                 raise TooManyRequests
             if current:
-                uid = next(iter(current))
-                expire = current[uid]
+                uid, expire = next(iter(current.items()))
                 if expire < now:
                     current.pop(uid)
             try:
