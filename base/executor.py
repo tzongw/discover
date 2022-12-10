@@ -6,6 +6,7 @@ from gevent import queue
 import gevent
 from typing import Callable
 from functools import partial
+from .utils import func_desc
 
 
 class _WorkItem:
@@ -29,7 +30,7 @@ class _WorkItem:
             self.future.set_result(result)
 
     def __str__(self):
-        return f'{self.fn.__module__}.{self.fn.__name__} {self.args} {self.kwargs}'
+        return func_desc(self.fn)
 
 
 class Executor:

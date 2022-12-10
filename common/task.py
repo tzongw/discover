@@ -13,6 +13,7 @@ from base.utils import timer_name, var_args
 from .mq_pb2 import Task
 
 F = TypeVar('F', bound=Callable)
+TASK_THRESHOLD = 16384
 
 
 class AsyncTask:
@@ -55,6 +56,8 @@ class AsyncTask:
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{timer_name(Task)}:{path}:{args}:{kwargs}', path=path, args=json.dumps(args),
                         kwargs=json.dumps(kwargs))
+            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
+                logging.warning(f'task parameters too big {task.path}')
             return task
 
         wrapper.wrapped = f
@@ -88,6 +91,8 @@ class HeavyTask:
 
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
+            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
+                logging.warning(f'task parameters too big {task.path}')
             return task
 
         wrapper.wrapped = f

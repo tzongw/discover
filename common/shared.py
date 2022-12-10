@@ -7,14 +7,15 @@ from weakref import WeakKeyDictionary
 import sys
 import gevent
 from redis import Redis
-from base import Registry, LogSuppress
+from base import Registry, LogSuppress, Dispatcher
 from base import Executor
 from base import Schedule
 from base import UniqueId
-from base import Dispatcher, Parser
+from base import Parser
 from base import Publisher
 from base import Timer
 from base import Invalidator
+from base.utils import func_desc
 from . import const
 from .config import options
 import service
@@ -75,7 +76,7 @@ def _cleanup():
 
 
 def spawn_worker(f, *args, **kwargs):
-    path = f'{f.__module__}.{f.__name__}'
+    desc = func_desc(f)
 
     def worker():
         start = time.time()
@@ -83,10 +84,10 @@ def spawn_worker(f, *args, **kwargs):
             f(*args, **kwargs)
         t = time.time() - start
         if t > const.SLOW_WORKER:
-            logging.warning(f'slow worker {t} {path}')
+            logging.warning(f'slow worker {t} {desc}')
 
     g = gevent.spawn(worker, *args, **kwargs)
-    _workers[g] = path
+    _workers[g] = desc
 
 
 def _sig_handler(sig, frame):
@@ -97,9 +98,9 @@ def _sig_handler(sig, frame):
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
             gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
-            for worker, path in _workers.items():
+            for worker, desc in _workers.items():
                 if worker:  # still active
-                    logging.error(f'worker {path} not finish')
+                    logging.error(f'worker {desc} not finish')
             sys.exit(0)
 
     gevent.spawn(graceful_exit)

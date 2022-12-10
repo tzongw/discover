@@ -3,7 +3,7 @@ from redis import Redis
 import gevent
 import logging
 from .executor import Executor
-from .utils import Dispatcher
+from . import Dispatcher
 
 
 class Invalidator:

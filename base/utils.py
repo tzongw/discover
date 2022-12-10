@@ -5,7 +5,6 @@ from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
 from typing import TypeVar, Optional, Type, Union
-from .executor import Executor
 from redis import Redis
 from redis.client import Pipeline
 from google.protobuf.message import Message
@@ -63,31 +62,6 @@ def var_args(f: Callable):
         f(*args, **kwargs)
 
     return wrapper
-
-
-class Dispatcher:
-    def __init__(self, sep=None, executor=None):
-        self.handlers = defaultdict(list)
-        self.sep = sep
-        self._executor = executor or Executor(name='dispatch')
-
-    def dispatch(self, key, *args, **kwargs):
-        if self.sep and isinstance(key, str):
-            key = key.split(self.sep, maxsplit=1)[0]
-        handlers = self.handlers.get(key) or []
-        for handle in handlers:
-            self._executor.submit(handle, *args, **kwargs)
-
-    def signal(self, event):
-        cls = event.__class__
-        self.dispatch(cls, event)
-
-    def handler(self, key):
-        def decorator(f):
-            self.handlers[key].append(var_args(f))
-            return f
-
-        return decorator
 
 
 M = TypeVar('M', bound=Message)
@@ -207,6 +181,13 @@ def stream_name(message_or_cls: Union[Message, Type[Message]]) -> str:
 def timer_name(message_or_cls: Union[Message, Type[Message]]) -> str:
     cls = message_or_cls.__class__ if isinstance(message_or_cls, Message) else message_or_cls
     return f'timer:{cls.__name__}'
+
+
+def func_desc(func):
+    try:
+        return f'{func.__module__}.{func.__name__}'
+    except AttributeError:
+        return str(func)
 
 
 def run_in_thread(fn, *args, **kwargs):
