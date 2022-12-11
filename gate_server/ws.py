@@ -66,16 +66,21 @@ class Client:
         try:
             while not self.ws.closed:
                 message = self.ws.receive()
+                addr = shared.user_service.address(hint=self.conn_id)
                 if isinstance(message, bytes):
-                    shared.user_service.recv_binary(options.rpc_address, self.conn_id, self.context, message)
+                    with shared.user_service.client(addr) as client:
+                        client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
                 elif isinstance(message, str):
-                    shared.user_service.recv_text(options.rpc_address, self.conn_id, self.context, message)
+                    with shared.user_service.client(addr) as client:
+                        client.recv_text(options.rpc_address, self.conn_id, self.context, message)
         finally:
             pc.stop()
 
     def _ping(self):
         self.send(self.ping_message)
-        shared.user_service.ping(options.rpc_address, self.conn_id, self.context)
+        addr = shared.user_service.address(hint=self.conn_id)
+        with shared.user_service.client(addr) as client:
+            client.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self, timeout):
         logging.debug(f'start {self}')

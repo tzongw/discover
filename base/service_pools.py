@@ -1,6 +1,6 @@
 import contextlib
 from random import choice
-from typing import Dict, ContextManager, Optional
+from typing import Dict, ContextManager
 import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
@@ -19,15 +19,22 @@ class ServicePools:
         self._settings = settings
         self._local_addresses = []
         self._good_addresses = []
+        self._all_addresses = []  # same as addresses, but as a list
         registry.add_callback(self._clean_pools)
 
     def addresses(self):
         return self._registry.addresses(self._name)
 
+    def address(self, hint):
+        addresses = self._local_addresses or self._good_addresses or self._all_addresses
+        return addresses[hash(hint) % len(addresses)]
+
     @contextlib.contextmanager
-    def connection(self, address: Optional[str] = None) -> ContextManager[TProtocolBase]:
+    def connection(self, address=None) -> ContextManager[TProtocolBase]:
         if address is None:
-            address = choice(self._local_addresses or self._good_addresses or tuple(self.addresses()))  # type: str
+            addresses = self._local_addresses or self._good_addresses or self._all_addresses
+            address = choice(addresses)
+
         pool = self._pools.get(address)
         if not pool:
             addr = Addr(address)
@@ -59,7 +66,7 @@ class ServicePools:
         self._update_addresses()
 
     def _update_addresses(self):
-        addresses = self.addresses()
+        addresses = self._all_addresses = sorted(self.addresses())
         now = time.time()
         expires = [addr for addr, cd in self._cooldown.items() if now >= cd]
         if expires:
