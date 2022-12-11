@@ -2,7 +2,6 @@
 import logging
 from tornado.log import LogFormatter
 from tornado.options import define, parse_config_file
-# noinspection PyUnresolvedReferences
 from tornado.options import options
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 from .const import Environment

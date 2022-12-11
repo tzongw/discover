@@ -7,6 +7,7 @@ SLOW_WORKER = 30
 APP_USER = 'user'
 APP_GATE = 'gate'
 APP_TIMER = 'timer'
+APP_RELOAD = 'reload'
 
 RPC_USER = f'rpc_{APP_USER}'
 HTTP_USER = f'http_{APP_USER}'
