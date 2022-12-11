@@ -11,7 +11,7 @@ LOG_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(l
              '%(message)s'
 
 
-def config_logging():
+def parse_callback():
     channel = ConcurrentRotatingFileHandler(filename=options.log_file, maxBytes=options.log_file_max_size,
                                             backupCount=options.log_file_num_backups,
                                             encoding='utf-8') if options.log_file else logging.StreamHandler()
@@ -21,11 +21,12 @@ def config_logging():
 
 
 options.log_to_stderr = False
-options.add_parse_callback(config_logging)
+options.add_parse_callback(parse_callback)
 
 define('config', type=str, help='path to config file',
        callback=lambda path: parse_config_file(path, final=False))
+define('app_name', 'app', str, 'app name')
+define('env', Environment.DEV, Environment, 'environment')
 define('redis', 'redis://', str, 'redis url')
 define('datacenter', 0, int, 'data center id')
-define('env', Environment.DEV, Environment, 'environment')
 define('log_file', type=str, help='log file path')

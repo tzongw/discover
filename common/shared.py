@@ -7,7 +7,7 @@ from weakref import WeakKeyDictionary
 import sys
 import gevent
 from redis import Redis
-from base import Registry, LogSuppress, Dispatcher
+from base import Registry, LogSuppress, Dispatcher, snowflake, Receiver
 from base import Executor
 from base import Schedule
 from base import UniqueId
@@ -20,23 +20,31 @@ from . import const
 from .config import options
 import service
 from .rpc_service import UserService, GateService, TimerService
+from .task import AsyncTask, HeavyTask
 
+app_name = options.app_name
+env = options.env
 redis = Redis.from_url(options.redis, decode_responses=True)
+executor = Executor(name='shared')
+schedule = Schedule()
+unique_id = UniqueId(schedule, redis)
+app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 registry = Registry(redis)
+id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 publisher = Publisher(redis)
+receiver = Receiver(redis, app_name, str(app_id))
 parser = Parser(redis)
 timer = Timer(redis)
+dispatcher = Dispatcher(sep=':')
+invalidator = Invalidator(redis)
+async_task = AsyncTask(timer, receiver)
+heavy_task = HeavyTask(redis, 'heavy_tasks')
+
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]
 
-executor = Executor(name='shared')
-schedule = Schedule()
-unique_id = UniqueId(schedule, redis)
-dispatcher = Dispatcher(sep=':')
-invalidator = Invalidator(redis)
-
-_exits = [registry.stop]
+_exits = [registry.stop, receiver.stop]
 _mains = []
 
 inited = False
