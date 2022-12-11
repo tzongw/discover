@@ -1,6 +1,6 @@
 import contextlib
 from random import choice
-from typing import Dict, ContextManager
+from typing import Dict, ContextManager, Optional
 import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
@@ -25,16 +25,9 @@ class ServicePools:
         return self._registry.addresses(self._name)
 
     @contextlib.contextmanager
-    def connection(self) -> ContextManager[TProtocolBase]:
-        address = choice(self._local_addresses or self._good_addresses or tuple(self.addresses()))  # type: str
-        with self.address_connection(address) as conn:
-            yield conn
-
-    @contextlib.contextmanager
-    def address_connection(self, address: str) -> ContextManager[TProtocolBase]:
-        addresses = self.addresses()
-        if address not in addresses:
-            raise ValueError(f"{self._name} {address} {addresses}")
+    def connection(self, address: Optional[str] = None) -> ContextManager[TProtocolBase]:
+        if address is None:
+            address = choice(self._local_addresses or self._good_addresses or tuple(self.addresses()))  # type: str
         pool = self._pools.get(address)
         if not pool:
             addr = Addr(address)

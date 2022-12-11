@@ -27,17 +27,17 @@ class Selector:
         return Selector._one_shot(client_factory, name, *args, **kwargs)
 
     @staticmethod
-    def _traverse(address_client_factory, addresses, name, *args, **kwargs):
+    def _traverse(client_factory, addresses, name, *args, **kwargs):
         for address in addresses:
             with LogSuppress(Exception):
-                with address_client_factory(address) as client:
+                with client_factory(address) as client:
                     getattr(client, name)(*args, **kwargs)
 
 
 class UserService(ServicePools, Selector):
     @contextlib.contextmanager
-    def client(self) -> ContextManager[user.Iface]:
-        with self.connection() as conn:
+    def client(self, address=None) -> ContextManager[user.Iface]:
+        with self.connection(address) as conn:
             yield user.Client(conn)
 
     def __getattr__(self, name):
@@ -49,7 +49,7 @@ class UserService(ServicePools, Selector):
 class GateService(ServicePools, Selector):
     @contextlib.contextmanager
     def client(self, address) -> ContextManager[gate.Iface]:
-        with self.address_connection(address) as conn:
+        with self.connection(address) as conn:
             yield gate.Client(conn)
 
     def __getattr__(self, name):
@@ -61,8 +61,8 @@ class GateService(ServicePools, Selector):
 
 class TimerService(ServicePools, Selector):
     @contextlib.contextmanager
-    def client(self) -> ContextManager[timer.Iface]:
-        with self.connection() as conn:
+    def client(self, address=None) -> ContextManager[timer.Iface]:
+        with self.connection(address) as conn:
             yield timer.Client(conn)
 
     def __getattr__(self, name):
