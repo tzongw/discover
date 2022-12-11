@@ -15,7 +15,7 @@ from base import LogSuppress
 
 
 def main():
-    logging.info(f'app id: {app_id}')
+    logging.info(f'{app_name} app id: {app_id}')
     workers = [ws.serve(), rpc.serve()]
     setproctitle(f'{app_name}-{app_id}-{options.ws_port}-{options.rpc_port}')
     shared.registry.start()

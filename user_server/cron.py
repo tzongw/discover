@@ -13,12 +13,12 @@ from base import LogSuppress
 
 
 def main():
-    logging.info(f'app id: {app_id}')
+    logging.info(f'{app_name} app id: {app_id}')
     shared.registry.start()
     shared.invalidator.start()
     init_main()
     if entry := options.entry:
-        setproctitle(f'{app_name}-{app_id}-{entry}')
+        setproctitle(f'{app_name}-{app_id}-{entry}.main')
         module = import_module(entry)
         options.parse_command_line(remaining, final=False)
         start = time.time()

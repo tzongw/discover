@@ -137,9 +137,10 @@ def rpc_serve(handler):
 
 
 def main():
+    logging.info(f'{shared.app_name} app id: {shared.app_id}')
     handler = Handler(shared.redis, shared.schedule, shared.registry)
     g = rpc_serve(handler)
-    setproctitle(f'{shared.app_name}-{options.rpc_port}')
+    setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     shared.registry.start()
     shared.init_main()
     shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})

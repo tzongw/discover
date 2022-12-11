@@ -8,6 +8,7 @@ import os
 from common import shared
 import logging
 from base import LogSuppress
+from setproctitle import setproctitle
 
 addr_map = {}
 changed = set()
@@ -43,6 +44,8 @@ def update_upstreams():
 
 
 def main():
+    logging.info(f'{shared.app_name} app id: {shared.app_id}')
+    setproctitle(f'{shared.app_name}-{shared.app_id}')
     shared.registry.add_callback(update_upstreams)
     shared.registry.start()
     shared.init_main()
