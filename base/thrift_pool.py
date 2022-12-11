@@ -7,7 +7,7 @@ from .pool import Pool
 
 class ThriftPool(Pool):
     def __init__(self, host, port, **settings):
-        super().__init__(**settings, acceptable=self.acceptable)
+        super().__init__(**settings, biz_exception=self.biz_exception)
         self._host = host
         self._port = port
 
@@ -22,5 +22,5 @@ class ThriftPool(Pool):
         conn.trans.close()
 
     @staticmethod
-    def acceptable(e: Exception):
+    def biz_exception(e: Exception):
         return isinstance(e, TException) and not isinstance(e, TTransport.TTransportException)

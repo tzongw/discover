@@ -4,12 +4,12 @@ from gevent.queue import Queue
 
 
 class Pool:
-    def __init__(self, maxsize=128, timeout=1, acceptable=lambda e: False):
+    def __init__(self, maxsize=128, timeout=1, biz_exception=lambda e: False):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
         self._size = 0
-        self._acceptable = acceptable
+        self._biz_exception = biz_exception
 
     def __del__(self):
         self.close_all()
@@ -62,7 +62,7 @@ class Pool:
         try:
             yield conn
         except Exception as e:
-            if self._acceptable(e):
+            if self._biz_exception(e):
                 return_conn()
             else:
                 close_conn()

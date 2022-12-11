@@ -20,7 +20,7 @@ class Selector:
         try:
             return Selector._one_shot(client_factory, name, *args, **kwargs)
         except Exception as e:
-            if ThriftPool.acceptable(e):
+            if ThriftPool.biz_exception(e):
                 raise
         # will retry another node
         logging.warning(f'retry {name} {args} {kwargs}')

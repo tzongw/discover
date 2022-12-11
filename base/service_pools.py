@@ -44,7 +44,7 @@ class ServicePools:
             try:
                 yield conn
             except Exception as e:
-                if not ThriftPool.acceptable(e):
+                if not ThriftPool.biz_exception(e):
                     count = len(self._cooldown)
                     self._cooldown[address] = time.time() + Registry.COOLDOWN
                     if len(self._cooldown) > count:
