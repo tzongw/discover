@@ -55,8 +55,6 @@ def init():
         timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer('welcome:2', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
-        timer.hint = app_id
-        publisher.hint = app_id
         oneshot_id = timer.create(Alarm(tip='oneshot'), timedelta(seconds=2))
         at_exit(lambda: timer.kill(oneshot_id))
         loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
