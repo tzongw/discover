@@ -16,7 +16,18 @@ F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384
 
 
-class AsyncTask:
+class _BaseTask:
+    def __init__(self):
+        self.paths = set()
+
+    def validate(self, f):
+        path = f'{f.__module__}.{f.__name__}'
+        assert path not in self.paths
+        self.paths.add(path)
+        return path
+
+
+class AsyncTask(_BaseTask):
     """
     Make sure new version handler is compatible with old version arguments, that means:
     1. can not remove an argument, instead add a new handler
@@ -25,6 +36,7 @@ class AsyncTask:
 
     def __init__(self, timer: Timer, receiver: Receiver, maxlen=4096):
         assert timer.redis is receiver.redis
+        super().__init__()
         self.timer = timer
         self.receiver = receiver
         self.publisher = Publisher(receiver.redis, hint=timer.hint)
@@ -37,7 +49,7 @@ class AsyncTask:
         return f'{stream_name(task)}:{task.path}'
 
     def __call__(self, f: F) -> F:
-        path = f'{f.__module__}.{f.__name__}'
+        path = self.validate(f)
         stream = self.stream_name(Task(path=path))
         vf = var_args(f)
 
@@ -80,14 +92,15 @@ class AsyncTask:
         self.publisher.publish(task, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 
 
-class HeavyTask:
+class HeavyTask(_BaseTask):
     def __init__(self, redis: Redis, key: str):
+        super().__init__()
         self.redis = redis
         self.key = key
 
     def __call__(self, f: F) -> F:
-        path = f'{f.__module__}.{f.__name__}'
-        assert not path.startswith('__main__')
+        path = self.validate(f)
+        assert not path.startswith('__main__')  # __main__ is different in another process
 
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
