@@ -7,7 +7,7 @@ import gevent
 import os
 from common import shared
 import logging
-from base import LogSuppress
+from base import LogSuppress, ip_address, Addr
 from setproctitle import setproctitle
 
 addr_map = {}
@@ -18,9 +18,21 @@ def is_api(name: str):
     return name.startswith('ws') or name.startswith('http')
 
 
+def valid(addr: str):
+    if addr.startswith('unix://'):
+        return os.path.exists(addr[len('unix://'):])
+    else:
+        return not options.same_host or Addr(addr).host in ['127.0.0.1', '::1', 'localhost', ip_address()]
+
+
 def reload_nginx():
     for name in changed:
-        addrs = sorted(addr_map[name])
+        addrs = sorted(addr for addr in addr_map[name] if valid(addr))
+        if filtered := addr_map[name] - set(addrs):
+            logging.info(f'filtered: {name} {filtered}')
+        if not addrs:
+            logging.info(f'ignore empty: {name}')
+            continue
         logging.info(f'updating: {name} {addrs}')
         with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
             f.write('\n'.join([f'server {l};' for l in addrs]))
