@@ -22,21 +22,23 @@ import service
 from .rpc_service import UserService, GateService, TimerService
 from .task import AsyncTask, HeavyTask
 
-app_name = options.app_name
-env = options.env
-redis = Redis.from_url(options.redis, decode_responses=True)
 executor = Executor(name='shared')
 schedule = Schedule()
+dispatcher = Dispatcher(sep=':')
+
+app_name = options.app_name
+env = options.env
+registry = Registry(Redis.from_url(options.registry, decode_responses=True))
+
+redis = Redis.from_url(options.redis, decode_responses=True)
+parser = Parser(redis)
+invalidator = Invalidator(redis)
 unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
-registry = Registry(redis)
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 publisher = Publisher(redis, hint=str(app_id))
 receiver = Receiver(redis, group=app_name, consumer=str(app_id))
-parser = Parser(redis)
 timer = Timer(redis, hint=str(app_id))
-dispatcher = Dispatcher(sep=':')
-invalidator = Invalidator(redis)
 async_task = AsyncTask(timer, receiver)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 

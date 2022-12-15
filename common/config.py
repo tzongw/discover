@@ -26,6 +26,7 @@ define('config', type=str, help='path to config file',
        callback=lambda path: parse_config_file(path, final=False))
 define('app_name', 'app', str, 'app name')
 define('env', Environment.DEV, Environment, 'environment')
-define('redis', 'redis://', str, 'redis url')
+define('registry', 'redis://', str, 'registry redis url')
+define('redis', 'redis://', str, 'biz redis url')
 define('datacenter', 0, int, 'data center id')
 define('log_file', type=str, help='log file path')
