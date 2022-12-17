@@ -4,13 +4,17 @@ set -eo pipefail
 
 key="$1"
 timeout="$2"
+len=${#key}
 shift 2
-value=$(redis-cli "$@" BLMOVE "$key" "$key" LEFT LEFT "$timeout")
-if [ -z "$value" ]; then
+while true; do
+  value=$(redis-cli "$@" BLPOP "$key" "$timeout")
+  if [ -z "$value" ]; then
     exit 0
-fi
-py=venv/bin/python
-if [ ! -f "$py" ]; then
+  fi
+  task=${value:len}
+  py=venv/bin/python
+  if [ ! -f "$py" ]; then
     py="/usr/bin/env python"
-fi
-PYTHONPATH="./common/gen-py:." $py user_server/cron.py
+  fi
+  PYTHONPATH="./common/gen-py:." $py user_server/cron.py "--" "$task"
+done

@@ -25,6 +25,11 @@ def main():
         logging.info(f'doing task {entry}')
         getattr(module, 'main')()
         logging.info(f'done task {entry} {time.time() - start}')
+    elif remaining:
+        for value in remaining:
+            task = shared.heavy_task.parse(value)
+            setproctitle(f'{app_name}-{app_id}-{task.path}')
+            shared.heavy_task.exec(task)
     elif task := shared.heavy_task.pop(block=False):
         setproctitle(f'{app_name}-{app_id}-{task.path}')
         shared.heavy_task.exec(task)

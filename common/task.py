@@ -120,6 +120,10 @@ class HeavyTask(_BaseTask):
         if r is None:
             return
         value = r[1] if isinstance(r, (list, tuple)) else r
+        return self.parse(value)
+
+    @staticmethod
+    def parse(value):
         task = Parse(value, Task(), ignore_unknown_fields=True)
         logging.info(f'-task {task.id} {task.path}')
         return task
