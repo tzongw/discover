@@ -2,6 +2,7 @@ import signal
 import logging
 import time
 import atexit
+from dataclasses import dataclass
 from typing import Union
 from weakref import WeakKeyDictionary
 import sys
@@ -49,26 +50,32 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 _exits = [registry.stop, receiver.stop]
 _mains = []
 
-inited = False
-exited = False
+
+@dataclass
+class Status:
+    inited: bool = False
+    exited: bool = False
+    worker: bool = False
+
+
+status = Status()
 _workers = WeakKeyDictionary()  # task workers, try to join all before exiting
 
 
 def at_main(fun):
-    assert callable(fun) and not inited
+    assert callable(fun) and not status.inited
     _mains.append(fun)
     return fun
 
 
 def at_exit(fun):
-    assert callable(fun) and not exited
+    assert callable(fun) and not status.exited
     _exits.append(fun)
     return fun
 
 
 def init_main():
-    global inited
-    inited = True
+    status.inited = True
     executor.gather(*_mains)
     _mains.clear()
 
@@ -78,8 +85,7 @@ atexit.register(unique_id.stop)  # after cleanup
 
 @atexit.register
 def _cleanup():
-    global exited
-    exited = True
+    status.exited = True
     with LogSuppress(Exception):
         executor.gather(*_exits)
     _exits.clear()
@@ -102,6 +108,9 @@ def spawn_worker(f, *args, **kwargs):
 
 def _sig_handler(sig, frame):
     def graceful_exit():
+        if status.worker:
+            logging.warning(f'ignore {sig} {frame}')
+            return
         logging.info(f'exit {sig} {frame}')
         _cleanup()
         if sig != signal.SIGUSR1:

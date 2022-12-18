@@ -42,7 +42,7 @@ def init_trace():
 
 @heavy_task
 def log(message):
-    for i in range(5):
+    for i in range(10):
         logging.info(f'{message} {i}')
         gevent.sleep(1)
 

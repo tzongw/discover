@@ -14,6 +14,7 @@ from base import LogSuppress
 
 def main():
     logging.info(f'{app_name} app id: {app_id}')
+    shared.status.worker = True
     shared.registry.start()
     shared.invalidator.start()
     init_main()
