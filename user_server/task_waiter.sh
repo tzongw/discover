@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 set -eo pipefail
 
-key="$1"
-timeout="$2"
+key=$1
+timeout=$2
 len=${#key}
 shift 2
 while true; do
