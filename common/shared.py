@@ -55,7 +55,6 @@ _mains = []
 class Status:
     inited: bool = False
     exited: bool = False
-    worker: bool = False
 
 
 status = Status()
@@ -108,9 +107,6 @@ def spawn_worker(f, *args, **kwargs):
 
 def _sig_handler(sig, frame):
     def graceful_exit():
-        if status.worker:
-            logging.warning(f'ignore {sig} {frame}')
-            return
         logging.info(f'exit {sig} {frame}')
         _cleanup()
         if sig != signal.SIGUSR1:

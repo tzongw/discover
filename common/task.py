@@ -137,5 +137,6 @@ class HeavyTask(_BaseTask):
         args = json.loads(task.args)  # type: list
         kwargs = json.loads(task.kwargs)  # type: dict
         start = time.time()
-        func(*args, **kwargs)
+        r = func(*args, **kwargs)
         logging.info(f'done task {task.id} {task.path} {time.time() - start}')
+        return r
