@@ -3,7 +3,7 @@ import logging
 from common.mq_pb2 import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
     async_task, at_main
-from datetime import timedelta
+from datetime import timedelta, datetime
 from dao import Account
 
 
@@ -43,8 +43,8 @@ def session_invalidate(key):
 
 
 @async_task
-def task(hello: str, repeat: int):
-    logging.info(hello * repeat)
+def task(hello: str, repeat: int, now: datetime):
+    logging.info(f'{hello * repeat} {now}')
     async_task.cancel()
 
 
@@ -59,7 +59,7 @@ def init():
         at_exit(lambda: timer.kill(oneshot_id))
         loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
         at_exit(lambda: timer.kill(loop_id))
-        task_id = async_task.post(task('hello', 3), timedelta(seconds=3), loop=True)
+        task_id = async_task.post(task('hello', 3, datetime.now()), timedelta(seconds=3), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from json import loads, dumps
 import logging
 import time
 from importlib import import_module
@@ -10,6 +9,8 @@ from redis import Redis
 from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import timer_name, var_args
+from yaml import dump as dumps
+from yaml import full_load as loads
 from .mq_pb2 import Task
 
 F = TypeVar('F', bound=Callable)
