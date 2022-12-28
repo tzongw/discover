@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+from json import loads, dumps
 import logging
 import time
 from importlib import import_module
@@ -56,8 +56,8 @@ class AsyncTask(_BaseTask):
         @self.receiver.group(Task, stream)
         def handler(id, task: Task):
             logging.debug(f'got task {id} {task.id} {task.path}')
-            args = json.loads(task.args)  # type: list
-            kwargs = json.loads(task.kwargs)  # type: dict
+            args = loads(task.args)  # type: list
+            kwargs = loads(task.kwargs)  # type: dict
             self.local.task = task
 
             try:
@@ -66,8 +66,8 @@ class AsyncTask(_BaseTask):
                 del self.local.task
 
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(id=f'{timer_name(Task)}:{path}:{args}:{kwargs}', path=path, args=json.dumps(args),
-                        kwargs=json.dumps(kwargs))
+            task = Task(id=f'{timer_name(Task)}:{path}:{args}:{kwargs}', path=path, args=dumps(args),
+                        kwargs=dumps(kwargs))
             if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
                 logging.warning(f'task parameters too big {task.path}')
             return task
@@ -103,7 +103,7 @@ class HeavyTask(_BaseTask):
         assert not path.startswith('__main__')  # __main__ is different in another process
 
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=json.dumps(args), kwargs=json.dumps(kwargs))
+            task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=dumps(args), kwargs=dumps(kwargs))
             if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
                 logging.warning(f'task parameters too big {task.path}')
             return task
@@ -134,8 +134,8 @@ class HeavyTask(_BaseTask):
         index = task.path.rindex('.')
         module = import_module(task.path[:index])
         func = getattr(module, task.path[index + 1:]).wrapped
-        args = json.loads(task.args)  # type: list
-        kwargs = json.loads(task.kwargs)  # type: dict
+        args = loads(task.args)  # type: list
+        kwargs = loads(task.kwargs)  # type: dict
         start = time.time()
         r = func(*args, **kwargs)
         logging.info(f'done task {task.id} {task.path} {time.time() - start}')
