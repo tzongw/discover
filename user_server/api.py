@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 import logging
 import flask
-from flask import jsonify, Blueprint, g
+from flask import jsonify, Blueprint, g, request
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
@@ -16,7 +16,7 @@ from gevent import pywsgi
 from config import options
 from const import CONTEXT_UID, CONTEXT_TOKEN
 from shared import session_key, heavy_task
-from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 from base.utils import ListConverter
 from flasgger import Swagger
 from hashlib import sha1
@@ -64,6 +64,15 @@ def hello(names):
     """
     heavy_task.push(log('processing'))
     return f'say hello {names}'
+
+
+@app.route('/eval', methods=['POST'])
+def eval_code():
+    if request.remote_addr not in ['127.0.0.1', '::1', '::ffff:127.0.0.1']:
+        raise Forbidden(request.remote_addr)
+    r = ['OK']
+    exec(request.data)
+    return r[0]
 
 
 @app.errorhandler(UnprocessableEntity)
