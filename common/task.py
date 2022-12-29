@@ -18,7 +18,7 @@ from yaml import safe_load as loads
 
 
 def represent_timedelta(self, data):
-    return self.represent_scalar('tag:yaml.org,2002:python/timedelta', str(data.total_seconds()))
+    return self.represent_scalar('!timedelta', str(data.total_seconds()))
 
 
 def construct_timedelta(self, node):
@@ -27,7 +27,7 @@ def construct_timedelta(self, node):
 
 
 SafeRepresenter.add_representer(timedelta, represent_timedelta)
-SafeConstructor.add_constructor('tag:yaml.org,2002:python/timedelta', construct_timedelta)
+SafeConstructor.add_constructor('!timedelta', construct_timedelta)
 
 F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384
