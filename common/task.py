@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+from datetime import timedelta
 from importlib import import_module
 from typing import TypeVar, Callable
 from gevent.local import local
@@ -9,9 +10,24 @@ from redis import Redis
 from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import timer_name, var_args
-from yaml import dump as dumps
-from yaml import full_load as loads
 from .mq_pb2 import Task
+from yaml.representer import SafeRepresenter
+from yaml.constructor import SafeConstructor
+from yaml import safe_dump as dumps
+from yaml import safe_load as loads
+
+
+def represent_timedelta(self, data):
+    return self.represent_scalar('tag:yaml.org,2002:python/timedelta', str(data.total_seconds()))
+
+
+def construct_timedelta(self, node):
+    seconds = float(self.construct_scalar(node))
+    return timedelta(seconds=seconds)
+
+
+SafeRepresenter.add_representer(timedelta, represent_timedelta)
+SafeConstructor.add_constructor('tag:yaml.org,2002:python/timedelta', construct_timedelta)
 
 F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384
