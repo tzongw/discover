@@ -2,6 +2,7 @@
 import logging
 import time
 from concurrent.futures import Future
+from weakref import WeakSet
 from gevent import queue
 import gevent
 from typing import Callable
@@ -50,14 +51,14 @@ class Executor:
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
-        if not self._overload and self._unfinished >= self._max_workers * 1.5:
-            self._overload = True
-            logging.warning(f'overload {self} {item}')
         start = time.time()
         self._items.put(item)
         t = time.time() - start
         if t > self._slow_log:
             logging.warning(f'slow put {t} {self} {item}')
+        if not self._overload and self._items.qsize() >= self._max_workers * 1.5:
+            self._overload = True
+            logging.warning(f'overload {self} {item}')
         return fut
 
     def gather(self, *fns, block=True):
@@ -81,17 +82,33 @@ class Executor:
         try:
             while True:
                 item = self._items.get(timeout=self._idle)  # type: _WorkItem
+                if self._overload and self._items.qsize() <= self._max_workers / 2:
+                    self._overload = False
+                    logging.warning(f'underload {self} {item}')
                 start = time.time()
                 item.run()
                 t = time.time() - start
                 if t > self._slow_log:
                     logging.warning(f'slow task {t} {self} {item}')
                 self._unfinished -= 1
-                if self._overload and self._unfinished <= self._max_workers / 2:
-                    self._overload = False
-                    logging.warning(f'underload {self} {item}')
         except queue.Empty:
             logging.debug(f'worker idle exit')
         finally:
             self._workers -= 1
             logging.debug(f'-worker {self}')
+
+
+class WaitGroup(Executor):
+    def __init__(self, max_workers=10, slow_log=1, name='unnamed'):
+        super().__init__(max_workers, queue_size=max_workers, idle=0, slow_log=slow_log, name=name)
+        self._futures = WeakSet()
+
+    def submit(self, fn: Callable, *args, **kwargs) -> Future:
+        fut = super().submit(fn, *args, **kwargs)
+        self._futures.add(fut)
+        return fut
+
+    def join(self):
+        while self._futures:
+            fut = self._futures.pop()
+            fut.result()
