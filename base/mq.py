@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Type, Dict
 from redis import Redis
-from .utils import stream_name
+from .utils import stream_name, var_args
 from . import Dispatcher
 from .executor import Executor
 from google.protobuf.message import Message
@@ -37,14 +37,16 @@ class ProtoDispatcher(Dispatcher):
         super_handler = super().handler
 
         def decorator(f):
+            vf = var_args(f)
+
             @super_handler(key)
-            def inner(id, data: Dict):
+            def inner(data: Dict, sid):
                 proto = data.get('proto')
                 if proto is None:
                     json = data.pop('')
                     proto = Parse(json, message_cls(), ignore_unknown_fields=True)
                     data['proto'] = proto
-                f(id, proto)
+                vf(proto, sid)
 
             return f
 
@@ -77,12 +79,12 @@ class Receiver:
 
     def start(self):
         @self.group(self._waker)
-        def group_wakeup(id, data):
-            logging.info(f'{id} {data}')
+        def group_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
 
         @self.fanout(self._waker)
-        def fanout_wakeup(id, data):
-            logging.info(f'{id} {data}')
+        def fanout_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
 
         with self.redis.pipeline() as pipe:
             for stream in self._group_dispatcher.handlers:
@@ -117,7 +119,7 @@ class Receiver:
                                                noack=True)
                 for stream, messages in result:
                     for message in messages:
-                        self._group_dispatcher.dispatch(stream, *message)
+                        self._group_dispatcher.dispatch(stream, *message[::-1])
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
@@ -140,7 +142,7 @@ class Receiver:
                 result = self.redis.xread(self._fanout_streams, count=self._batch, block=0)
                 for stream, messages in result:
                     for message in messages:
-                        self._fanout_dispatcher.dispatch(stream, *message)
+                        self._fanout_dispatcher.dispatch(stream, *message[::-1])
                         if stream in self._fanout_streams:  # may removed in dispatch
                             self._fanout_streams[stream] = message[0]  # update last id
             except Exception:

@@ -23,18 +23,18 @@ def on_register(account: Account):
 
 
 @receiver.group(Login)
-def on_login(id, data: Login):
-    logging.info(f'{id} {data}')
+def on_login(data: Login):
+    logging.info(f'{data}')
 
 
 @receiver.fanout(Logout)
-def on_logout(id, data: Logout):
-    logging.info(f'{id} {data}')
+def on_logout(data: Logout):
+    logging.info(f'{data}')
 
 
 @receiver.group(Alarm)
-def on_alarm(id, data: Alarm):
-    logging.info(f'{id} {data}')
+def on_alarm(data: Alarm):
+    logging.info(f'{data}')
 
 
 @invalidator.handler('session')
