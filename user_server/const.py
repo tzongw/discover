@@ -2,8 +2,8 @@
 # noinspection PyUnresolvedReferences
 from common.const import *
 
-CONTEXT_UID = 'uid'
-CONTEXT_TOKEN = 'token'
-CONTEXT_GROUP = 'group'
+CTX_UID = 'uid'
+CTX_TOKEN = 'token'
+CTX_GROUP = 'group'
 
-CHAT_ROOM = 'chat_room'
+ROOM = 'room'

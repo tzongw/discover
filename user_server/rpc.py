@@ -28,8 +28,8 @@ class Handler:
                 request = app.request_class({'HTTP_COOKIE': cookie})
                 session = app.open_session(request)
                 params.update(session)
-            uid = int(params[const.CONTEXT_UID])
-            token = params[const.CONTEXT_TOKEN]
+            uid = int(params[const.CTX_UID])
+            token = params[const.CTX_TOKEN]
             session = shared.parser.hget(session_key(uid), Session())
             if token != session.token and options.env != const.Environment.DEV:
                 raise ValueError("token error")
@@ -55,13 +55,13 @@ class Handler:
                 client.remove_conn(conn_id)
         else:
             with shared.gate_service.client(address) as client:
-                client.set_context(conn_id, const.CONTEXT_UID, str(uid))
+                client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success')
 
     def ping(self, address: str, conn_id: str, context: Dict[str, str]):
         try:
             logging.debug(f'{address} {conn_id} {context}')
-            uid = int(context[const.CONTEXT_UID])
+            uid = int(context[const.CTX_UID])
             key = online_key(uid)
             online = shared.parser.hget(key, Online())
             if conn_id != online.conn_id:
@@ -77,7 +77,7 @@ class Handler:
         logging.info(f'{address} {conn_id} {context}')
         if not context:
             return
-        uid = int(context[const.CONTEXT_UID])
+        uid = int(context[const.CTX_UID])
         key = online_key(uid)
 
         def unset_login_status(pipe: Pipeline):
@@ -100,24 +100,24 @@ class Handler:
         if not context:
             logging.warning(f'not login {address} {conn_id} {context} {message}')
             return
-        uid = int(context[const.CONTEXT_UID])
-        group = context.get(const.CONTEXT_GROUP)
+        uid = int(context[const.CTX_UID])
+        group = context.get(const.CTX_GROUP)
         if message == 'join':
             with shared.gate_service.client(address) as client:
-                client.join_group(conn_id, const.CHAT_ROOM)
-                client.set_context(conn_id, const.CONTEXT_GROUP, const.CHAT_ROOM)
-            shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} join')
+                client.join_group(conn_id, const.ROOM)
+                client.set_context(conn_id, const.CTX_GROUP, const.ROOM)
+            shared.gate_service.broadcast_text(const.ROOM, [conn_id], f'sys: {uid} join')
         elif message == 'leave':
             with shared.gate_service.client(address) as client:
-                client.leave_group(conn_id, const.CHAT_ROOM)
-                client.unset_context(conn_id, const.CONTEXT_GROUP, const.CHAT_ROOM)
-            shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'sys: {uid} leave')
+                client.leave_group(conn_id, const.ROOM)
+                client.unset_context(conn_id, const.CTX_GROUP, const.ROOM)
+            shared.gate_service.broadcast_text(const.ROOM, [conn_id], f'sys: {uid} leave')
         else:
             if not group:
                 with shared.gate_service.client(address) as client:
                     client.send_text(conn_id, f'not in group')
             else:
-                shared.gate_service.broadcast_text(const.CHAT_ROOM, [conn_id], f'{uid}: {message}')
+                shared.gate_service.broadcast_text(const.ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
         dispatcher.dispatch(key, key, data)

@@ -14,7 +14,7 @@ import hash_pb2
 import gevent
 from gevent import pywsgi
 from config import options
-from const import CONTEXT_UID, CONTEXT_TOKEN
+from const import CTX_UID, CTX_TOKEN
 from shared import session_key, heavy_task
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 from base.utils import ListConverter
@@ -140,9 +140,9 @@ def login(username: str, password: str):
     if account is None or account.hashed != hash_password(account.id, password):
         return 'account not exist or password error'
     else:
-        flask.session[CONTEXT_UID] = account.id
+        flask.session[CTX_UID] = account.id
         token = str(uuid.uuid4())
-        flask.session[CONTEXT_TOKEN] = token
+        flask.session[CTX_TOKEN] = token
         flask.session.permanent = True
         key = session_key(account.id)
         parser.hset(key, hash_pb2.Session(token=token), expire=app.permanent_session_lifetime)
@@ -154,7 +154,7 @@ bp = Blueprint('/', __name__)
 
 @bp.before_request
 def authorize():
-    uid, token = flask.session.get(CONTEXT_UID), flask.session.get(CONTEXT_TOKEN)
+    uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token or token != session_cache.get(uid).token:
         raise Unauthorized
     ctx.uid = g.uid = uid
@@ -169,10 +169,13 @@ def user_limiter(cooldown):
             now = time.time()
             if current.get(g.uid, 0) > now:
                 raise TooManyRequests
-            if current:
+            count = 10
+            while current and count > 0:
                 uid, expire = next(iter(current.items()))
-                if expire < now:
-                    current.pop(uid)
+                if expire > now:
+                    break
+                current.pop(uid)
+                count -= 1
             try:
                 current[g.uid] = float('inf')  # not reentrant
                 return f(*args, **kwargs)

@@ -11,7 +11,7 @@ while true; do
   if [ -z "$value" ]; then
     exit 0
   fi
-  task=${value:len}
+  task=${value:len} # skip key string
   py=venv/bin/python
   if [ ! -f "$py" ]; then
     py="/usr/bin/env python"
