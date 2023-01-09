@@ -111,4 +111,4 @@ class WaitGroup(Executor):
     def join(self):
         while self._futures:
             fut = self._futures.pop()
-            fut.result()
+            fut.exception()
