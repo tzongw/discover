@@ -11,23 +11,8 @@ from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import timer_name, var_args
 from .mq_pb2 import Task
-from yaml.representer import SafeRepresenter
-from yaml.constructor import SafeConstructor
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
-
-
-def represent_timedelta(self, data):
-    return self.represent_scalar('!timedelta', str(data.total_seconds()))
-
-
-def construct_timedelta(self, node):
-    seconds = float(self.construct_scalar(node))
-    return timedelta(seconds=seconds)
-
-
-SafeRepresenter.add_representer(timedelta, represent_timedelta)
-SafeConstructor.add_constructor('!timedelta', construct_timedelta)
 
 F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384

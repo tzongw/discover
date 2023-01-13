@@ -16,3 +16,19 @@ from .service_pools import ServicePools
 from .timer import Timer
 from .unique import UniqueId
 from .cache import Cache, TTLCache, FullCache, FullTTLCache
+from yaml.representer import SafeRepresenter
+from yaml.constructor import SafeConstructor
+from datetime import timedelta
+
+
+def represent_timedelta(self, data):
+    return self.represent_scalar('!timedelta', str(data.total_seconds()))
+
+
+def construct_timedelta(self, node):
+    seconds = float(self.construct_scalar(node))
+    return timedelta(seconds=seconds)
+
+
+SafeRepresenter.add_representer(timedelta, represent_timedelta)
+SafeConstructor.add_constructor('!timedelta', construct_timedelta)
