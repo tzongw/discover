@@ -2,7 +2,7 @@
 from functools import partial
 import contextlib
 from typing import ContextManager
-from base.service_pools import ServicePools
+from base.service import Service
 from base.thrift_pool import ThriftPool
 from base.utils import LogSuppress
 from service import gate, user, timer
@@ -34,7 +34,7 @@ class Selector:
                     getattr(client, name)(*args, **kwargs)
 
 
-class UserService(ServicePools, Selector):
+class UserService(Service, Selector):
     @contextlib.contextmanager
     def client(self, address=None) -> ContextManager[user.Iface]:
         with self.connection(address) as conn:
@@ -46,7 +46,7 @@ class UserService(ServicePools, Selector):
         return super().__getattr__(name)
 
 
-class GateService(ServicePools, Selector):
+class GateService(Service, Selector):
     @contextlib.contextmanager
     def client(self, address) -> ContextManager[gate.Iface]:
         with self.connection(address) as conn:
@@ -59,7 +59,7 @@ class GateService(ServicePools, Selector):
         return super().__getattr__(name)
 
 
-class TimerService(ServicePools, Selector):
+class TimerService(Service, Selector):
     @contextlib.contextmanager
     def client(self, address=None) -> ContextManager[timer.Iface]:
         with self.connection(address) as conn:

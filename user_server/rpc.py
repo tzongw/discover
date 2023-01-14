@@ -8,7 +8,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import shared
 import const
-from common.message import Login, Logout
+from common.messages import Login, Logout
 from models import Online, Session
 from redis.client import Pipeline
 from base.mq import Publisher

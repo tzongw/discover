@@ -10,7 +10,7 @@ import time
 from .utils import ip_address, Addr
 
 
-class ServicePools:
+class Service:
     def __init__(self, registry: Registry, name, **settings):
         self._name = name
         self._registry = registry

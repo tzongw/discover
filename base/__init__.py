@@ -15,7 +15,7 @@ from .schedule import Schedule
 from .invalidator import Invalidator
 from .mq import Receiver, Publisher
 from .registry import Registry
-from .service_pools import ServicePools
+from .service import Service
 from .timer import Timer
 from .unique import UniqueId
 from .cache import Cache, TTLCache, FullCache, FullTTLCache

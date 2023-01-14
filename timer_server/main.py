@@ -16,7 +16,7 @@ from typing import Dict
 from base.registry import Registry
 from redis import Redis
 from base.schedule import Handle, PeriodicCallback, Schedule
-from base.service_pools import ServicePools
+from base.service import Service
 from service import timeout
 from setproctitle import setproctitle
 from base.utils import LogSuppress
@@ -37,7 +37,7 @@ class Handler:
         self._schedule = schedule
         self._registry = registry
         self._timers = {}  # type: Dict[str, dict]
-        self._services = {}  # type: Dict[str, ServicePools]
+        self._services = {}  # type: Dict[str, Service]
 
     def load_timers(self):
         full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
@@ -61,7 +61,7 @@ class Handler:
         logging.info(f'{key} {service_name} {data}')
         service = self._services.get(service_name)
         if not service:
-            service = ServicePools(self._registry, service_name)
+            service = Service(self._registry, service_name)
             self._services[service_name] = service
         with service.connection() as conn:
             client = timeout.Client(conn)
