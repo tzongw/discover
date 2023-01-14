@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from yaml.representer import SafeRepresenter
+from yaml.constructor import SafeConstructor
+from datetime import timedelta
 from .utils import LogSuppress, Addr, ip_address, Parser, ListConverter, Proxy, SingleFlight, stream_name, \
     run_in_thread
 from .snowflake import extract_datetime, from_datetime, IdGenerator
@@ -16,9 +19,7 @@ from .service_pools import ServicePools
 from .timer import Timer
 from .unique import UniqueId
 from .cache import Cache, TTLCache, FullCache, FullTTLCache
-from yaml.representer import SafeRepresenter
-from yaml.constructor import SafeConstructor
-from datetime import timedelta
+from .task import AsyncTask, HeavyTask
 
 
 def represent_timedelta(self, data):

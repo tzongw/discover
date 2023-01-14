@@ -121,7 +121,7 @@ class HeavyTask(_BaseTask):
 
     def push(self, task: Task):
         logging.info(f'+task {task.id} {task.path}')
-        self.redis.rpush(self.key, MessageToJson(task))
+        self.redis.rpush(self.key, task.json())
 
     def pop(self, *, timeout=0, block=True):
         r = self.redis.blpop(self.key, timeout) if block else self.redis.lpop(self.key)
@@ -132,7 +132,7 @@ class HeavyTask(_BaseTask):
 
     @staticmethod
     def parse(value):
-        task = Parse(value, Task(), ignore_unknown_fields=True)
+        task = Task.parse_raw(value)
         logging.info(f'-task {task.id} {task.path}')
         return task
 

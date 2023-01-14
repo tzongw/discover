@@ -21,7 +21,7 @@ from . import const
 from .config import options
 import service
 from .rpc_service import UserService, GateService, TimerService
-from .task import AsyncTask, HeavyTask
+from base import AsyncTask, HeavyTask
 
 executor = Executor(name='shared')
 schedule = Schedule()
