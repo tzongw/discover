@@ -8,8 +8,8 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import shared
 import const
-from hash_pb2 import Online, Session
-from common.mq_pb2 import Login, Logout
+from common.message import Login, Logout
+from models import Online, Session
 from redis.client import Pipeline
 from base.mq import Publisher
 from service import user
@@ -30,14 +30,14 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            session = shared.parser.hget(session_key(uid), Session())
-            if token != session.token and options.env != const.Environment.DEV:
+            session = shared.parser.get(session_key(uid), Session)
+            if (session is None or session.token != token) and options.env != const.Environment.DEV:
                 raise ValueError("token error")
             key = online_key(uid)
             with redis.pipeline() as pipe:
                 parser = Parser(pipe)
-                parser.hget(key, Online(), return_none=True)
-                parser.hset(key, Online(address=address, conn_id=conn_id), expire=const.CLIENT_TTL)
+                parser.get(key, Online)
+                parser.set(key, Online(address=address, conn_id=conn_id), ex=const.CLIENT_TTL)
                 Publisher(pipe).publish(Login(uid=uid))
                 old_online, *_ = pipe.execute()
             if old_online:
@@ -63,8 +63,8 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            online = shared.parser.hget(key, Online())
-            if conn_id != online.conn_id:
+            online = shared.parser.get(key, Online)
+            if online is None or online.conn_id != conn_id:
                 raise ValueError(f'{online} {conn_id}')
             redis.expire(key, const.CLIENT_TTL)
         except Exception as e:
@@ -81,8 +81,8 @@ class Handler:
         key = online_key(uid)
 
         def unset_login_status(pipe: Pipeline):
-            online = Parser(pipe).hget(key, Online())
-            if conn_id == online.conn_id:
+            online = Parser(pipe).get(key, Online)
+            if online and online.conn_id == conn_id:
                 logging.info(f'clear {uid} {online}')
                 pipe.multi()
                 pipe.delete(key)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from shared import online_key, redis, gate_service, parser
-from hash_pb2 import Online
+from models import Online
 from base.utils import Parser
 
 
@@ -10,7 +10,7 @@ def send(uid_or_uids, message):
     with redis.pipeline() as pipe:
         parser = Parser(pipe)
         for key in keys:
-            parser.hget(key, Online(), return_none=True)
+            parser.get(key, Online)
         onlines = pipe.execute()
     for online in onlines:
         if not online:
@@ -24,7 +24,7 @@ def send(uid_or_uids, message):
 
 def kick(uid, message=None):
     key = online_key(uid)
-    online = parser.hget(key, Online(), return_none=True)
+    online = parser.get(key, Online)
     if not online:
         return
     with gate_service.client(online.address) as client:
@@ -42,7 +42,7 @@ def broadcast(group, message, exclude=None):
     with redis.pipeline() as pipe:
         parser = Parser(pipe)
         for key in keys:
-            parser.hget(key, Online(), return_none=True)
+            parser.get(key, Online)
         onlines = pipe.execute()
     exclude = {online.conn_id for online in onlines if online}
     if isinstance(message, str):
@@ -53,7 +53,7 @@ def broadcast(group, message, exclude=None):
 
 def join(uid, group):
     key = online_key(uid)
-    online = parser.hget(key, Online(), return_none=True)
+    online = parser.get(key, Online)
     if not online:
         return
     with gate_service.client(online.address) as client:
@@ -62,7 +62,7 @@ def join(uid, group):
 
 def leave(uid, group):
     key = online_key(uid)
-    online = parser.hget(key, Online(), return_none=True)
+    online = parser.get(key, Online)
     if not online:
         return
     with gate_service.client(online.address) as client:

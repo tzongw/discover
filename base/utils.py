@@ -7,13 +7,12 @@ from functools import lru_cache, wraps
 from typing import TypeVar, Optional, Type, Union
 from redis import Redis
 from redis.client import Pipeline
-from google.protobuf.message import Message
-from google.protobuf.json_format import ParseDict, MessageToDict
 from werkzeug.routing import BaseConverter
 from random import choice
 from concurrent.futures import Future
 from collections import defaultdict
 import gevent
+from pydantic import BaseModel
 
 
 class LogSuppress(contextlib.suppress):
@@ -64,39 +63,26 @@ def var_args(f: Callable):
     return wrapper
 
 
-M = TypeVar('M', bound=Message)
+M = TypeVar('M', bound=BaseModel)
 
 
 class Parser:
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Union[Redis, Pipeline]):
         self._redis = redis
-        redis.response_callbacks['HGETALL'] = self.hgetall_callback
+        redis.response_callbacks['GET'] = self.get_callback
 
     @staticmethod
-    def hgetall_callback(response, converter=None):
-        response = Redis.RESPONSE_CALLBACKS['HGETALL'](response)
+    def get_callback(response, converter=None):
         return converter(response) if converter else response
 
-    def hset(self, name: str, message: Message, expire=None):  # embedded message not work
-        mapping = MessageToDict(message)
-        if expire is None:
-            self._redis.hset(name, mapping=mapping)
-        else:
-            if isinstance(self._redis, Pipeline):
-                self._redis.hset(name, mapping=mapping)
-                self._redis.expire(name, expire)
-            else:
-                with self._redis.pipeline() as pipe:
-                    pipe.hset(name, mapping=mapping)
-                    pipe.expire(name, expire)
-                    pipe.execute()
+    def set(self, name: str, model: M, **kwargs):
+        return self._redis.set(name, model.json(), **kwargs)
 
-    def hget(self, name: str, message: M, return_none=False) -> Optional[M]:
-        def converter(mapping):
-            return ParseDict(mapping, message, ignore_unknown_fields=True) \
-                if mapping or not return_none else None
+    def get(self, name: str, cls: Type[M]) -> Optional[M]:
+        def converter(value):
+            return cls.parse_raw(value) if value is not None else None
 
-        return self._redis.execute_command('HGETALL', name, converter=converter)
+        return self._redis.execute_command('GET', name, converter=converter)
 
 
 class ListConverter(BaseConverter):
@@ -173,13 +159,13 @@ class SingleFlight:
         return [fut.result() for fut in futures]
 
 
-def stream_name(message_or_cls: Union[Message, Type[Message]]) -> str:
-    cls = message_or_cls.__class__ if isinstance(message_or_cls, Message) else message_or_cls
+def stream_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:
+    cls = message_or_cls.__class__ if isinstance(message_or_cls, BaseModel) else message_or_cls
     return f'stream:{cls.__name__}'
 
 
-def timer_name(message_or_cls: Union[Message, Type[Message]]) -> str:
-    cls = message_or_cls.__class__ if isinstance(message_or_cls, Message) else message_or_cls
+def timer_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:
+    cls = message_or_cls.__class__ if isinstance(message_or_cls, BaseModel) else message_or_cls
     return f'timer:{cls.__name__}'
 
 

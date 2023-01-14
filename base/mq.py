@@ -7,8 +7,7 @@ from redis import Redis
 from .utils import stream_name, var_args
 from . import Dispatcher
 from .executor import Executor
-from google.protobuf.message import Message
-from google.protobuf.json_format import Parse, MessageToJson
+from pydantic import BaseModel
 
 
 class Publisher:
@@ -16,13 +15,12 @@ class Publisher:
         self.redis = redis
         self.hint = hint
 
-    def publish(self, message: Message, maxlen=4096, do_hint=True, stream=None):
+    def publish(self, message: BaseModel, maxlen=4096, do_hint=True, stream=None):
         stream = stream or stream_name(message)
-        json = MessageToJson(message)
         params = [stream, 'MAXLEN', '~', maxlen]
         if do_hint and self.hint:
             params += ['HINT', self.hint]
-        params += ['*', '', json]
+        params += ['*', '', message.json()]
         return self.redis.execute_command('XADD', *params)
 
 
@@ -31,8 +29,8 @@ class ProtoDispatcher(Dispatcher):
         if isinstance(key_or_cls, str):
             return super().handler(key_or_cls)
 
-        assert issubclass(key_or_cls, Message)
-        message_cls = key_or_cls  # type: Type[Message]
+        assert issubclass(key_or_cls, BaseModel)
+        message_cls = key_or_cls  # type: Type[BaseModel]
         key = stream or stream_name(message_cls)
         super_handler = super().handler
 
@@ -44,7 +42,7 @@ class ProtoDispatcher(Dispatcher):
                 proto = data.get('proto')
                 if proto is None:
                     json = data.pop('')
-                    proto = Parse(json, message_cls(), ignore_unknown_fields=True)
+                    proto = message_cls.parse_raw(json)
                     data['proto'] = proto
                 vf(proto, sid)
 

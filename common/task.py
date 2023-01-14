@@ -1,18 +1,24 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-from datetime import timedelta
 from importlib import import_module
 from typing import TypeVar, Callable
 from gevent.local import local
-from google.protobuf.json_format import MessageToJson, Parse
 from redis import Redis
 from base.mq import Receiver, Publisher
 from base.timer import Timer
 from base.utils import timer_name, var_args
-from .mq_pb2 import Task
+from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
+
+
+class Task(BaseModel):
+    id: str
+    path: str
+    args: str
+    kwargs: str
+
 
 F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384
@@ -52,7 +58,7 @@ class AsyncTask(_BaseTask):
 
     def __call__(self, f: F) -> F:
         path = self.validate(f)
-        stream = self.stream_name(Task(path=path))
+        stream = self.stream_name(Task(id='', path=path, args='', kwargs=''))
         vf = var_args(f)
 
         @self.receiver.group(Task, stream)

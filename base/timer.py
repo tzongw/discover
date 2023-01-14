@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from redis import Redis
-from google.protobuf.message import Message
-from google.protobuf.json_format import MessageToJson
 from datetime import timedelta
 from typing import Union
 from .utils import stream_name, timer_name
+from pydantic import BaseModel
 
 
 class Timer:
@@ -51,13 +50,13 @@ class Timer:
             return dict(zip(res[::2], res[1::2]))
         return res
 
-    def create(self, message: Message, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
+    def create(self, message: BaseModel, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
         if not self.registered:
             self.redis.function_load(self._SCRIPT, replace=True)
             self.registered = True
         stream = stream or stream_name(message)
-        data = MessageToJson(message)
+        data = message.json()
         if key is None:
             key = f'{timer_name(message)}:{data}'
         function = 'timer_xadd'

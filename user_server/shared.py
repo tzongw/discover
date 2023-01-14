@@ -2,7 +2,7 @@
 from common.shared import *
 from flask import Flask
 from base.cache import TTLCache
-from hash_pb2 import Session
+from models import Session
 from gevent.local import local
 
 app = Flask(__name__)
@@ -21,7 +21,7 @@ def session(uid: int):
     key = session_key(uid)
     with redis.pipeline() as pipe:
         parser = Parser(pipe)
-        parser.hget(key, Session())
+        parser.get(key, Session)
         pipe.ttl(key)
         return pipe.execute()
 

@@ -10,7 +10,6 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from dao import Account, Session
 from shared import app, parser, dispatcher, id_generator, session_cache, ctx
-import hash_pb2
 import gevent
 from gevent import pywsgi
 from config import options
@@ -20,6 +19,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyReques
 from base.utils import ListConverter
 from flasgger import Swagger
 from hashlib import sha1
+import models
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
@@ -145,7 +145,7 @@ def login(username: str, password: str):
         flask.session[CTX_TOKEN] = token
         flask.session.permanent = True
         key = session_key(account.id)
-        parser.hset(key, hash_pb2.Session(token=token), expire=app.permanent_session_lifetime)
+        parser.set(key, models.Session(token=token), ex=app.permanent_session_lifetime)
         return jsonify(account)
 
 

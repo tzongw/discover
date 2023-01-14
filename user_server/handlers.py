@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
-from common.mq_pb2 import Login, Logout, Alarm
+from common.message import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
     async_task, at_main
-from datetime import timedelta, datetime
+from datetime import timedelta
 from dao import Account
 
 
