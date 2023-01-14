@@ -69,7 +69,7 @@ M = TypeVar('M', bound=BaseModel)
 class Parser:
     def __init__(self, redis: Union[Redis, Pipeline]):
         self._redis = redis
-        redis.response_callbacks['GET'] = self.get_callback
+        redis.response_callbacks['GET'] = redis.response_callbacks['GETDEL'] = self.get_callback
         redis.response_callbacks['SET'] = self.set_callback
 
     @staticmethod
@@ -99,6 +99,12 @@ class Parser:
             return cls.parse_raw(value) if value is not None else None
 
         return self._redis.execute_command('GET', name, converter=converter)
+
+    def getdel(self, name: str, cls: Type[M]) -> Optional[M]:
+        def converter(value):
+            return cls.parse_raw(value) if value is not None else None
+
+        return self._redis.execute_command('GETDEL', name, converter=converter)
 
 
 class ListConverter(BaseConverter):
