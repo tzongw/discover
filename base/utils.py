@@ -70,13 +70,29 @@ class Parser:
     def __init__(self, redis: Union[Redis, Pipeline]):
         self._redis = redis
         redis.response_callbacks['GET'] = self.get_callback
+        redis.response_callbacks['SET'] = self.set_callback
 
     @staticmethod
     def get_callback(response, converter=None):
         return converter(response) if converter else response
 
-    def set(self, name: str, model: M, **kwargs):
-        return self._redis.set(name, model.json(), **kwargs)
+    @staticmethod
+    def set_callback(response, converter=None, **options):
+        return converter(response) if converter else Redis.RESPONSE_CALLBACKS['SET'](response, **options)
+
+    def set(self, name: str, model: M, **kwargs) -> Union[M, bool]:
+        response = self._redis.set(name, model.json(), **kwargs)
+        if kwargs.get('get'):
+            def converter(value):
+                cls = model.__class__
+                return cls.parse_raw(value) if value is not None else None
+
+            if response is self:  # pipeline command staged
+                _, options = self._redis.command_stack[-1]
+                options['converter'] = converter
+            else:
+                response = converter(response)
+        return response
 
     def get(self, name: str, cls: Type[M]) -> Optional[M]:
         def converter(value):

@@ -33,13 +33,9 @@ class Handler:
             session = shared.parser.get(session_key(uid), Session)
             if (session is None or session.token != token) and options.env != const.Environment.DEV:
                 raise ValueError("token error")
-            key = online_key(uid)
-            with redis.pipeline() as pipe:
-                parser = Parser(pipe)
-                parser.get(key, Online)
-                parser.set(key, Online(address=address, conn_id=conn_id), ex=const.CLIENT_TTL)
-                Publisher(pipe).publish(Login(uid=uid))
-                old_online, *_ = pipe.execute()
+            old_online = shared.parser.set(online_key(uid), Online(address=address, conn_id=conn_id),
+                                           ex=const.CLIENT_TTL, get=True)
+            shared.publisher.publish(Login(uid=uid))
             if old_online:
                 logging.warning(f'kick conn {uid} {old_online}')
                 with shared.gate_service.client(old_online.address) as client:
