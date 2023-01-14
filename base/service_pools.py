@@ -21,6 +21,7 @@ class ServicePools:
         self._good_addresses = []
         self._all_addresses = []  # same as addresses, but as a list
         registry.add_callback(self._clean_pools)
+        self._update_addresses()
 
     def addresses(self):
         return self._registry.addresses(self._name)

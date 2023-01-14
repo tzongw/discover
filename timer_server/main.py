@@ -24,7 +24,7 @@ import time
 
 
 class Handler:
-    _PREFIX = 'timer'
+    _PREFIX = 'TIMER'
     _KEY = 'key'
     _SERVICE = 'service'
     _DATA = 'data'
