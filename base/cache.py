@@ -5,7 +5,8 @@ from typing import TypeVar, Optional, Generic, Callable
 from concurrent.futures import Future
 import functools
 
-from .utils import SingleFlight, make_key
+from .utils import make_key
+from .single_flight import SingleFlight
 from .invalidator import Invalidator
 
 T = TypeVar('T')

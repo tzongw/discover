@@ -4,7 +4,7 @@ from typing import Union, Type, Optional, List, Dict
 from redis import Redis
 from redis.client import Pipeline
 
-from base.utils import M
+from .utils import M
 
 
 class Parser:

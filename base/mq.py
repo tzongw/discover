@@ -5,7 +5,7 @@ import uuid
 from typing import Type, Dict
 from redis import Redis
 from .utils import stream_name, var_args
-from . import Dispatcher
+from .dispatcher import Dispatcher
 from .executor import Executor
 from pydantic import BaseModel
 
