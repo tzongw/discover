@@ -2,8 +2,9 @@
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta
-from .utils import LogSuppress, Addr, ip_address, Parser, ListConverter, Proxy, SingleFlight, stream_name, \
+from .utils import LogSuppress, Addr, ip_address, ListConverter, Proxy, SingleFlight, stream_name, \
     run_in_thread
+from .parser import Parser
 from .snowflake import extract_datetime, from_datetime, IdGenerator
 from .chunk import chunks
 from .defer import deferrable, defer_if, defer

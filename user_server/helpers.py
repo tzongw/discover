@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from shared import online_key, redis, gate_service, parser
 from models import Online
-from base.utils import Parser
+from base import Parser
 
 
 def send(uid_or_uids, message):

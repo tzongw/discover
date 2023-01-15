@@ -15,7 +15,7 @@ from base.mq import Publisher
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key
 from config import options
-from base.utils import Parser
+from base import Parser
 
 
 class Handler:

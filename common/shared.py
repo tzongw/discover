@@ -8,11 +8,10 @@ from weakref import WeakKeyDictionary
 import sys
 import gevent
 from redis import Redis
-from base import Registry, LogSuppress, Dispatcher, snowflake, Receiver
+from base import Registry, LogSuppress, Dispatcher, snowflake, Receiver, Parser
 from base import Executor
 from base import Schedule
 from base import UniqueId
-from base import Parser
 from base import Publisher
 from base import Timer
 from base import Invalidator
