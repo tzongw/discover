@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from base import Executor
-from base.utils import var_args
+from .executor import Executor
+from .utils import var_args
 
 
 class Dispatcher:

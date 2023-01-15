@@ -5,9 +5,9 @@ from importlib import import_module
 from typing import TypeVar, Callable
 from gevent.local import local
 from redis import Redis
-from base.mq import Receiver, Publisher
-from base.timer import Timer
-from base.utils import timer_name, var_args
+from .mq import Receiver, Publisher
+from .timer import Timer
+from .utils import timer_name, var_args
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
@@ -53,7 +53,7 @@ class AsyncTask(_BaseTask):
 
     @staticmethod
     def stream_name(task: Task):
-        from base.utils import stream_name
+        from .utils import stream_name
         return f'{stream_name(task)}:{task.path}'
 
     def __call__(self, f: F) -> F:
