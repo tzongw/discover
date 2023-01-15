@@ -68,7 +68,7 @@ class Handler:
         return f'{cls._PREFIX}:{service_name}:{key}'
 
     def _fire_timer(self, key, service_name, data):
-        logging.debug(f'{key} {service_name} {data}')
+        logging.debug(f'{key} {service_name}')
         service = self._services.get(service_name)
         if not service:
             service = Service(self._registry, service_name)
@@ -78,7 +78,7 @@ class Handler:
             client.timeout(key, data)
 
     def call_later(self, key, service_name, data, delay):
-        logging.info(f'{key} {service_name} {data} {delay}')
+        logging.info(f'{key} {service_name} {delay}')
         full_key = self._full_key(key, service_name)
         self._delete_timer(full_key)
         deadline = time.time() + delay
@@ -94,7 +94,7 @@ class Handler:
 
     def call_repeat(self, key, service_name, data, interval):
         assert interval > 0
-        logging.info(f'{key} {service_name} {data} {interval}')
+        logging.info(f'{key} {service_name} {interval}')
         full_key = self._full_key(key, service_name)
         self._delete_timer(full_key)
         timer_info = TimerInfo(key=key, service=service_name, data=data, interval=interval)
