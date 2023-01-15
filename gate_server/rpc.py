@@ -70,8 +70,8 @@ def serve():
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     g = gevent.spawn(server.serve)
-    gevent.sleep(0.1)
     if not options.rpc_port:
+        gevent.sleep(0.01)
         options.rpc_port = transport.handle.getsockname()[1]
     logging.info(f'Starting rpc server {options.rpc_address} ...')
     return g

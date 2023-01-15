@@ -28,8 +28,8 @@ app.url_map.converters['list'] = ListConverter
 def serve():
     server = pywsgi.WSGIServer(options.http_port, app, log=logging.getLogger(), error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
-    gevent.sleep(0.1)
     if not options.http_port:
+        gevent.sleep(0.01)
         options.http_port = server.address[1]
     logging.info(f'Starting http server {options.http_address} ...')
     return g
