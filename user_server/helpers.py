@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
-from shared import online_key, redis, gate_service, parser
+from shared import online_key, gate_service, parser
 from models import Online
-from base import Parser
 
 
 def send(uid_or_uids, message):
     uids = [uid_or_uids] if isinstance(uid_or_uids, int) else uid_or_uids
     keys = [online_key(uid) for uid in uids]
-    with redis.pipeline() as pipe:
-        parser = Parser(pipe)
-        for key in keys:
-            parser.get(key, Online)
-        onlines = pipe.execute()
-    for online in onlines:
+    for online in parser.mget(keys, Online):
         if not online:
             continue
         with gate_service.client(online.address) as client:
@@ -35,16 +29,9 @@ def kick(uid, message=None):
         client.remove_conn(online.conn_id)
 
 
-def broadcast(group, message, exclude=None):
-    if exclude is None:
-        exclude = []
+def broadcast(group, message, *, exclude=()):
     keys = [online_key(uid) for uid in exclude]
-    with redis.pipeline() as pipe:
-        parser = Parser(pipe)
-        for key in keys:
-            parser.get(key, Online)
-        onlines = pipe.execute()
-    exclude = {online.conn_id for online in onlines if online}
+    exclude = {online.conn_id for online in parser.mget(keys, Online) if online}
     if isinstance(message, str):
         gate_service.broadcast_text(group, exclude, message)
     else:
