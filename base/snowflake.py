@@ -4,8 +4,8 @@ import time
 # twitter's snowflake parameters
 twepoch = 1288834974657
 datacenter_id_bits = 5
-worker_id_bits = 5
-sequence_id_bits = 12
+worker_id_bits = 10
+sequence_id_bits = 7
 timestamp_bits = 63 - datacenter_id_bits - worker_id_bits - sequence_id_bits
 
 max_timestamp = 1 << timestamp_bits
@@ -18,7 +18,7 @@ max_sequence_id = 1 << sequence_id_bits
 sequence_id_mask = max_sequence_id - 1
 
 
-def make_snowflake(timestamp_ms: int, datacenter_id: int, worker_id: int, sequence_id: int):
+def make(timestamp_ms: int, datacenter_id: int, worker_id: int, sequence_id: int):
     """generate a twitter-snowflake id, based on 
     https://github.com/twitter/snowflake/blob/master/src/main/scala/com/twitter/service/snowflake/IdWorker.scala
     :param: timestamp_ms time since UNIX epoch in milliseconds"""
@@ -58,7 +58,7 @@ def extract_datetime(snowflake_id):
 
 def from_datetime(dt: datetime):
     timestamp_ms = int(dt.timestamp() * 1000)
-    return make_snowflake(timestamp_ms, 0, 0, 0)
+    return make(timestamp_ms, 0, 0, 0)
 
 
 class IdGenerator:
@@ -75,16 +75,16 @@ class IdGenerator:
         if timestamp_ms == self._timestamp_ms:
             self._sequence_id += 1
         else:
+            self._timestamp_ms = timestamp_ms
             self._sequence_id = 0
-        self._timestamp_ms = timestamp_ms
-        return make_snowflake(timestamp_ms, self._datacenter_id, self._worker_id, self._sequence_id)
+        return make(timestamp_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
 
 if __name__ == '__main__':
     t0 = twepoch + 1234
     print(local_datetime(t0))
     args = (t0, 12, 23, 34)
-    assert melt(make_snowflake(*args)) == args
+    assert melt(make(*args)) == args
     g = IdGenerator(datacenter_id=1, worker_id=2)
     for _ in range(1000):
         uid = g.gen()
