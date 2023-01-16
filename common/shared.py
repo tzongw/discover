@@ -27,7 +27,6 @@ schedule = Schedule()
 dispatcher = Dispatcher(sep=':')
 
 app_name = options.app_name
-env = options.env
 registry = Registry(Redis.from_url(options.registry, decode_responses=True))
 
 redis = Redis.from_url(options.redis, decode_responses=True)

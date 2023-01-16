@@ -19,6 +19,11 @@ from base import LogSuppress
 def main():
     logging.info(f'{app_name} app id: {app_id}')
     workers = [rpc.serve(), api.serve()]
+    if options.env == const.Environment.DEV and options.back_port:
+        from gevent.backdoor import BackdoorServer
+        logging.info(f'Starting backdoor: {options.back_port}')
+        server = BackdoorServer(('127.0.0.1', options.back_port), locals={'shared': shared})
+        workers.append(gevent.spawn(server.serve_forever))
     setproctitle(f'{app_name}-{app_id}-{options.http_port}-{options.rpc_port}')
     shared.registry.start()
     shared.invalidator.start()
