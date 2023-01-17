@@ -34,7 +34,7 @@ class Parser:
         response = self._redis.set(name, model.json(), **kwargs)
         if kwargs.get('get'):
             convert = self._parser(model.__class__)
-            if response is self:  # pipeline command staged
+            if response is self._redis:  # pipeline command staged
                 _, options = self._redis.command_stack[-1]
                 options['convert'] = convert
             else:
