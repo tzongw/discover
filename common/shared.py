@@ -15,7 +15,7 @@ from base import UniqueId
 from base import Publisher
 from base import Timer
 from base import Invalidator
-from base.utils import func_desc
+from base.utils import func_desc, ip_address
 from . import const
 from .config import options
 import service
@@ -35,9 +35,10 @@ invalidator = Invalidator(redis)
 unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
-publisher = Publisher(redis, hint=str(app_id))
-receiver = Receiver(redis, group=app_name, consumer=str(app_id))
-timer = Timer(redis, hint=str(app_id))
+hint = f'{options.env.value}:{ip_address()}:{app_id}'
+publisher = Publisher(redis, hint=hint)
+receiver = Receiver(redis, group=app_name, consumer=hint)
+timer = Timer(redis, hint=hint)
 async_task = AsyncTask(timer, receiver)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 
