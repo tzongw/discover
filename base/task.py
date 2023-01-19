@@ -3,6 +3,7 @@ import logging
 import time
 from importlib import import_module
 from typing import TypeVar, Callable
+import functools
 from gevent.local import local
 from redis import Redis
 from .mq import Receiver, Publisher
@@ -73,6 +74,7 @@ class AsyncTask(_BaseTask):
             finally:
                 del self.local.task
 
+        @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{timer_name(Task)}:{path}:{args}:{kwargs}', path=path, args=dumps(args),
                         kwargs=dumps(kwargs))
@@ -110,6 +112,7 @@ class HeavyTask(_BaseTask):
         path = self.validate(f)
         assert not path.startswith('__main__')  # __main__ is different in another process
 
+        @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
             task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=dumps(args), kwargs=dumps(kwargs))
             if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:

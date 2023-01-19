@@ -17,7 +17,7 @@ class Result(Flag):
 
 def deferrable(f):
     @functools.wraps(f)
-    def inner(*args, **kwargs):
+    def wrapper(*args, **kwargs):
         if not hasattr(_local, 'stacks'):
             _local.stacks = []
         stacks = _local.stacks
@@ -29,7 +29,7 @@ def deferrable(f):
             _local.result = result
             return result
 
-    return inner
+    return wrapper
 
 
 def defer(f: Callable, *args, **kwargs):
