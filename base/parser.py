@@ -60,7 +60,7 @@ class Parser:
         return items
 
     def mset(self, mapping: Dict[str, M]) -> bool:
-        return self._redis.execute_command('MSET', self._pieces(mapping))
+        return self._redis.execute_command('MSET', *self._pieces(mapping))
 
     def msetnx(self, mapping: Dict[str, M]) -> bool:
-        return self._redis.execute_command('MSETNX', self._pieces(mapping))
+        return self._redis.execute_command('MSETNX', *self._pieces(mapping))
