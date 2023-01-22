@@ -91,8 +91,9 @@ class Cache(Generic[T]):
                 return
             key = key.split(invalidator.sep, maxsplit=1)[1]
             if handler:
-                key = handler(key, *args, **kwargs)
-                if key is not None:
+                key_or_keys = handler(key, *args, **kwargs)
+                keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
+                for key in keys:
                     self.lru.pop(key, None)
             else:
                 key = type(next(iter(self.lru)))(key)
