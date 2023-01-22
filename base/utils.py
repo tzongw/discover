@@ -4,7 +4,7 @@ import socket
 from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
-from typing import TypeVar, Type, Union
+from typing import Type, Union
 from werkzeug.routing import BaseConverter
 from random import choice
 from collections import defaultdict
@@ -58,9 +58,6 @@ def var_args(f: Callable):
         f(*args, **kwargs)
 
     return wrapper
-
-
-M = TypeVar('M', bound=BaseModel)
 
 
 class ListConverter(BaseConverter):

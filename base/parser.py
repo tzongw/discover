@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from typing import Union, Type, Optional, List, Dict
-
+from typing import Union, Type, Optional, List, Dict, TypeVar
 from redis import Redis
 from redis.client import Pipeline
+from pydantic import BaseModel
 
-from .utils import M
+M = TypeVar('M', bound=BaseModel)
 
 
 class Parser:
