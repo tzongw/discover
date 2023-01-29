@@ -87,7 +87,6 @@ class Client:
         idle_timeout = False
         try:
             while True:
-                idle_timeout = False
                 message = self.messages.get(timeout=timeout)
                 if message is None:
                     break
