@@ -32,7 +32,7 @@ class Pool:
     def _get(self):
         pool = self._pool
         if not pool.empty() or self._size >= self._maxsize:
-            return pool.get(timeout=self._timeout)
+            return pool.get(block=self._timeout > 0, timeout=self._timeout)
 
         self._size += 1
         try:

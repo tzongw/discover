@@ -87,7 +87,7 @@ class Client:
         idle_timeout = False
         try:
             while True:
-                message = self.messages.get(timeout=timeout)
+                message = self.messages.get(block=timeout > 0, timeout=timeout)
                 if message is None:
                     break
                 if message is self.ping_message:

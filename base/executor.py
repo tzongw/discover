@@ -81,7 +81,7 @@ class Executor:
     def _worker(self):
         try:
             while True:
-                item = self._items.get(timeout=self._idle)  # type: _WorkItem
+                item = self._items.get(block=self._idle > 0, timeout=self._idle)  # type: _WorkItem
                 if self._overload and self._items.qsize() <= self._max_workers / 2:
                     self._overload = False
                     logging.warning(f'underload {self} {item}')
