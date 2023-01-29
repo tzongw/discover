@@ -89,4 +89,4 @@ if __name__ == '__main__':
     for _ in range(1000):
         uid = g.gen()
         args = melt(uid)
-        print(local_datetime(args[0]), args)
+        print(uid, local_datetime(args[0]), args)
