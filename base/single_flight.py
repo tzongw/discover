@@ -34,14 +34,15 @@ class SingleFlight:
             try:
                 values = self._mget(missed_keys, *args, **kwargs)
                 assert len(missed_keys) == len(values)
-                for key, value in zip(missed_keys, values):
-                    made_key = make_key(key, *args, **kwargs)
-                    fut = self._futures.pop(made_key)
-                    fut.set_result(value)
             except Exception as e:
                 for key in missed_keys:
                     made_key = make_key(key, *args, **kwargs)
                     fut = self._futures.pop(made_key)
                     fut.set_exception(e)
                 raise
+            else:
+                for key, value in zip(missed_keys, values):
+                    made_key = make_key(key, *args, **kwargs)
+                    fut = self._futures.pop(made_key)
+                    fut.set_result(value)
         return [fut.result() for fut in futures]

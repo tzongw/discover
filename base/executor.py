@@ -29,6 +29,8 @@ class _WorkItem:
             self.future.set_exception(exc)
         else:
             self.future.set_result(result)
+        finally:
+            self.future = None
 
     def __str__(self):
         return func_desc(self.fn)
