@@ -58,7 +58,7 @@ class Executor:
         t = time.time() - start
         if t > self._slow_log:
             logging.warning(f'slow put {t} {self} {item}')
-        if not self._overload and self._items.qsize() >= self._max_workers * 1.5:
+        if not self._overload and self._items.qsize() >= self._max_workers * 2:
             self._overload = True
             logging.warning(f'overload {self} {item}')
         return fut
@@ -84,7 +84,7 @@ class Executor:
         try:
             while True:
                 item = self._items.get(block=self._idle > 0, timeout=self._idle)  # type: _WorkItem
-                if self._overload and self._items.qsize() <= self._max_workers / 2:
+                if self._overload and self._items.qsize() <= self._max_workers // 2:
                     self._overload = False
                     logging.warning(f'underload {self} {item}')
                 start = time.time()
