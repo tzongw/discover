@@ -50,7 +50,7 @@ class Registry:
     def register(self, services):
         logging.info(f'register {services}')
         self._services.update(services)
-        self._unregister()
+        self._unregister()  # remove first in case process restarting
 
     def _unregister(self):
         if not self._services:
