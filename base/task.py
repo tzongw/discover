@@ -15,10 +15,9 @@ from yaml import safe_load as loads
 
 
 class Task(BaseModel):
-    id: str
     path: str
-    args: str
-    kwargs: str
+    args: str = dumps(())
+    kwargs: str = dumps({})
 
 
 F = TypeVar('F', bound=Callable)
@@ -57,14 +56,18 @@ class AsyncTask(_BaseTask):
         from .utils import stream_name
         return f'{stream_name(task)}:{task.path}'
 
+    @staticmethod
+    def task_id(task: Task):
+        return f'{timer_name(Task)}:{task}'
+
     def __call__(self, f: F) -> F:
         path = self.validate(f)
-        stream = self.stream_name(Task(id='', path=path, args='', kwargs=''))
+        stream = self.stream_name(Task(path=path))
         vf = var_args(f)
 
         @self.receiver.group(Task, stream)
         def handler(task: Task, sid):
-            logging.debug(f'got task {sid} {task.id} {task.path}')
+            logging.debug(f'got task {sid} {task}')
             args = loads(task.args)  # type: list
             kwargs = loads(task.kwargs)  # type: dict
             self.local.task = task
@@ -76,25 +79,25 @@ class AsyncTask(_BaseTask):
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(id=f'{timer_name(Task)}:{path}:{args}:{kwargs}', path=path, args=dumps(args),
-                        kwargs=dumps(kwargs))
+            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
             if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
-                logging.warning(f'task parameters too big {task.path}')
+                logging.warning(f'task parameters too big {task}')
             return task
 
         wrapper.wrapped = f
         return wrapper
 
-    def post(self, task: Task, interval, loop=False, do_hint=True):
+    def post(self, task: Task, interval, *, loop=False, task_id=None, do_hint=True):
+        key = task_id or self.task_id(task)
         stream = self.stream_name(task)
-        return self.timer.create(task, interval, loop, key=task.id, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
+        return self.timer.create(task, interval, loop=loop, key=key, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 
     @property
     def current_task(self):
         return self.local.task
 
     def cancel(self, task_id=None):
-        return self.timer.kill(task_id or self.current_task.id)
+        return self.timer.kill(task_id or self.task_id(self.current_task))
 
     def publish(self, task=None, do_hint=True):
         task = task or self.current_task
@@ -114,16 +117,16 @@ class HeavyTask(_BaseTask):
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
-            task = Task(id=f'{path}:{args}:{kwargs}', path=path, args=dumps(args), kwargs=dumps(kwargs))
+            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
             if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
-                logging.warning(f'task parameters too big {task.path}')
+                logging.warning(f'task parameters too big {task}')
             return task
 
         wrapper.wrapped = f
         return wrapper
 
     def push(self, task: Task):
-        logging.info(f'+task {task.id} {task.path}')
+        logging.info(f'+task {task}')
         self.redis.rpush(self.key, task.json())
 
     def pop(self, *, timeout=0, block=True):
@@ -136,12 +139,11 @@ class HeavyTask(_BaseTask):
     @staticmethod
     def parse(value):
         task = Task.parse_raw(value)
-        logging.info(f'-task {task.id} {task.path}')
         return task
 
     @staticmethod
     def exec(task: Task):
-        logging.info(f'doing task {task.id} {task.path}')
+        logging.info(f'doing task {task}')
         index = task.path.rindex('.')
         module = import_module(task.path[:index])
         func = getattr(module, task.path[index + 1:]).wrapped
@@ -149,5 +151,5 @@ class HeavyTask(_BaseTask):
         kwargs = loads(task.kwargs)  # type: dict
         start = time.time()
         r = func(*args, **kwargs)
-        logging.info(f'done task {task.id} {task.path} {time.time() - start}')
+        logging.info(f'done task {task} {time.time() - start}')
         return r

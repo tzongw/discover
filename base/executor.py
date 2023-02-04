@@ -25,7 +25,7 @@ class _WorkItem:
         try:
             result = self.fn(*self.args, **self.kwargs)
         except BaseException as exc:
-            logging.exception(f'')
+            logging.exception(f'{self}')
             self.future.set_exception(exc)
         else:
             self.future.set_result(result)
@@ -33,7 +33,7 @@ class _WorkItem:
             self.future = None
 
     def __str__(self):
-        return func_desc(self.fn)
+        return f'{func_desc(self.fn)}:{self.args}:{self.kwargs}'
 
 
 class Executor:

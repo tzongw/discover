@@ -50,7 +50,7 @@ class Timer:
             return dict(zip(res[::2], res[1::2]))
         return res
 
-    def create(self, message: BaseModel, interval: Union[int, timedelta], loop=False, key=None, maxlen=4096,
+    def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
         if not self.registered:
             self.redis.function_load(self._SCRIPT, replace=True)
