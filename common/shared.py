@@ -49,6 +49,10 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 _exits = [registry.stop, receiver.stop]
 _mains = []
 
+if options.env == const.Environment.DEV:
+    # in dev, run in worker to debug
+    HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
+
 
 @dataclass
 class Status:
@@ -100,7 +104,7 @@ def spawn_worker(f, *args, **kwargs):
         if t > const.SLOW_WORKER:
             logging.warning(f'slow worker {t} {desc}')
 
-    g = gevent.spawn(worker, *args, **kwargs)
+    g = gevent.spawn(worker)
     _workers[g] = desc
 
 
