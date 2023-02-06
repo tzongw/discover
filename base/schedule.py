@@ -73,27 +73,27 @@ class PeriodicCallback:
     __slots__ = ["_schedule", "_callback", "_period", "_handle"]
 
     def __init__(self, schedule: Schedule, callback: Callable, period: Union[int, float, timedelta]):
+        if isinstance(period, timedelta):
+            period = period.total_seconds()
         assert callable(callback) and period > 0
         self._schedule = schedule
         self._callback = callback
         self._period = period
         self._handle = None  # type: Optional[Handle]
-        self.start()
+        self._schedule_next()
 
     def _run(self):
-        with LogSuppress(Exception):
-            self._callback()
+        if self._callback:
+            with LogSuppress(Exception):
+                self._callback()
         if self._handle:
             self._schedule_next()
 
     def _schedule_next(self):
         self._handle = self._schedule.call_later(self._run, self._period)
 
-    def start(self):
-        if self._handle is None:
-            self._schedule_next()
-
     def stop(self):
+        self._callback = None
         if self._handle:
             self._handle.cancel()
             self._handle = None
