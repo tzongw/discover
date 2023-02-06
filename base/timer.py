@@ -17,8 +17,14 @@ class Timer:
           return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
         end
         
+        local function timer_tick(keys, args)
+          local tick = redis.call('INCR', keys[1])
+          return redis.call('XADD', keys[2], 'MAXLEN', '~', 1, '*', '', tick)
+        end
+        
         redis.register_function('timer_xadd', timer_xadd)
         redis.register_function('timer_xadd_hint', timer_xadd_hint)
+        redis.register_function('timer_tick', timer_tick)
     """
 
     def __init__(self, redis: Redis, hint=None):
@@ -66,3 +72,7 @@ class Timer:
             keys_and_args.append(self.hint)
         self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
         return key
+
+    def tick(self, key, interval: Union[int, timedelta], counter, stream):
+        keys_and_args = [counter, stream]
+        return self.new(key, 'timer_tick', interval, loop=True, num_keys=2, keys_and_args=keys_and_args)

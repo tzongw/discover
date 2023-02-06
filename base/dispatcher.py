@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
+from datetime import timedelta
 
 from .executor import Executor
 from .utils import var_args
@@ -28,3 +29,21 @@ class Dispatcher:
             return f
 
         return decorator
+
+
+class ModDispatcher(Dispatcher):
+    def __init__(self, executor=None):
+        super().__init__(executor=executor or Executor(name='mod_dispatch'))
+
+    def dispatch(self, key, *args, **kwargs):
+        for factor, handles in self.handlers.items():
+            if key % factor:
+                continue
+            for handle in handles:
+                self._executor.submit(handle, *args, **kwargs)
+
+    def handler(self, factor: [int, timedelta]):
+        if isinstance(factor, timedelta):
+            factor = int(factor.total_seconds())
+        assert isinstance(factor, int) and factor > 0
+        return super().handler(factor)

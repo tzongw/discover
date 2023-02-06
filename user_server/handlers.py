@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
+import const
 from common.messages import Login, Logout, Alarm
-from shared import dispatcher, receiver, timer_service, const, at_exit, redis, registry, timer, invalidator, \
-    async_task, at_main
+from shared import dispatcher, receiver, timer_service, at_exit, redis, registry, timer, invalidator, \
+    async_task, at_main, tick
 from datetime import timedelta
 from dao import Account
 
@@ -42,6 +43,11 @@ def session_invalidate(key):
     logging.info(key)
 
 
+@tick.handler(timedelta(seconds=10))
+def on_10s():
+    logging.info('tick')
+
+
 @async_task
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
@@ -64,3 +70,5 @@ def init():
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
+        timer.tick(const.TICK_TIMER, timedelta(seconds=1), const.TICK_COUNTER, const.TICK_STREAM)
+        at_exit(lambda: timer.kill(const.TICK_TIMER))

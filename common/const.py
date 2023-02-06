@@ -9,6 +9,10 @@ APP_GATE = 'gate'
 APP_TIMER = 'timer'
 APP_RELOAD = 'reload'
 
+TICK_STREAM = 'stream:tick'
+TICK_COUNTER = 'counter:tick'
+TICK_TIMER = 'timer:tick'
+
 RPC_USER = f'rpc_{APP_USER}'
 HTTP_USER = f'http_{APP_USER}'
 RPC_TIMER = f'rpc_{APP_TIMER}'

@@ -66,8 +66,7 @@ class AsyncTask(_BaseTask):
         vf = var_args(f)
 
         @self.receiver.group(Task, stream)
-        def handler(task: Task, sid):
-            logging.debug(f'got task {sid} {task}')
+        def handler(task: Task):
             args = loads(task.args)  # type: list
             kwargs = loads(task.kwargs)  # type: dict
             self.local.task = task

@@ -26,11 +26,10 @@ class Publisher:
 
 class ProtoDispatcher(Dispatcher):
     def handler(self, key_or_cls, stream=None):
-        if isinstance(key_or_cls, str):
+        if not isinstance(key_or_cls, type) or not issubclass(key_or_cls, BaseModel):
             return super().handler(key_or_cls)
 
-        assert issubclass(key_or_cls, BaseModel)
-        message_cls = key_or_cls  # type: Type[BaseModel]
+        message_cls = key_or_cls
         key = stream or stream_name(message_cls)
         super_handler = super().handler
 

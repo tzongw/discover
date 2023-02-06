@@ -15,6 +15,7 @@ from base import UniqueId
 from base import Publisher
 from base import Timer
 from base import Invalidator
+from base import ModDispatcher
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
@@ -25,6 +26,7 @@ from base import AsyncTask, HeavyTask
 executor = Executor(name='shared')
 schedule = Schedule()
 dispatcher = Dispatcher(sep=':')
+tick = ModDispatcher()
 
 app_name = options.app_name
 registry = Registry(Redis.from_url(options.registry, decode_responses=True))
@@ -52,6 +54,12 @@ _mains = []
 if options.env == const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
+
+
+@receiver.group(const.TICK_STREAM)
+def _on_tick(data: dict):
+    counter = int(data.pop(''))
+    tick.dispatch(counter)
 
 
 @dataclass
