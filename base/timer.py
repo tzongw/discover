@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from redis import Redis
+from redis import Redis, RedisCluster
 from datetime import timedelta
 from typing import Union
 
@@ -29,7 +29,7 @@ class Timer:
         redis.register_function('timer_tick', timer_tick)
     """
 
-    def __init__(self, redis: Redis, hint=None):
+    def __init__(self, redis: RedisCluster, hint=None):
         self.redis = redis
         self.hint = hint
         self.registered = False
@@ -64,8 +64,11 @@ class Timer:
     def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
         if not self.registered:
-            self.redis.function_load(self._SCRIPT, replace=True)
-            self.registered = True
+            for node in self.redis.get_primaries():
+                redis = Redis(host=node.host, port=node.port)
+                redis.function_load(self._SCRIPT, replace=True)
+                redis.close()
+                self.registered = True
         stream = stream or stream_name(message)
         data = message.json()
         if key is None:
