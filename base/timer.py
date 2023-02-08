@@ -64,11 +64,8 @@ class Timer:
     def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
         if not self.registered:
-            for node in self.redis.get_primaries():
-                redis = Redis(host=node.host, port=node.port)
-                redis.function_load(self._SCRIPT, replace=True)
-                redis.close()
-                self.registered = True
+            self.redis.function_load(self._SCRIPT, replace=True)
+            self.registered = True
         stream = stream or stream_name(message)
         data = message.json()
         if key is None:
