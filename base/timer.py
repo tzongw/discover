@@ -30,9 +30,9 @@ class Timer:
     """
 
     def __init__(self, redis: RedisCluster, hint=None):
+        redis.function_load(self._SCRIPT, replace=True)
         self.redis = redis
         self.hint = hint
-        self.registered = False
 
     def new(self, key: str, function: str, interval: Union[int, timedelta], loop: bool, num_keys: int,
             keys_and_args):
@@ -63,9 +63,6 @@ class Timer:
 
     def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
-        if not self.registered:
-            self.redis.function_load(self._SCRIPT, replace=True)
-            self.registered = True
         stream = stream or stream_name(message)
         data = message.json()
         if key is None:
