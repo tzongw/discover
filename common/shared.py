@@ -7,7 +7,7 @@ from typing import Union
 from weakref import WeakKeyDictionary
 import sys
 import gevent
-from redis import Redis
+from redis import Redis, RedisCluster
 from base import Registry, LogSuppress, Dispatcher, snowflake, Receiver, Parser
 from base import Executor
 from base import Schedule
@@ -32,15 +32,16 @@ app_name = options.app_name
 registry = Registry(Redis.from_url(options.registry, decode_responses=True))
 
 redis = Redis.from_url(options.redis, decode_responses=True)
+redis_cluster = RedisCluster.from_url('redis://localhost:7001', decode_responses=True)
 parser = Parser(redis)
 invalidator = Invalidator(redis)
 unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
-publisher = Publisher(redis, hint=hint)
-receiver = Receiver(redis, group=app_name, consumer=hint)
-timer = Timer(redis, hint=hint)
+publisher = Publisher(redis_cluster, hint=hint)
+receiver = Receiver(redis_cluster, group=app_name, consumer=hint)
+timer = Timer(redis_cluster, hint=hint)
 async_task = AsyncTask(timer, receiver)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 
@@ -54,6 +55,24 @@ _mains = []
 if options.env == const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
+
+clusters = 8
+
+
+def all_clustered(name: str):
+    assert not name.startswith('{')
+    return [f'{{{str(i)}}}:{name}' for i in range(clusters)]
+
+
+def clustered(name: str, node=None):
+    assert not name.startswith('{')
+    node = node if node is not None else hash(name) % clusters
+    return f'{{{node}}}:{name}'
+
+
+def normalized(name: str):
+    assert name.startswith('{')
+    return name[name.index(':') + 1:]
 
 
 @receiver.group(const.TICK_STREAM)

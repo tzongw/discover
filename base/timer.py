@@ -2,6 +2,8 @@
 from redis import Redis
 from datetime import timedelta
 from typing import Union
+
+from common.shared import clustered, clusters
 from .utils import stream_name, timer_name
 from pydantic import BaseModel
 
@@ -45,12 +47,15 @@ class Timer:
         return self.redis.execute_command('TIMER.NEW', *params)
 
     def kill(self, key):
+        key = clustered(key)
         return self.redis.execute_command('TIMER.KILL', key)
 
     def exists(self, key: str):
+        key = clustered(key)
         return self.redis.exists(key)
 
     def info(self, key: str):
+        key = clustered(key)
         res = self.redis.execute_command('TIMER.INFO', key)
         if isinstance(res, list):
             return dict(zip(res[::2], res[1::2]))
@@ -65,14 +70,17 @@ class Timer:
         data = message.json()
         if key is None:
             key = f'{timer_name(message)}:{data}'
+        node = hash(key) % clusters
         function = 'timer_xadd'
-        keys_and_args = [stream, data, maxlen]
+        keys_and_args = [clustered(stream, node), data, maxlen]
         if do_hint and self.hint:
             function = 'timer_xadd_hint'
             keys_and_args.append(self.hint)
-        self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
+        self.new(clustered(key, node), function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
         return key
 
     def tick(self, key, interval: Union[int, timedelta], counter, stream):
-        keys_and_args = [counter, stream]
-        return self.new(key, 'timer_tick', interval, loop=True, num_keys=2, keys_and_args=keys_and_args)
+        node = hash(key) % clusters
+        keys_and_args = [clustered(counter, node), clustered(stream, node)]
+        return self.new(clustered(key, node), 'timer_tick', interval, loop=True, num_keys=2,
+                        keys_and_args=keys_and_args)
