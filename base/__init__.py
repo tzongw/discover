@@ -1,4 +1,25 @@
 # -*- coding: utf-8 -*-
+
+
+clusters = 3
+
+
+def all_clustered(name: str):
+    assert not name.startswith('{')
+    return [f'{{{str(i)}}}:{name}' for i in range(clusters)]
+
+
+def clustered(name: str, node=None):
+    assert not name.startswith('{')
+    node = node if node is not None else hash(name) % clusters
+    return f'{{{node}}}:{name}'
+
+
+def normalized(name: str):
+    assert name.startswith('{')
+    return name[name.index(':') + 1:]
+
+
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta

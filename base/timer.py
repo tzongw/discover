@@ -3,7 +3,7 @@ from redis import Redis
 from datetime import timedelta
 from typing import Union
 
-from common.shared import clustered, clusters
+from base import clustered, clusters
 from .utils import stream_name, timer_name
 from pydantic import BaseModel
 

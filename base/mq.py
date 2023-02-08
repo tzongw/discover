@@ -5,7 +5,7 @@ import uuid
 from typing import Dict
 from redis import Redis
 
-from common.shared import clustered, all_clustered
+from base import clustered, all_clustered, normalized
 from .utils import stream_name, var_args
 from .dispatcher import Dispatcher
 from .executor import Executor
@@ -58,7 +58,7 @@ class Receiver:
         self.redis = redis
         self._group = group
         self._consumer = consumer
-        self._wakers = all_clustered(f'waker:{self._group}:{self._consumer}')
+        self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
         self._group_dispatcher = ProtoDispatcher(
             executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
@@ -76,14 +76,13 @@ class Receiver:
         return self._fanout_dispatcher.handler
 
     def start(self):
-        for waker in self._wakers:
-            @self.group(waker)
-            def group_wakeup(data, sid):
-                logging.info(f'{sid} {data}')
+        @self.group(self._waker)
+        def group_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
 
-            @self.fanout(waker)
-            def fanout_wakeup(data, sid):
-                logging.info(f'{sid} {data}')
+        @self.fanout(self._waker)
+        def fanout_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
 
         with self.redis.pipeline(transaction=False) as pipe:
             for stream in self._group_dispatcher.handlers:
@@ -103,7 +102,7 @@ class Receiver:
         logging.info(f'stop')
         self._stopped = True
         with self.redis.pipeline(transaction=False) as pipe:
-            for waker in self._wakers:
+            for waker in all_clustered(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
             for stream in self._group_dispatcher.handlers:
@@ -111,7 +110,7 @@ class Receiver:
                     pipe.xgroup_delconsumer(name, self._group, self._consumer)
             pipe.execute(raise_on_error=False)
         logging.info(f'delete consumers {self._group_dispatcher.handlers.keys()}')
-        logging.info(f'delete wakers {self._wakers}')
+        logging.info(f'delete waker {self._waker}')
 
     def _group_run(self):
         def run(streams):
@@ -123,7 +122,7 @@ class Receiver:
                                                    noack=True)
                     for stream, messages in result:
                         for message in messages:
-                            self._group_dispatcher.dispatch(stream, *message[::-1])
+                            self._group_dispatcher.dispatch(normalized(stream), *message[::-1])
                 except Exception:
                     logging.exception(f'')
                     gevent.sleep(1)
@@ -133,21 +132,18 @@ class Receiver:
             gevent.spawn(run, names)
 
     def _fanout_run(self):
-        with self.redis.pipeline(transaction=False) as pipe:
-            stream_names = self._fanout_dispatcher.handlers.keys()
-            for stream in stream_names:
-                pipe.xinfo_stream(stream)
-            last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
-        stream_last_ids = dict(zip(stream_names, last_ids))
-
         def run(streams):
-            streams = {stream: stream_last_ids[stream] for stream in streams}
+            with self.redis.pipeline(transaction=False) as pipe:
+                for stream in streams:
+                    pipe.xinfo_stream(stream)
+                last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
+            streams = dict(zip(streams, last_ids))
             while not self._stopped:
                 try:
                     result = self.redis.xread(streams, count=self._batch, block=0)
                     for stream, messages in result:
                         for message in messages:
-                            self._fanout_dispatcher.dispatch(stream, *message[::-1])
+                            self._fanout_dispatcher.dispatch(normalized(stream), *message[::-1])
                             if stream in streams:  # may removed in dispatch
                                 streams[stream] = message[0]  # update last id
                 except Exception:

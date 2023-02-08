@@ -56,24 +56,6 @@ if options.env == const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
-clusters = 8
-
-
-def all_clustered(name: str):
-    assert not name.startswith('{')
-    return [f'{{{str(i)}}}:{name}' for i in range(clusters)]
-
-
-def clustered(name: str, node=None):
-    assert not name.startswith('{')
-    node = node if node is not None else hash(name) % clusters
-    return f'{{{node}}}:{name}'
-
-
-def normalized(name: str):
-    assert name.startswith('{')
-    return name[name.index(':') + 1:]
-
 
 @receiver.group(const.TICK_STREAM)
 def _on_tick(data: dict):
