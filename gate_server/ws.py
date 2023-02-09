@@ -35,7 +35,7 @@ def serve():
 class Client:
     ping_message = object()
 
-    __slots__ = ["conn_id", "context", "ws", "messages", "groups", "writing"]
+    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing']
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -117,7 +117,7 @@ class Client:
         self.context[key] = value
 
     def unset_context(self, key, value):
-        if self.context.get(key) == value or value == "":
+        if not value or self.context.get(key) == value:
             self.context.pop(key, None)
 
 
