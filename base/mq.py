@@ -150,4 +150,4 @@ class Receiver:
     def remove(self, stream):
         self._group_streams.pop(stream, None)
         self._fanout_streams.pop(stream, None)
-        self.redis.xadd(self._waker, {'wake': 'up'})
+        self.redis.xadd(self._waker, {'wake': 'up'}, maxlen=1)

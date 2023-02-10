@@ -19,13 +19,12 @@ class Timer:
         
         local function timer_tick(keys, args)
             local cur_ts = tonumber(redis.call('TIME')[1])
-            local tick_ts = tonumber(redis.call('GET', keys[1])) or cur_ts
+            local tick_ts = tonumber(redis.call('SET', keys[1], cur_ts, 'GET')) or cur_ts
             local init_ts = math.max(tick_ts + 1, cur_ts - args[1])
             for ts = init_ts, cur_ts
             do
                 redis.call('XADD', keys[2], 'MAXLEN', '~', args[2], '*', '', ts)
             end
-            redis.call('SET', keys[1], cur_ts)
             return math.max(cur_ts - init_ts + 1, 0)
         end
         
