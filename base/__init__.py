@@ -12,7 +12,7 @@ from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool
 from .executor import Executor
-from .dispatcher import Dispatcher, ModDispatcher
+from .dispatcher import Dispatcher, TimeDispatcher
 from .schedule import Schedule
 from .invalidator import Invalidator
 from .mq import Receiver, Publisher

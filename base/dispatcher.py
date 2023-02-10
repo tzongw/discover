@@ -31,13 +31,13 @@ class Dispatcher:
         return decorator
 
 
-class ModDispatcher(Dispatcher):
+class TimeDispatcher(Dispatcher):
     def __init__(self, executor=None):
         super().__init__(executor=executor or Executor(name='mod_dispatch'))
 
-    def dispatch(self, key, *args, **kwargs):
+    def dispatch(self, ts, *args, **kwargs):
         for factor, handles in self.handlers.items():
-            if key % factor:
+            if ts % factor:
                 continue
             for handle in handles:
                 self._executor.submit(handle, *args, **kwargs)

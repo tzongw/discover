@@ -70,5 +70,5 @@ def init():
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
-        timer.tick(const.TICK_TIMER, timedelta(seconds=1), const.TICK_COUNTER, const.TICK_STREAM)
+        timer.tick(const.TICK_TIMER, timedelta(seconds=1), const.TICK_TS, const.TICK_STREAM)
         at_exit(lambda: timer.kill(const.TICK_TIMER))

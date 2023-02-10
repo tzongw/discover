@@ -10,16 +10,23 @@ class Timer:
     _PREFIX = 'timer'
     _SCRIPT = """#!lua name=timer
         local function timer_xadd(keys, args)
-          return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
+            return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
         end
         
         local function timer_xadd_hint(keys, args)
-          return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
+            return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
         end
         
         local function timer_tick(keys, args)
-          local tick = redis.call('INCR', keys[1])
-          return redis.call('XADD', keys[2], 'MAXLEN', '~', 1, '*', '', tick)
+            local cur_ts = tonumber(redis.call('TIME')[1])
+            local tick_ts = tonumber(redis.call('GET', keys[1])) or cur_ts
+            local init_ts = math.max(tick_ts + 1, cur_ts - 300) 
+            for ts = init_ts, cur_ts
+            do
+                redis.call('XADD', keys[2], 'MAXLEN', '~', 1024, '*', '', ts)
+            end
+            redis.call('SET', keys[1], cur_ts)
+            return math.max(cur_ts - init_ts + 1, 0)
         end
         
         redis.register_function('timer_xadd', timer_xadd)
