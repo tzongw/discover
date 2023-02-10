@@ -81,7 +81,7 @@ class TimeDispatcher:
     def crontab(self, *, year=None, month=None, day=None, hour=None, minute=None, second=None, weekday=None):
         cron = _Crontab(year, month, day, hour, minute, second, weekday)
         for value in cron.__dict__.values():
-            assert value is None or isinstance(value, int) or iter(value)
+            assert value is None or isinstance(value, int) or -1 not in value  # supports `in`
 
         def decorator(f):
             self._crontab_handlers.append([cron, var_args(f)])
