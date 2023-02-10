@@ -4,7 +4,7 @@ import const
 from common.messages import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, redis, registry, timer, invalidator, \
     async_task, at_main, tick
-from datetime import timedelta
+from datetime import timedelta, datetime
 from dao import Account
 
 
@@ -52,6 +52,11 @@ def on_10s():
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
     async_task.cancel()
+
+
+@tick.crontab(second=range(0, 60, 15))
+def on_quarter(dt: datetime):
+    logging.info(f'quarter {dt}')
 
 
 @at_main
