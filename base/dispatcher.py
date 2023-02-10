@@ -33,7 +33,7 @@ class Dispatcher:
 
 class TimeDispatcher(Dispatcher):
     def __init__(self, executor=None):
-        super().__init__(executor=executor or Executor(name='mod_dispatch'))
+        super().__init__(executor=executor or Executor(name='time_dispatch'))
 
     def dispatch(self, ts, *args, **kwargs):
         for factor, handles in self.handlers.items():
