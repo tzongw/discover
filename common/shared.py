@@ -39,8 +39,8 @@ app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
 publisher = Publisher(redis, hint=hint)
-receiver = Receiver(redis, group=app_name, consumer=hint)
 timer = Timer(redis, hint=hint)
+receiver = Receiver(redis, group=app_name, consumer=str(app_id))
 async_task = AsyncTask(timer, receiver)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 
