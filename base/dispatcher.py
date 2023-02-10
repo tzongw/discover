@@ -54,26 +54,26 @@ class _Crontab:
 class TimeDispatcher:
     def __init__(self, executor=None):
         self._executor = executor or Executor(name='time_dispatch')
-        self._factor_handlers = []
+        self._periodic_handlers = []
         self._crontab_handlers = []
 
     def dispatch(self, ts: int):
         dt = datetime.fromtimestamp(ts)
-        for factor, handle in self._factor_handlers:
-            if ts % factor == 0:
+        for period, handle in self._periodic_handlers:
+            if ts % period == 0:
                 self._executor.submit(handle, dt)
         now = _Crontab(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.weekday())
         for cron, handle in self._crontab_handlers:
             if now in cron:
                 self._executor.submit(handle, dt)
 
-    def handler(self, factor: [int, timedelta]):
-        if isinstance(factor, timedelta):
-            factor = int(factor.total_seconds())
-        assert isinstance(factor, int) and factor > 0
+    def periodic(self, period: [int, timedelta]):
+        if isinstance(period, timedelta):
+            period = int(period.total_seconds())
+        assert isinstance(period, int) and period > 0
 
         def decorator(f):
-            self._factor_handlers.append([factor, var_args(f)])
+            self._periodic_handlers.append([period, var_args(f)])
             return f
 
         return decorator

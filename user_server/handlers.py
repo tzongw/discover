@@ -43,7 +43,7 @@ def session_invalidate(key):
     logging.info(key)
 
 
-@tick.handler(timedelta(seconds=10))
+@tick.periodic(timedelta(seconds=10))
 def on_10s():
     logging.info('tick')
 
