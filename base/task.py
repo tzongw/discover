@@ -95,7 +95,8 @@ class AsyncTask(_BaseTask):
     def current_task(self):
         return self.local.task
 
-    def cancel(self, task_id=None):
+    def cancel(self, task_or_id=None):
+        task_id = self.task_id(task_or_id) if isinstance(task_or_id, Task) else task_or_id
         return self.timer.kill(task_id or self.task_id(self.current_task))
 
     def publish(self, task=None, do_hint=True):
