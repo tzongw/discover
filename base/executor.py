@@ -37,7 +37,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=1, name='unnamed'):
+    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_log=3, name='unnamed'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
@@ -46,6 +46,7 @@ class Executor:
         self._slow_log = slow_log
         self._name = name
         self._overload = False
+        self._slow_count = 0
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
@@ -56,11 +57,16 @@ class Executor:
         start = time.time()
         self._items.put(item)
         t = time.time() - start
-        if t > self._slow_log:
-            logging.warning(f'slow put {t} {self} {item}')
+        if t >= self._slow_log:
+            self._slow_count += 1
+            if self._slow_count <= 10:
+                logging.warning(f'+ slow put {t} {self} {item}')
+        elif self._slow_count > 0:
+            logging.warning(f'- slow put {t} {self} {item}')
+            self._slow_count = 0
         if not self._overload and self._items.qsize() >= self._max_workers * 2:
             self._overload = True
-            logging.warning(f'overload {self} {item}')
+            logging.warning(f'+ overload {self} {item}')
         return fut
 
     def gather(self, *fns, block=True):
@@ -75,10 +81,11 @@ class Executor:
         if self._unfinished > self._workers and self._workers < self._max_workers:
             self._workers += 1
             gevent.spawn(self._worker)
-            logging.debug(f'+worker {self}')
+            logging.debug(f'+ worker {self}')
 
     def __str__(self):
-        return f'{self._name}: unfinished: {self._unfinished}, workers: {self._workers}'
+        return f'{self._name}: unfinished: {self._unfinished}, workers: {self._workers} queue: {self._items.qsize()}' \
+               f' overload: {self._overload} slow_count: {self._slow_count}'
 
     def _worker(self):
         try:
@@ -86,18 +93,18 @@ class Executor:
                 item = self._items.get(block=self._idle > 0, timeout=self._idle)  # type: _WorkItem
                 if self._overload and self._items.qsize() <= self._max_workers // 2:
                     self._overload = False
-                    logging.warning(f'underload {self} {item}')
+                    logging.warning(f'- overload {self} {item}')
                 start = time.time()
                 item.run()
                 t = time.time() - start
                 if t > self._slow_log:
-                    logging.warning(f'slow task {t} {self} {item}')
+                    logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
         except queue.Empty:
             logging.debug(f'worker idle exit')
         finally:
             self._workers -= 1
-            logging.debug(f'-worker {self}')
+            logging.debug(f'- worker {self}')
 
 
 class WaitGroup(Executor):
