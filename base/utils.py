@@ -125,14 +125,15 @@ class DefaultDict(defaultdict):
 
 def zpop_by_score(redis: Redis, key, start, stop, limit=None):
     kwargs = {'offset': 0, 'num': limit} if limit else {}
-    values = {key: score for key, score in redis.zrange(key, start, stop, byscore=True, withscores=True, **kwargs)}
+    members = {member: score for member, score in
+               redis.zrange(key, start, stop, byscore=True, withscores=True, **kwargs)}
     with redis.pipeline() as pipe:
-        for member in values:
+        for member in members:
             pipe.zrem(key, member)
         misses = []
-        for member, removed in zip(values, pipe.execute()):
+        for member, removed in zip(members, pipe.execute()):
             if not removed:
                 misses.append(member)
     for member in misses:
-        values.pop(member)
-    return values
+        members.pop(member)
+    return members
