@@ -10,7 +10,6 @@ APP_TIMER = 'timer'
 APP_RELOAD = 'reload'
 
 TICK_STREAM = 'stream:tick'
-TICK_TS = 'ts:tick'
 TICK_TIMER = 'timer:tick'
 
 RPC_USER = f'rpc_{APP_USER}'
