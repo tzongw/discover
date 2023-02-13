@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import functools
 from concurrent.futures import Future
 from .utils import make_key
 
@@ -46,3 +47,17 @@ class SingleFlight:
                     fut = self._futures.pop(made_key)
                     fut.set_result(value)
         return [fut.result() for fut in futures]
+
+
+def single_flight(f):
+    def get(key, *args, **kwargs):
+        return f(*args, **kwargs)
+
+    sf = SingleFlight(get=get)
+
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        key = make_key(None, *args, **kwargs)
+        return sf.get(key, *args, **kwargs)
+
+    return wrapper
