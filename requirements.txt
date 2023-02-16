@@ -42,7 +42,7 @@ wcwidth==0.2.5
 webargs==7.0.1
 websocket-client==0.56.0
 websockets==9.1
-Werkzeug==1.0.1
+Werkzeug==2.2.3
 wrapt==1.13.3
 zipp==3.4.0
 zope.event==4.5.0
