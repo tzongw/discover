@@ -127,10 +127,10 @@ class HeavyTask(_BaseTask):
 
     def push(self, task: Task):
         logging.info(f'+task {task}')
-        self.redis.rpush(self.key, task.json())
+        self.redis.rpush(self.key, task.json(exclude_defaults=True))
 
     def pop(self, *, timeout=0, block=True):
-        r = self.redis.blpop(self.key, timeout) if block else self.redis.lpop(self.key)
+        r = self.redis.blpop([self.key], timeout) if block else self.redis.lpop(self.key)
         if r is None:
             return
         value = r[1] if isinstance(r, (list, tuple)) else r

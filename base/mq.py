@@ -20,7 +20,7 @@ class Publisher:
         params = [stream, 'MAXLEN', '~', maxlen]
         if do_hint and self.hint:
             params += ['HINT', self.hint]
-        params += ['*', '', message.json()]
+        params += ['*', '', message.json(exclude_defaults=True)]
         return self.redis.execute_command('XADD', *params)
 
 

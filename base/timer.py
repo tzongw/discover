@@ -75,7 +75,7 @@ class Timer:
     def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
         stream = stream or stream_name(message)
-        data = message.json()
+        data = message.json(exclude_defaults=True)
         if key is None:
             key = f'{timer_name(message)}:{data}'
         function = 'timer_xadd'
