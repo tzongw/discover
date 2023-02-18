@@ -58,18 +58,13 @@ class Parser:
             return []
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
-    @staticmethod
-    def _pieces(mapping: Dict[str, M]):
-        items = []
-        for k, v in mapping.items():
-            items.extend([k, v.json(exclude_defaults=True)])
-        return items
-
     def mset(self, mapping: Dict[str, M]) -> bool:
-        return self._redis.execute_command('MSET', *self._pieces(mapping))
+        mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
+        return self._redis.mset(mapping)
 
     def msetnx(self, mapping: Dict[str, M]) -> bool:
-        return self._redis.execute_command('MSETNX', *self._pieces(mapping))
+        mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
+        return self._redis.msetnx(mapping)
 
     def hget(self, name, cls: Type[M]) -> Optional[M]:
         def convert(mapping):
