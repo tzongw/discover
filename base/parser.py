@@ -11,16 +11,17 @@ class Parser:
     def __init__(self, redis: Union[Redis, Pipeline]):
         self._redis = redis
         redis.response_callbacks['SET'] = self.set_callback
-        redis.response_callbacks['GET'] = redis.response_callbacks['GETDEL'] = self.get_callback
+        redis.response_callbacks['GET'] = redis.response_callbacks['GETDEL'] = self.callback
         redis.response_callbacks['MGET'] = self.mget_callback
         redis.response_callbacks['HGETALL'] = self.hget_callback
+        redis.response_callbacks['HMGET'] = self.callback
 
     @staticmethod
     def set_callback(response, convert=None, **options):
         return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET'](response, **options)
 
     @staticmethod
-    def get_callback(response, convert=None):
+    def callback(response, convert=None):
         return convert(response) if convert else response
 
     @staticmethod
@@ -66,11 +67,21 @@ class Parser:
         mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
         return self._redis.msetnx(mapping)
 
-    def hget(self, name, cls: Type[M]) -> Optional[M]:
-        def convert(mapping):
-            return cls.parse_obj(mapping) if mapping else None
+    def hget(self, name, cls: Type[M], *, only=None, exclude=None) -> Optional[M]:
+        if exclude is not None:
+            assert not only, '`only`, `exclude` are mutually exclusive'
+            only = [field for field in cls.__fields__ if field not in exclude]
+        if only:
+            def convert(values):
+                mapping = {k: v for k, v in zip(only, values) if v is not None}
+                return cls.parse_obj(mapping)
 
-        return self._redis.execute_command('HGETALL', name, convert=convert)
+            return self._redis.execute_command('HMGET', name, *only, convert=convert)
+        else:
+            def convert(mapping):
+                return cls.parse_obj(mapping) if mapping else None
+
+            return self._redis.execute_command('HGETALL', name, convert=convert)
 
     def hset(self, name: str, model: M):
         mapping = model.dict(exclude_defaults=True) or model.dict()
