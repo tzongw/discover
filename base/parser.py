@@ -84,5 +84,5 @@ class Parser:
             return self._redis.execute_command('HGETALL', name, convert=convert)
 
     def hset(self, name: str, model: M):
-        mapping = model.dict(exclude_defaults=True) or model.dict()
+        mapping = model.dict(exclude_unset=True)
         return self._redis.hset(name, mapping=mapping)
