@@ -25,7 +25,7 @@ from base import AsyncTask, HeavyTask
 
 executor = Executor(name='shared')
 schedule = Schedule()
-dispatcher = Dispatcher(sep=':')
+dispatcher = Dispatcher()
 tick = TimeDispatcher()
 
 app_name = options.app_name

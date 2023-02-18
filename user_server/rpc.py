@@ -117,7 +117,8 @@ class Handler:
                 shared.gate_service.broadcast_text(const.ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, key, data):
-        dispatcher.dispatch(key, key, data)
+        group, key = key.split(':', maxsplit=1)
+        dispatcher.dispatch(group, key, data)
 
 
 def serve():

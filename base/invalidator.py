@@ -10,7 +10,7 @@ class Invalidator:
     def __init__(self, redis: Redis, sep=':'):
         self.redis = redis
         self.sep = sep
-        self.dispatcher = Dispatcher(sep=sep, executor=Executor(name='invalidator'))
+        self.dispatcher = Dispatcher(executor=Executor(name='invalidator'))
 
     @property
     def handler(self):
@@ -26,9 +26,9 @@ class Invalidator:
     def invalidate(self, key, *args, **kwargs):
         self.dispatcher.dispatch(key, *args, **kwargs)
 
-    def invalidate_all(self):
-        for prefix in self.prefixes:
-            self.dispatcher.dispatch(prefix, '')
+    def _invalidate_all(self):
+        for key in self.prefixes:
+            self.dispatcher.dispatch(key, '')
 
     def publish(self, key):
         self.redis.publish('__redis__:invalidate', key)
@@ -49,7 +49,7 @@ class Invalidator:
                     sub.subscribe('__redis__:invalidate')
                     res = sub.parse_response()
                     logging.info(res)
-                    self.invalidate_all()
+                    self._invalidate_all()
                 msg = sub.get_message(ignore_subscribe_messages=True, timeout=None)
                 if msg is None:
                     continue
@@ -57,12 +57,13 @@ class Invalidator:
                 data = msg['data']
                 if data is None:
                     logging.warning(f'db flush all')
-                    self.invalidate_all()
+                    self._invalidate_all()
                     continue
                 if isinstance(data, (bytes, str)):
                     data = [data]
                 for key in data:
-                    self.dispatcher.dispatch(key, key)
+                    group, key = key.split(self.sep, maxsplit=1)
+                    self.dispatcher.dispatch(group, key)
             except Exception:
                 logging.exception(f'')
                 sub = None
