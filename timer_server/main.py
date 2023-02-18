@@ -53,7 +53,7 @@ class Handler:
     def load_timers(self):
         full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         for full_key in full_keys:
-            with LogSuppress(Exception):
+            with LogSuppress():
                 timer_info = self._parser.get(full_key, TimerInfo)
                 if timer_info.deadline:
                     self.call_later(timer_info.key, timer_info.service, timer_info.data,
@@ -145,5 +145,5 @@ def main():
 
 
 if __name__ == '__main__':
-    with LogSuppress(Exception):
+    with LogSuppress():
         main()

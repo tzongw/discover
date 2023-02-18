@@ -14,10 +14,17 @@ from pydantic import BaseModel
 
 
 class LogSuppress(contextlib.suppress):
+    def __init__(self, *exceptions, log_level=logging.ERROR):
+        if not exceptions:
+            exceptions = [Exception]
+        super().__init__(*exceptions)
+        self.log = {logging.INFO: logging.info, logging.WARNING: logging.warning, logging.ERROR: logging.error}.get(
+            log_level)
+
     def __exit__(self, exctype, excinst, exctb):
         suppress = super().__exit__(exctype, excinst, exctb)
         if suppress:
-            logging.exception(f'')
+            self.log(f'suppressed: {excinst}', exc_info=True)
         return suppress
 
 

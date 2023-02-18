@@ -34,5 +34,5 @@ def main():
 
 
 if __name__ == '__main__':
-    with LogSuppress(Exception):
+    with LogSuppress():
         main()

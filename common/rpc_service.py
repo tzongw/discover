@@ -29,7 +29,7 @@ class Selector:
     @staticmethod
     def _traverse(client_factory, addresses, name, *args, **kwargs):
         for address in addresses:
-            with LogSuppress(Exception):
+            with LogSuppress():
                 with client_factory(address) as client:
                     getattr(client, name)(*args, **kwargs)
 

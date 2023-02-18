@@ -97,7 +97,7 @@ atexit.register(unique_id.stop)  # after cleanup
 @atexit.register
 def _cleanup():
     status.exited = True
-    with LogSuppress(Exception):
+    with LogSuppress():
         executor.gather(*_exits)
     _exits.clear()
 
@@ -107,7 +107,7 @@ def spawn_worker(f, *args, **kwargs):
 
     def worker():
         start = time.time()
-        with LogSuppress(Exception):
+        with LogSuppress():
             f(*args, **kwargs)
         t = time.time() - start
         if t > const.SLOW_WORKER:

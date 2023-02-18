@@ -66,14 +66,14 @@ class Registry:
         keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         addresses = defaultdict(set)
         for key in keys:
-            with LogSuppress(Exception):
+            with LogSuppress():
                 name, address = self._unpack(key)
                 addresses[name].add(address)
         if addresses != self._addresses:
             logging.info(f'{self._addresses} -> {addresses}')
             self._addresses = addresses
             for cb in self._callbacks:
-                with LogSuppress(Exception):
+                with LogSuppress():
                     cb()
 
     def _run(self):
