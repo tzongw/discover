@@ -7,15 +7,14 @@ from typing import Union
 from weakref import WeakKeyDictionary
 import sys
 import gevent
-from redis import Redis
-from base import Registry, LogSuppress, Dispatcher, snowflake, Receiver, Parser
-from base import Executor
-from base import Schedule
-from base import UniqueId
-from base import Publisher
-from base import Timer
+from redis import Redis, RedisCluster
+from base import Registry, LogSuppress, Parser
+from base import Executor, Schedule
+from base import UniqueId, snowflake
+from base import Publisher, Receiver, Timer
 from base import Invalidator
-from base import TimeDispatcher
+from base import Dispatcher, TimeDispatcher
+from base.cluster import ShardedKey, ShardedTimer, ShardedReceiver, ShardedPublisher
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
@@ -38,11 +37,20 @@ unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
-publisher = Publisher(redis, hint=hint)
-timer = Timer(redis, hint=hint)
-receiver = Receiver(redis, group=app_name, consumer=str(app_id))
-async_task = AsyncTask(timer, receiver)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
+
+if options.redis_cluster:
+    redis_cluster = RedisCluster.from_url(options.redis_cluster, decode_responses=True)
+    sharded_key = ShardedKey(len(redis_cluster.get_primaries()))
+    publisher = ShardedPublisher(redis_cluster, hint=hint, sharded_key=sharded_key)
+    timer = ShardedTimer(redis_cluster, hint=hint, sharded_key=sharded_key)
+    receiver = ShardedReceiver(redis_cluster, group=app_name, consumer=str(app_id), sharded_key=sharded_key)
+    async_task = AsyncTask(timer, receiver)
+else:
+    publisher = Publisher(redis, hint=hint)
+    timer = Timer(redis, hint=hint)
+    receiver = Receiver(redis, group=app_name, consumer=str(app_id))
+    async_task = AsyncTask(timer, receiver)
 
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]

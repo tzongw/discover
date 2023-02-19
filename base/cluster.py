@@ -32,7 +32,7 @@ class ShardedKey:
 
 
 class ShardedPublisher(Publisher):
-    def __init__(self, redis, sharded_key: ShardedKey, hint=None):
+    def __init__(self, redis, *, sharded_key: ShardedKey, hint=None):
         super().__init__(redis, hint)
         self._shared_key = sharded_key
 
@@ -44,11 +44,12 @@ class ShardedPublisher(Publisher):
 
 class NormalizedDispatcher(ProtoDispatcher):
     def dispatch(self, stream, *args, **kwargs):
-        return self.dispatch(ShardedKey.normalized_key(stream), *args, **kwargs)
+        stream = ShardedKey.normalized_key(stream)
+        return super().dispatch(stream, *args, **kwargs)
 
 
 class ShardedReceiver(Receiver):
-    def __init__(self, redis, group: str, consumer: str, sharded_key: ShardedKey, batch=10):
+    def __init__(self, redis, group: str, consumer: str, *, sharded_key: ShardedKey, batch=10):
         super().__init__(redis, group, consumer, batch, dispatcher=NormalizedDispatcher)
         self._shared_key = sharded_key
 
@@ -73,14 +74,16 @@ class ShardedReceiver(Receiver):
             for waker in self._shared_key.all_sharded_keys(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
+            self._group_dispatcher.handlers.pop(self._waker)  # already deleted
             for stream in self._group_dispatcher.handlers:
-                pipe.xgroup_delconsumer(stream, self._group, self._consumer)
+                for sharded_stream in self._shared_key.all_sharded_keys(stream):
+                    pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
             pipe.execute()
         logging.info(f'delete waker {self._waker}')
 
 
 class ShardedTimer(Timer):
-    def __init__(self, redis, sharded_key: ShardedKey, hint=None):
+    def __init__(self, redis, *, sharded_key: ShardedKey, hint=None):
         super().__init__(redis, hint)
         self._shared_key = sharded_key
 
@@ -90,8 +93,9 @@ class ShardedTimer(Timer):
         if key is None:
             data = message.json(exclude_defaults=True)
             key = f'{timer_name(message)}:{data}'
-        key, stream = self._shared_key.sharded_keys(key, stream)
-        return super().create(message, interval, loop=loop, key=key, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        sharded_key, stream = self._shared_key.sharded_keys(key, stream)
+        super().create(message, interval, loop=loop, key=sharded_key, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        return key
 
     def kill(self, key):
         key = self._shared_key.sharded_key(key)
@@ -104,3 +108,7 @@ class ShardedTimer(Timer):
     def info(self, key: str):
         key = self._shared_key.sharded_key(key)
         return super().info(key)
+
+    def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+        key, stream = self._shared_key.sharded_keys(key, stream)
+        return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
