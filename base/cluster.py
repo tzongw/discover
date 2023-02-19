@@ -65,7 +65,8 @@ class ShardedReceiver(Receiver):
 
         for streams in zip(*[self._sharded_key.all_sharded_keys(stream) for stream in self._group_dispatcher.handlers]):
             gevent.spawn(self._group_run, streams)
-        for streams in zip(*[self._sharded_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.handlers]):
+        for streams in zip(
+                *[self._sharded_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.handlers]):
             gevent.spawn(self._fanout_run, streams)
 
     def stop(self):
@@ -112,4 +113,29 @@ class ShardedTimer(Timer):
 
     def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
         key, stream = self._sharded_key.sharded_keys(key, stream)
+        return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
+
+
+class MigratingTimer(ShardedTimer):
+    def __init__(self, redis, *, sharded_new: ShardedKey, sharded_old: ShardedKey, hint=None):
+        super().__init__(redis, sharded_key=sharded_new, hint=hint)
+        self._timer_old = ShardedTimer(redis, sharded_key=sharded_old, hint=hint)
+
+    def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
+               do_hint=True, stream=None):
+        key = super().create(message, interval, loop=loop, key=key, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        self._timer_old.kill(key)
+        return key
+
+    def kill(self, key):
+        return self._timer_old.kill(key) or super().kill(key)
+
+    def exists(self, key: str):
+        return self._timer_old.exists(key) or super().exists(key)
+
+    def info(self, key: str):
+        return self._timer_old.info(key) or super().info(key)
+
+    def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+        self._timer_old.kill(key)
         return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
