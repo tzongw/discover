@@ -4,6 +4,7 @@ from typing import Union
 from datetime import timedelta
 import gevent
 from pydantic import BaseModel
+from redis.crc import key_slot
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, timer_name
 from .timer import Timer
@@ -22,7 +23,7 @@ class ShardedKey:
 
     def sharded_keys(self, *keys):
         assert all(not key.startswith('{') for key in keys)
-        shard = hash(keys[0]) % self.shards
+        shard = key_slot(keys[0].encode()) % self.shards  # consistent across different runs
         return [f'{{{shard}}}:{key}' for key in keys]
 
     @staticmethod

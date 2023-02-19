@@ -37,9 +37,6 @@ class Addr:
     def __str__(self):
         return f'{self.host}:{self.port}'
 
-    def __repr__(self):
-        return str(self)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.host == other.host and self.port == other.port
 
