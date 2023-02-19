@@ -50,17 +50,23 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, batch=10):
+    def __init__(self, redis: Redis, group: str, consumer: str, batch=10, dispatcher=ProtoDispatcher):
         self.redis = redis
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = ProtoDispatcher(
-            executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
-        self._fanout_dispatcher = ProtoDispatcher(executor=Executor(max_workers=batch, queue_size=0,
-                                                                    name='fanout_dispatch'))
+        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
+        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='fanout_dispatch'))
         self._batch = batch
+
+        @self.group(self._waker)
+        def group_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
+
+        @self.fanout(self._waker)
+        def fanout_wakeup(data, sid):
+            logging.info(f'{sid} {data}')
 
     @property
     def group(self):
@@ -71,22 +77,14 @@ class Receiver:
         return self._fanout_dispatcher.handler
 
     def start(self):
-        @self.group(self._waker)
-        def group_wakeup(data, sid):
-            logging.info(f'{sid} {data}')
-
-        @self.fanout(self._waker)
-        def fanout_wakeup(data, sid):
-            logging.info(f'{sid} {data}')
-
         with self.redis.pipeline() as pipe:
             streams = set(self._group_dispatcher.handlers) | set(self._fanout_dispatcher.handlers)
             for stream in streams:
                 # create group & stream
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        gevent.spawn(self._group_run)
-        gevent.spawn(self._fanout_run)
+        gevent.spawn(self._group_run, self._group_dispatcher.handlers)
+        gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)
 
     def stop(self):
         logging.info(f'stop')
@@ -99,8 +97,8 @@ class Receiver:
             pipe.execute()
         logging.info(f'delete waker {self._waker}')
 
-    def _group_run(self):
-        streams = {stream: '>' for stream in self._group_dispatcher.handlers}
+    def _group_run(self, streams):
+        streams = {stream: '>' for stream in streams}
         while not self._stopped:
             try:
                 result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch,
@@ -114,9 +112,8 @@ class Receiver:
                 gevent.sleep(1)
         logging.info(f'group exit {streams.keys()}')
 
-    def _fanout_run(self):
+    def _fanout_run(self, streams):
         with self.redis.pipeline() as pipe:
-            streams = self._fanout_dispatcher.handlers
             for stream in streams:
                 pipe.xinfo_stream(stream)
             last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
