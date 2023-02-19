@@ -11,8 +11,9 @@ from .timer import Timer
 
 
 class ShardedKey:
-    def __init__(self, shards):
+    def __init__(self, shards, fixed=()):
         self.shards = shards
+        self.fixed = fixed  # keys fixed in shard 0
 
     def all_sharded_keys(self, key: str):
         assert not key.startswith('{')
@@ -23,7 +24,8 @@ class ShardedKey:
 
     def sharded_keys(self, *keys):
         assert all(not key.startswith('{') for key in keys)
-        shard = key_slot(keys[0].encode()) % self.shards  # consistent across different runs
+        # consistent across different runs
+        shard = 0 if keys[0] in self.fixed else key_slot(keys[0].encode()) % self.shards
         return [f'{{{shard}}}:{key}' for key in keys]
 
     @staticmethod
@@ -58,9 +60,9 @@ class ShardedReceiver(Receiver):
         with self.redis.pipeline(transaction=False) as pipe:
             streams = set(self._group_dispatcher.handlers) | set(self._fanout_dispatcher.handlers)
             for stream in streams:
-                for shared in self._sharded_key.all_sharded_keys(stream):
+                for sharded_stream in self._sharded_key.all_sharded_keys(stream):
                     # create group & stream
-                    pipe.xgroup_create(shared, self._group, mkstream=True)
+                    pipe.xgroup_create(sharded_stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
 
         for streams in zip(*[self._sharded_key.all_sharded_keys(stream) for stream in self._group_dispatcher.handlers]):
@@ -112,6 +114,7 @@ class ShardedTimer(Timer):
         return super().info(key)
 
     def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+        assert key in self._sharded_key.fixed, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharded_key.sharded_keys(key, stream)
         return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
 
@@ -135,7 +138,3 @@ class MigratingTimer(ShardedTimer):
 
     def info(self, key: str):
         return self._timer_old.info(key) or super().info(key)
-
-    def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
-        self._timer_old.kill(key)
-        return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)

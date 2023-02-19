@@ -41,7 +41,7 @@ heavy_task = HeavyTask(redis, 'heavy_tasks')
 
 if options.redis_cluster:
     redis_cluster = RedisCluster.from_url(options.redis_cluster, decode_responses=True)
-    sharded_key = ShardedKey(len(redis_cluster.get_primaries()))
+    sharded_key = ShardedKey(shards=len(redis_cluster.get_primaries()), fixed=[const.TICK_TIMER])
     publisher = ShardedPublisher(redis_cluster, hint=hint, sharded_key=sharded_key)
     timer = ShardedTimer(redis_cluster, hint=hint, sharded_key=sharded_key)
     receiver = ShardedReceiver(redis_cluster, group=app_name, consumer=str(app_id), sharded_key=sharded_key)

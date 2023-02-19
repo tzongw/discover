@@ -44,8 +44,8 @@ def session_invalidate(key):
 
 
 @tick.periodic(timedelta(seconds=10))
-def on_10s():
-    logging.info('tick')
+def on_10s(dt: datetime):
+    logging.info(f'tick {dt}')
 
 
 @async_task
