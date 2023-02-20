@@ -126,15 +126,17 @@ class MigratingTimer(ShardedTimer):
 
     def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
                do_hint=True, stream=None):
-        key = super().create(message, interval, loop=loop, key=key, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        if key is None:
+            data = message.json(exclude_defaults=True)
+            key = f'{timer_name(message)}:{data}'
         self._timer_old.kill(key)
-        return key
+        return super().create(message, interval, loop=loop, key=key, maxlen=maxlen, do_hint=do_hint, stream=stream)
 
     def kill(self, key):
-        return self._timer_old.kill(key) or super().kill(key)
+        return super().kill(key) or self._timer_old.kill(key)
 
     def exists(self, key: str):
-        return self._timer_old.exists(key) or super().exists(key)
+        return super().exists(key) or self._timer_old.exists(key)
 
     def info(self, key: str):
-        return self._timer_old.info(key) or super().info(key)
+        return super().info(key) or self._timer_old.info(key)
