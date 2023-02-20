@@ -31,7 +31,7 @@ class LogSuppress(contextlib.suppress):
 class Addr:
     def __init__(self, value: str):
         host, port = value.rsplit(':', maxsplit=1)
-        self.host = host
+        self.host = host or '127.0.0.1'
         self.port = int(port)
 
     def __str__(self):
