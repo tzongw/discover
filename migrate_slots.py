@@ -27,16 +27,16 @@ def migrate(redis: RedisCluster, source: Addr, target: Addr, slot, confirm=Confi
         raise ValueError(f'target({target}) not exists or not primary')
     if redis.nodes_manager.get_node_from_slot(slot) != source_node:
         raise ValueError(f'source({source}) not own slot({slot})')
-    source_id = redis.cluster_myid(target_node=source_node)
-    target_id = redis.cluster_myid(target_node=target_node)
     count = redis.cluster_countkeysinslot(slot)
     if confirm == Confirm.ALWAYS or confirm == Confirm.SOME and count > 0:
         logging.info(f'{count} keys in slot({slot}), continue? (Y/n)')
         answer = sys.stdin.readline()
         if answer.strip() != 'Y':
-            logging.info(f'break')
+            logging.info(f'migrate break!!')
             sys.exit(0)
     logging.info(f'migrate slot({slot} source({source}) -> target({target}) begin')
+    source_id = redis.cluster_myid(target_node=source_node)
+    target_id = redis.cluster_myid(target_node=target_node)
     redis.cluster_setslot(target_node=target_node, node_id=source_id, slot_id=slot, state='IMPORTING')
     redis.cluster_setslot(target_node=source_node, node_id=target_id, slot_id=slot, state='MIGRATING')
     migrating = 0

@@ -52,7 +52,7 @@ def update_upstreams():
             changed.add(name)
     if empty and changed:
         logging.info('spawn reload')
-        gevent.spawn_later(0.2, reload_nginx)
+        gevent.spawn_later(1.0, reload_nginx)
 
 
 def main():
