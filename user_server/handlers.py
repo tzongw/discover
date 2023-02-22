@@ -68,7 +68,7 @@ def init():
     if redis.execute_command('MODULE LIST'):  # timer module loaded
         oneshot_id = timer.create(Alarm(tip='oneshot'), timedelta(seconds=2))
         at_exit(lambda: timer.kill(oneshot_id))
-        loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=4), loop=True)
+        loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=8), loop=True)
         at_exit(lambda: timer.kill(loop_id))
         task_id = async_task.post(task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
         at_exit(lambda: async_task.cancel(task_id))

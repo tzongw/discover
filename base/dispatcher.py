@@ -41,11 +41,8 @@ class _Crontab:
     weekday: Union[None, int, Iterable]
 
     def __contains__(self, cron: '_Crontab'):
-        for value, pattern in zip(cron.__dict__.values(), self.__dict__.values()):
-            if pattern is None or value == pattern or (not isinstance(pattern, int) and value in pattern):
-                continue
-            return False
-        return True
+        return all(pattern is None or (value == pattern if isinstance(pattern, int) else value in pattern) for
+                   value, pattern in zip(cron.__dict__.values(), self.__dict__.values()))
 
 
 class TimeDispatcher:
