@@ -94,7 +94,7 @@ class Receiver:
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
-            pipe.execute(raise_on_error=False)  # stop before start
+            pipe.execute(raise_on_error=False)  # stop but no start
         logging.info(f'delete waker {self._waker}')
 
     def _group_run(self, streams):

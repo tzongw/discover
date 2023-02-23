@@ -82,7 +82,7 @@ class ShardedReceiver(Receiver):
             for stream in self._group_dispatcher.handlers:
                 for sharded_stream in self._sharded_key.all_sharded_keys(stream):
                     pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
-            pipe.execute()
+            pipe.execute(raise_on_error=False)  # stop but no start
         logging.info(f'delete waker {self._waker}')
 
 
