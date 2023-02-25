@@ -26,9 +26,10 @@ class Cache(Generic[T]):
     # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096):
+    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=make_key):
         self.single_flight = SingleFlight(get=get, mget=mget)
         self.lru = OrderedDict()
+        self.make_key = make_key
         self.maxsize = maxsize
         self.full_cached = False
         self.hits = 0
@@ -57,7 +58,7 @@ class Cache(Generic[T]):
         missed_keys = []
         indexes = []
         for index, key in enumerate(keys):
-            made_key = make_key(key, *args, **kwargs)
+            made_key = self.make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
                 self.hits += 1
@@ -72,9 +73,9 @@ class Cache(Generic[T]):
                 self._set(made_key, self.placeholder)
         if missed_keys:
             values = self.single_flight.mget(missed_keys, *args, **kwargs)
-            for key, value, index in zip(missed_keys, values, indexes):
+            for index, key, value in zip(indexes, missed_keys, values):
                 results[index] = value
-                made_key = make_key(key, *args, **kwargs)
+                made_key = self.make_key(key, *args, **kwargs)
                 if made_key in self.lru:
                     self.lru[made_key] = value
         return results
@@ -84,18 +85,16 @@ class Cache(Generic[T]):
         def invalidate(key: str, *args, **kwargs):
             self.full_cached = False
             self.invalids += 1
-            if not self.lru:
-                return
             if not key:
                 self.lru.clear()
                 return
-            key = type(next(iter(self.lru)))(key)
             if handler:
                 key_or_keys = handler(key, *args, **kwargs)
                 keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
                 for key in keys:
                     self.lru.pop(key, None)
             else:
+                key = self.make_key(key)
                 self.lru.pop(key, None)
 
 
@@ -107,7 +106,7 @@ class TTLCache(Cache[T]):
         missed_keys = []
         indexes = []
         for index, key in enumerate(keys):
-            made_key = make_key(key, *args, **kwargs)
+            made_key = self.make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
                 self.hits += 1
@@ -122,9 +121,9 @@ class TTLCache(Cache[T]):
                 self._set(made_key, self.placeholder)
         if missed_keys:
             tuples = self.single_flight.mget(missed_keys, *args, **kwargs)
-            for key, (value, expire), index in zip(missed_keys, tuples, indexes):
+            for index, key, (value, expire) in zip(indexes, missed_keys, tuples):
                 results[index] = value
-                made_key = make_key(key, *args, **kwargs)
+                made_key = self.make_key(key, *args, **kwargs)
                 if made_key in self.lru:
                     pair = TTLCache.Pair(value, expire_at(expire))
                     self.lru[made_key] = pair
