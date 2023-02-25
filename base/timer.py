@@ -2,8 +2,8 @@
 from redis import Redis
 from datetime import timedelta
 from typing import Union
-from .utils import stream_name, timer_name
 from pydantic import BaseModel
+from .utils import stream_name, timer_name
 
 
 class Timer:

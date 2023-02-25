@@ -6,13 +6,12 @@ from typing import TypeVar, Callable
 import functools
 from gevent.local import local
 from redis import Redis
-from .mq import Receiver, Publisher
-from .timer import Timer
-from .utils import timer_name, var_args
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
-
+from .mq import Receiver, Publisher
+from .timer import Timer
+from .utils import timer_name, var_args
 
 class Task(BaseModel):
     path: str

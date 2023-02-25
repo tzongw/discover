@@ -1,12 +1,12 @@
 import contextlib
+import logging
+import time
 from random import choice
 from typing import Dict, ContextManager
 import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
 from .thrift_pool import ThriftPool
-import logging
-import time
 from .utils import ip_address, Addr
 
 

@@ -5,10 +5,10 @@ import threading
 from datetime import timedelta, datetime
 from typing import List, Union
 import gevent
-from .executor import Executor
 import heapq
 from typing import Optional, Callable
 from .utils import LogSuppress
+from .executor import Executor
 
 
 class Handle:

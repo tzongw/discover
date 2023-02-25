@@ -3,10 +3,10 @@ import gevent
 import logging
 from typing import Dict
 from redis import Redis
+from pydantic import BaseModel
 from .utils import stream_name, var_args
 from .dispatcher import Dispatcher
 from .executor import Executor
-from pydantic import BaseModel
 
 
 class Publisher:
