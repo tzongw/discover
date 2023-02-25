@@ -110,7 +110,8 @@ def get_documents(collection: str, cursor=0, limit=10, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def upsert_document(collection: str, **kwargs):
     coll = collections[collection]
-    coll(**kwargs).save()
+    doc = coll(**kwargs).save()
+    doc.invalidate()
     return {}
 
 

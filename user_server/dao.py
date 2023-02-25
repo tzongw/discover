@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import options
 import const
-from base import Cache
+from base import FullCache
 from common.shared import invalidator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
@@ -87,7 +87,7 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
     addr = StringField(default='')
 
 
-cache = Cache(mget=Profile.mget, make_key=Profile.id.to_python)
+cache = FullCache(mget=Profile.mget, make_key=Profile.id.to_python, get_keys=lambda: Profile.objects.distinct('id'))
 cache.listen(invalidator, Profile.__name__)
 Profile.mget = cache.mget
 
