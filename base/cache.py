@@ -136,8 +136,7 @@ class FullMixin:
     full_cached: bool
     mget: Callable
 
-    def __init__(self, *, mget, get_keys, get_expire=None, maxsize: Optional[int] = 4096):
-        super().__init__(mget=mget, maxsize=maxsize)
+    def __init__(self, *, get_keys, get_expire=None):
         self.get_keys = get_keys
         self.get_expire = get_expire
         self._fut = None  # type: Optional[Future]
@@ -208,8 +207,12 @@ class FullMixin:
 
 
 class FullCache(FullMixin, Cache[T]):
-    pass
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+        super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
+        super().__init__(get_keys=get_keys, get_expire=get_expire)
 
 
 class FullTTLCache(FullMixin, TTLCache[T]):
-    pass
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+        super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
+        super().__init__(get_keys=get_keys, get_expire=get_expire)
