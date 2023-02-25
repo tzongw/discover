@@ -27,7 +27,7 @@ class Cache(Generic[T]):
     placeholder = object()
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=make_key):
-        self.single_flight = SingleFlight(get=get, mget=mget)
+        self.single_flight = SingleFlight(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.make_key = make_key
         self.maxsize = maxsize
@@ -56,6 +56,7 @@ class Cache(Generic[T]):
     def mget(self, keys, *args, **kwargs):
         results = []
         missed_keys = []
+        made_keys = []
         indexes = []
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
@@ -68,14 +69,14 @@ class Cache(Generic[T]):
             else:
                 self.misses += 1
                 missed_keys.append(key)
+                made_keys.append(made_key)
                 indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
         if missed_keys:
             values = self.single_flight.mget(missed_keys, *args, **kwargs)
-            for index, key, value in zip(indexes, missed_keys, values):
+            for index, made_key, value in zip(indexes, made_keys, values):
                 results[index] = value
-                made_key = self.make_key(key, *args, **kwargs)
                 if made_key in self.lru:
                     self.lru[made_key] = value
         return results
@@ -94,8 +95,8 @@ class Cache(Generic[T]):
                 for key in keys:
                     self.lru.pop(key, None)
             else:
-                key = self.make_key(key)
-                self.lru.pop(key, None)
+                made_key = self.make_key(key)
+                self.lru.pop(made_key, None)
 
 
 class TTLCache(Cache[T]):
@@ -104,6 +105,7 @@ class TTLCache(Cache[T]):
     def mget(self, keys, *args, **kwargs):
         results = []
         missed_keys = []
+        made_keys = []
         indexes = []
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
@@ -116,14 +118,14 @@ class TTLCache(Cache[T]):
             else:
                 self.misses += 1
                 missed_keys.append(key)
+                made_keys.append(made_key)
                 indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
         if missed_keys:
             tuples = self.single_flight.mget(missed_keys, *args, **kwargs)
-            for index, key, (value, expire) in zip(indexes, missed_keys, tuples):
+            for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 results[index] = value
-                made_key = self.make_key(key, *args, **kwargs)
                 if made_key in self.lru:
                     pair = TTLCache.Pair(value, expire_at(expire))
                     self.lru[made_key] = pair

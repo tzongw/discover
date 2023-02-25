@@ -5,13 +5,14 @@ from .utils import make_key
 
 
 class SingleFlight:
-    def __init__(self, *, get=None, mget=None):
+    def __init__(self, *, get=None, mget=None, make_key=make_key):
         assert get or mget
         if mget is None:
             # simulate mget to reuse code
             def mget(keys, *args, **kwargs):
                 assert len(keys) == 1
                 return [get(key, *args, **kwargs) for key in keys]
+        self.make_key = make_key
         self._mget = mget
         self._futures = {}  # type: dict[any, Future]
 
@@ -22,8 +23,9 @@ class SingleFlight:
     def mget(self, keys, *args, **kwargs):
         futures = []
         missed_keys = []
+        made_keys = []
         for key in keys:
-            made_key = make_key(key, *args, **kwargs)
+            made_key = self.make_key(key, *args, **kwargs)
             if made_key in self._futures:
                 futures.append(self._futures[made_key])
             else:
@@ -31,33 +33,31 @@ class SingleFlight:
                 self._futures[made_key] = fut
                 futures.append(fut)
                 missed_keys.append(key)
+                made_keys.append(made_key)
         if missed_keys:
             try:
                 values = self._mget(missed_keys, *args, **kwargs)
                 assert len(missed_keys) == len(values)
             except Exception as e:
-                for key in missed_keys:
-                    made_key = make_key(key, *args, **kwargs)
+                for made_key in made_keys:
                     fut = self._futures.pop(made_key)
                     fut.set_exception(e)
                 raise
             else:
-                for key, value in zip(missed_keys, values):
-                    made_key = make_key(key, *args, **kwargs)
+                for made_key, value in zip(made_keys, values):
                     fut = self._futures.pop(made_key)
                     fut.set_result(value)
         return [fut.result() for fut in futures]
 
 
 def single_flight(f):
-    def get(key, *args, **kwargs):
+    def get(_, *args, **kwargs):
         return f(*args, **kwargs)
 
     sf = SingleFlight(get=get)
 
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        key = make_key(None, *args, **kwargs)
-        return sf.get(key, *args, **kwargs)
+        return sf.get(None, *args, **kwargs)
 
     return wrapper
