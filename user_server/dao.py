@@ -39,6 +39,8 @@ T = TypeVar('T')
 class GetterMixin(Generic[T]):
     id: Any
     objects: Callable
+    _data: dict
+    __json__ = []
 
     @classmethod
     def mget(cls, keys) -> list[Optional[T]]:
@@ -52,6 +54,9 @@ class GetterMixin(Generic[T]):
         if value is None and ensure_exists:
             raise KeyError(f'document {key} not exists')
         return value
+
+    def to_dict(self):
+        return {k: v for k, v in self._data.items() if k in self.__json__} if self.__json__ else self._data
 
 
 class CacheMixin:
@@ -68,6 +73,8 @@ class CacheMixin:
 
 
 class Profile(Document, GetterMixin['Profile'], CacheMixin):
+    __json__ = ['name', 'addr']
+
     id = IntField(primary_key=True)
     name = StringField(default='')
     addr = StringField(default='')

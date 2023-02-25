@@ -4,11 +4,14 @@ import time
 import uuid
 from collections import OrderedDict
 import logging
+import json
+from datetime import datetime, date
 import flask
 from flask import jsonify, Blueprint, g, request
+from flask.app import DefaultJSONProvider
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from dao import Account, Session
+from dao import Account, Session, GetterMixin
 from shared import app, parser, dispatcher, id_generator, session_cache, ctx
 import gevent
 from gevent import pywsgi
@@ -21,8 +24,26 @@ from flasgger import Swagger
 from hashlib import sha1
 import models
 
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, GetterMixin):
+            return o.to_dict()
+        elif isinstance(o, datetime):
+            return o.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(o, date):
+            return o.strftime('%Y-%m-%d')
+        return json.JSONEncoder.default(self, o)
+
+
+class JSONProvider(DefaultJSONProvider):
+    def dumps(self, obj, **kwargs) -> str:
+        return json.dumps(obj, cls=JSONEncoder, **kwargs)
+
+
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
+app.json = JSONProvider(app)
 
 
 def serve():
