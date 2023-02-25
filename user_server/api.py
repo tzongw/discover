@@ -11,7 +11,8 @@ from flask import jsonify, Blueprint, g, request
 from flask.app import DefaultJSONProvider
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from dao import Account, Session, GetterMixin
+from marshmallow.validate import Range
+from dao import Account, Session, GetterMixin, collections
 from shared import app, parser, dispatcher, id_generator, session_cache, ctx
 import gevent
 from gevent import pywsgi
@@ -23,6 +24,9 @@ from base.utils import ListConverter
 from flasgger import Swagger
 from hashlib import sha1
 import models
+
+cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
+cursor_filed.num_type = lambda v: int(v or 0)
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -85,6 +89,29 @@ def hello(names):
     """
     heavy_task.push(log('processing'))
     return f'say hello {names}'
+
+
+@app.route('/collections/<collection>/documents')
+@use_kwargs({'cursor': cursor_filed,
+             'limit': fields.Int(validate=Range(min=1, max=50)),
+             'order_by': fields.DelimitedList(fields.Str())},
+            location='query', unknown='include')
+def get_documents(collection: str, cursor=0, limit=10, order_by=None, **kwargs):
+    coll = collections[collection]
+    order_by = order_by or [f'-{coll.id.name}']
+    docs = [doc.to_dict(fields=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(limit)]
+    return {
+        'documents': docs,
+        'cursor': '' if len(docs) < limit else str(cursor + limit),
+    }
+
+
+@app.route('/collections/<collection>/documents', methods=['POST'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def upsert_document(collection: str, **kwargs):
+    coll = collections[collection]
+    coll(**kwargs).save()
+    return {}
 
 
 @app.route('/eval', methods=['POST'])

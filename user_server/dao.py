@@ -40,7 +40,7 @@ class GetterMixin(Generic[T]):
     id: Any
     objects: Callable
     _data: dict
-    __json__ = []
+    __fields__ = None
 
     @classmethod
     def mget(cls, keys) -> list[Optional[T]]:
@@ -55,25 +55,32 @@ class GetterMixin(Generic[T]):
             raise KeyError(f'document {key} not exists')
         return value
 
-    def to_dict(self):
-        return {k: v for k, v in self._data.items() if k in self.__json__} if self.__json__ else self._data
+    def to_dict(self, fields=None):
+        if fields is None:
+            fields = self.__fields__
+        return {k: v for k, v in self._data.items() if k in fields} if fields else self._data
 
 
 class CacheMixin:
     _class_name: str
     id: Any
 
-    @classmethod
-    def key_prefix(cls):
-        return cls._class_name
-
     def invalidate(self):
-        key = f'{self.key_prefix()}:{self.id}'
+        key = f'{self.__class__.__name__}:{self.id}'
         invalidator.publish(key)
 
 
+collections = {}
+
+
+def collection(coll):
+    collections[coll.__name__] = coll
+    return coll
+
+
+@collection
 class Profile(Document, GetterMixin['Profile'], CacheMixin):
-    __json__ = ['name', 'addr']
+    __fields__ = ['name', 'addr']
 
     id = IntField(primary_key=True)
     name = StringField(default='')
@@ -81,7 +88,7 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
 
 
 cache = Cache(mget=Profile.mget, make_key=Profile.id.to_python)
-cache.listen(invalidator, Profile.key_prefix())
+cache.listen(invalidator, Profile.__name__)
 Profile.mget = cache.mget
 
 
