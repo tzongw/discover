@@ -13,6 +13,7 @@ from .mq import Receiver, Publisher
 from .timer import Timer
 from .utils import timer_name, var_args
 
+
 class Task(BaseModel):
     path: str
     args: str = dumps(())

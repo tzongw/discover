@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 import logging
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import flask
 from flask import jsonify, Blueprint, g, request
 from flask.app import DefaultJSONProvider
@@ -13,7 +13,7 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, session_cache, ctx
+from shared import app, parser, dispatcher, id_generator, session_cache, ctx, redis, poller
 import gevent
 from gevent import pywsgi
 from config import options
@@ -72,6 +72,12 @@ def log(message):
         gevent.sleep(1)
 
 
+@poller.handler('poll', interval=timedelta(seconds=10), batch=1)
+def poll(name):
+    logging.info(f'got {name}')
+    gevent.sleep(1)
+
+
 @app.route('/hello/<list:names>')
 def hello(names):
     """say hello
@@ -87,7 +93,11 @@ def hello(names):
       200:
         description: hello
     """
-    heavy_task.push(log('processing'))
+    if len(names) > 1:
+        redis.rpush('poll', *names)
+        poller.notify('poll')
+    else:
+        heavy_task.push(log('processing'))
     return f'say hello {names}'
 
 

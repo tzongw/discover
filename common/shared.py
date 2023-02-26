@@ -20,7 +20,7 @@ from . import const
 from .config import options
 import service
 from .rpc_service import UserService, GateService, TimerService
-from base import AsyncTask, HeavyTask
+from base import AsyncTask, HeavyTask, Poller
 
 executor = Executor(name='shared')
 schedule = Schedule()
@@ -51,6 +51,8 @@ else:
     timer = Timer(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=str(app_id))
     async_task = AsyncTask(timer, receiver)
+
+poller = Poller(redis, async_task)
 
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
