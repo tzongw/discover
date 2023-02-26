@@ -18,9 +18,10 @@ class Result(Flag):
 def deferrable(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        if not hasattr(_local, 'stacks'):
-            _local.stacks = []
-        stacks = _local.stacks
+        try:
+            stacks = _local.stacks
+        except AttributeError:
+            stacks = _local.stacks = []
         with contextlib.ExitStack() as stack:
             stacks.append(stack)
             stack.callback(stacks.pop)
