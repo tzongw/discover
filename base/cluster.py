@@ -2,9 +2,9 @@
 import logging
 from typing import Union
 from datetime import timedelta
+from binascii import crc32
 import gevent
 from pydantic import BaseModel
-from redis.crc import key_slot
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, timer_name
 from .timer import Timer
@@ -25,7 +25,7 @@ class ShardedKey:
     def sharded_keys(self, *keys):
         assert all(not key.startswith('{') for key in keys)
         # consistent across different runs
-        shard = 0 if keys[0] in self.fixed else key_slot(keys[0].encode()) % self.shards
+        shard = 0 if keys[0] in self.fixed else crc32(keys[0].encode()) % self.shards
         return [f'{{{shard}}}:{key}' for key in keys]
 
     @staticmethod
