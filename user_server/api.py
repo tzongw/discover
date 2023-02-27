@@ -95,7 +95,7 @@ def hello(names):
     """
     if len(names) > 1:
         redis.rpush('queue:hello', *names)
-        poller.notify('queue:hello')
+        poller.notify('queue:hello', 'queue:hello')
     else:
         heavy_task.push(log('processing'))
     return f'say hello {names}'

@@ -25,12 +25,12 @@ class Poller:
 
         @async_task
         @deferrable
-        def poll_task(queue: str):
-            config = self.configs.get(queue)
+        def poll_task(group: str, queue: str):
+            config = self.configs.get(group)
             if not config:
                 logging.info(f'no config, quit {queue}')  # deploying? other apps will poll again
                 return
-            task = poll_task(queue)
+            task = poll_task(group, queue)
             defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
                 if jobs := config.poll(redis, queue, config.batch):
@@ -50,19 +50,16 @@ class Poller:
     def task_id(queue: str):
         return f'poll:{queue}'
 
-    def notify(self, queue: str):
-        config = self.configs[queue]
-        task = self.poll_task(queue)
+    def notify(self, group: str, queue: str):
+        config = self.configs[group]
+        task = self.poll_task(group, queue)
         self.async_task.post(self.task_id(queue), task, config.interval, loop=True)
         self.async_task.publish(task)
 
-    def handler(self, queue, interval=timedelta(seconds=1), *, poll=Redis.lpop, batch=100):
+    def handler(self, group, interval=timedelta(seconds=1), *, poll=Redis.lpop, batch=100):
         def decorator(f):
-            assert queue not in self.configs
-            self.configs[queue] = Config(f, interval, poll, batch)
+            assert group not in self.configs
+            self.configs[group] = Config(f, interval, poll, batch)
             return f
 
         return decorator
-
-    def __contains__(self, queue: str):
-        return queue in self.configs
