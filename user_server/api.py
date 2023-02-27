@@ -72,9 +72,9 @@ def log(message):
         gevent.sleep(1)
 
 
-@poller.handler('queue:hello', interval=timedelta(seconds=10), batch=1)
-def poll(name):
-    logging.info(f'got {name}')
+@poller.handler('hello', interval=timedelta(seconds=10), batch=1)
+def poll(queue, names):
+    logging.info(f'{queue} got {names}')
     gevent.sleep(1)
 
 
@@ -95,7 +95,7 @@ def hello(names):
     """
     if len(names) > 1:
         redis.rpush('queue:hello', *names)
-        poller.notify('queue:hello', 'queue:hello')
+        poller.notify('hello', 'queue:hello')
     else:
         heavy_task.push(log('processing'))
     return f'say hello {names}'

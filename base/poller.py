@@ -34,7 +34,7 @@ class Poller:
             defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
                 if jobs := config.poll(redis, queue, config.batch):
-                    config.handler(*jobs)
+                    config.handler(queue, jobs)
                     return True  # notify next
                 logging.debug(f'no jobs, stop {queue}')
                 task_id = self.task_id(queue)
