@@ -45,12 +45,12 @@ if options.redis_cluster:
     publisher = ShardedPublisher(redis_cluster, hint=hint, sharded_key=sharded_key)
     timer = ShardedTimer(redis_cluster, hint=hint, sharded_key=sharded_key)
     receiver = ShardedReceiver(redis_cluster, group=app_name, consumer=str(app_id), sharded_key=sharded_key)
-    async_task = AsyncTask(timer, receiver)
+    async_task = AsyncTask(timer, publisher, receiver)
 else:
     publisher = Publisher(redis, hint=hint)
     timer = Timer(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=str(app_id))
-    async_task = AsyncTask(timer, receiver)
+    async_task = AsyncTask(timer, publisher, receiver)
 
 poller = Poller(redis, async_task)
 

@@ -26,6 +26,7 @@ class Publisher:
 class ProtoDispatcher(Dispatcher):
     def handler(self, key_or_cls, stream=None):
         if not isinstance(key_or_cls, type) or not issubclass(key_or_cls, BaseModel):
+            assert stream is None
             return super().handler(key_or_cls)
 
         message_cls = key_or_cls

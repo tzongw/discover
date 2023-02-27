@@ -42,12 +42,12 @@ class AsyncTask(_BaseTask):
     2. add new argument at the end and set a default value
     """
 
-    def __init__(self, timer: Timer, receiver: Receiver, maxlen=4096):
-        assert timer.redis is receiver.redis
+    def __init__(self, timer: Timer, publisher: Publisher, receiver: Receiver, maxlen=4096):
+        assert timer.redis is publisher.redis is receiver.redis
         super().__init__()
         self.timer = timer
         self.receiver = receiver
-        self.publisher = Publisher(receiver.redis, hint=timer.hint)
+        self.publisher = publisher
         self.maxlen = maxlen
 
     @staticmethod
