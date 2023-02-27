@@ -48,7 +48,7 @@ class Poller:
 
     @staticmethod
     def task_id(queue: str):
-        return f'task:poller:{queue}'
+        return f'poll:{queue}'
 
     def notify(self, queue: str):
         config = self.configs[queue]
