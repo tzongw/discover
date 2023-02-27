@@ -107,7 +107,7 @@ class ShardedTimer(Timer):
         key = self._sharded_key.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key: str, stream, interval=timedelta(seconds=1), offset=10, maxlen=1024):
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         assert key in self._sharded_key.fixed, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharded_key.sharded_keys(key, stream)
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)

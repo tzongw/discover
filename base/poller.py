@@ -20,7 +20,7 @@ class Config:
 
 class Poller:
     def __init__(self, redis: Redis, async_task: AsyncTask, timeout=timedelta(minutes=1)):
-        self.configs = {}
+        self.configs = {}  # type: dict[str, Config]
         self.async_task = async_task
 
         @async_task
