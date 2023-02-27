@@ -76,16 +76,16 @@ class AsyncTask(_BaseTask):
         wrapper.wrapped = f
         return wrapper
 
-    def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False, do_hint=True):
+    def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
         stream = self.stream_name(task)
-        return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
+        return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, stream=stream)
 
     def cancel(self, task_id: str):
         return self.timer.kill(task_id)
 
-    def publish(self, task, *, do_hint=True):
+    def publish(self, task):
         stream = self.stream_name(task)
-        self.publisher.publish(task, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
+        self.publisher.publish(task, maxlen=self.maxlen, stream=stream)
 
 
 class HeavyTask(_BaseTask):

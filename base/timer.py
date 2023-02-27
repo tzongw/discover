@@ -69,13 +69,12 @@ class Timer:
             return dict(zip(res[::2], res[1::2]))
         return res
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096,
-               do_hint=True, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
         function = 'timer_xadd'
         data = message.json(exclude_defaults=True)
         keys_and_args = [stream, data, maxlen]
-        if do_hint and self.hint:
+        if self.hint:
             function = 'timer_xadd_hint'
             keys_and_args.append(self.hint)
         return self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)

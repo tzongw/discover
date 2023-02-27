@@ -14,10 +14,10 @@ class Publisher:
         self.redis = redis
         self.hint = hint
 
-    def publish(self, message: BaseModel, maxlen=4096, do_hint=True, stream=None):
+    def publish(self, message: BaseModel, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
         params = [stream, 'MAXLEN', '~', maxlen]
-        if do_hint and self.hint:
+        if self.hint:
             params += ['HINT', self.hint]
         params += ['*', '', message.json(exclude_defaults=True)]
         return self.redis.execute_command('XADD', *params)

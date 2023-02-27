@@ -38,10 +38,10 @@ class ShardedPublisher(Publisher):
         super().__init__(redis, hint)
         self._sharded_key = sharded_key
 
-    def publish(self, message: BaseModel, maxlen=4096, do_hint=True, stream=None):
+    def publish(self, message: BaseModel, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
         stream = self._sharded_key.sharded_key(stream)
-        return super().publish(message, maxlen, do_hint, stream)
+        return super().publish(message, maxlen, stream)
 
 
 class NormalizedDispatcher(ProtoDispatcher):
@@ -90,11 +90,10 @@ class ShardedTimer(Timer):
         super().__init__(redis, hint)
         self._sharded_key = sharded_key
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, do_hint=True,
-               stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
         key, stream = self._sharded_key.sharded_keys(key, stream)
-        return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
 
     def kill(self, key):
         key = self._sharded_key.sharded_key(key)
@@ -119,10 +118,9 @@ class MigratingTimer(ShardedTimer):
         super().__init__(redis, sharded_key=sharded_new, hint=hint)
         self._timer_old = ShardedTimer(redis, sharded_key=sharded_old, hint=hint)
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096,
-               do_hint=True, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         self._timer_old.kill(key)
-        return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
 
     def kill(self, key):
         return super().kill(key) or self._timer_old.kill(key)
