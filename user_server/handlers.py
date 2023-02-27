@@ -51,7 +51,7 @@ def on_10s(dt: datetime):
 @async_task
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
-    async_task.cancel()
+    async_task.cancel('task:hello')
 
 
 @tick.crontab(second=range(0, 60, 15))
@@ -66,11 +66,14 @@ def init():
         timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer('welcome:2', const.RPC_USER))
     if redis.execute_command('MODULE LIST'):  # timer module loaded
-        oneshot_id = timer.create(Alarm(tip='oneshot'), timedelta(seconds=2))
+        oneshot_id = 'timer:oneshot'
+        timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))
         at_exit(lambda: timer.kill(oneshot_id))
-        loop_id = timer.create(Alarm(tip='loop'), timedelta(seconds=8), loop=True)
+        loop_id = 'timer:loop'
+        timer.create(loop_id, Alarm(tip='loop'), timedelta(seconds=8), loop=True)
         at_exit(lambda: timer.kill(loop_id))
-        task_id = async_task.post(task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
+        task_id = 'task:hello'
+        async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))

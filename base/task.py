@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+from datetime import timedelta
 from importlib import import_module
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, Union
 import functools
-from gevent.local import local
 from redis import Redis
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .mq import Receiver, Publisher
 from .timer import Timer
-from .utils import timer_name, var_args
+from .utils import var_args
 
 
 class Task(BaseModel):
@@ -49,16 +49,11 @@ class AsyncTask(_BaseTask):
         self.receiver = receiver
         self.publisher = Publisher(receiver.redis, hint=timer.hint)
         self.maxlen = maxlen
-        self.local = local()
 
     @staticmethod
     def stream_name(task: Task):
         from .utils import stream_name
         return f'{stream_name(task)}:{task.path}'
-
-    @staticmethod
-    def task_id(task: Task):
-        return f'{timer_name(Task)}:{task}'
 
     def __call__(self, f: F) -> F:
         path = self.validate(f)
@@ -69,12 +64,7 @@ class AsyncTask(_BaseTask):
         def handler(task: Task):
             args = loads(task.args)  # type: list
             kwargs = loads(task.kwargs)  # type: dict
-            self.local.task = task
-
-            try:
-                vf(*args, **kwargs)
-            finally:
-                del self.local.task
+            vf(*args, **kwargs)
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
@@ -86,21 +76,14 @@ class AsyncTask(_BaseTask):
         wrapper.wrapped = f
         return wrapper
 
-    def post(self, task: Task, interval, *, loop=False, task_id=None, do_hint=True):
-        key = task_id or self.task_id(task)
+    def post(self, task_id: str, task: Task, interval: Union[int, timedelta], *, loop=False, do_hint=True):
         stream = self.stream_name(task)
-        return self.timer.create(task, interval, loop=loop, key=key, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
+        return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 
-    @property
-    def current_task(self):
-        return self.local.task
+    def cancel(self, task_id: str):
+        return self.timer.kill(task_id)
 
-    def cancel(self, task_or_id=None):
-        task_id = self.task_id(task_or_id) if isinstance(task_or_id, Task) else task_or_id
-        return self.timer.kill(task_id or self.task_id(self.current_task))
-
-    def publish(self, task=None, do_hint=True):
-        task = task or self.current_task
+    def publish(self, task, *, do_hint=True):
         stream = self.stream_name(task)
         self.publisher.publish(task, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 

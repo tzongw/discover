@@ -3,7 +3,7 @@ from redis import Redis
 from datetime import timedelta
 from typing import Union
 from pydantic import BaseModel
-from .utils import stream_name, timer_name
+from .utils import stream_name
 
 
 class Timer:
@@ -72,19 +72,16 @@ class Timer:
             return dict(zip(res[::2], res[1::2]))
         return res
 
-    def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
+    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
                do_hint=True, stream=None):
         stream = stream or stream_name(message)
-        data = message.json(exclude_defaults=True)
-        if key is None:
-            key = f'{timer_name(message)}:{data}'
         function = 'timer_xadd'
+        data = message.json(exclude_defaults=True)
         keys_and_args = [stream, data, maxlen]
         if do_hint and self.hint:
             function = 'timer_xadd_hint'
             keys_and_args.append(self.hint)
-        self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
-        return key
+        return self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
     def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
         keys_and_args = [stream, offset, maxlen]

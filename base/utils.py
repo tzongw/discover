@@ -100,11 +100,6 @@ def stream_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:
     return f'stream:{cls.__name__}'
 
 
-def timer_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:
-    cls = message_or_cls.__class__ if isinstance(message_or_cls, BaseModel) else message_or_cls
-    return f'timer:{cls.__name__}'
-
-
 def func_desc(func):
     try:
         return f'{func.__module__}.{func.__name__}'

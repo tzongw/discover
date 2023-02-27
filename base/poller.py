@@ -26,25 +26,31 @@ class Poller:
         @async_task
         @deferrable
         def poll_task(queue: str):
-            defer_if(Result.TRUE, lambda: async_task.publish(do_hint=False))  # without lock
+            task = poll_task(queue)
+            defer_if(Result.TRUE, lambda: async_task.publish(task, do_hint=False))  # without lock
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
                 config = self.configs[queue]
                 if jobs := config.poll(redis, queue, config.batch):
                     config.handler(*jobs)
                     return True  # notify next
                 logging.debug(f'no jobs, quit {queue}')
-                async_task.cancel()
+                task_id = self.task_id(queue)
+                async_task.cancel(task_id)
                 if redis.exists(queue):  # race
                     logging.info(f'new jobs, restart {queue}')
-                    async_task.post(async_task.current_task, config.interval, loop=True, do_hint=False)
+                    async_task.post(task_id, task, config.interval, loop=True, do_hint=False)
                     return True  # notify next
 
         self.poll_task = poll_task
 
+    @staticmethod
+    def task_id(queue: str):
+        return f'task:poller:{queue}'
+
     def notify(self, queue: str):
         config = self.configs[queue]
         task = self.poll_task(queue)
-        self.async_task.post(task, config.interval, loop=True, do_hint=False)
+        self.async_task.post(self.task_id(queue), task, config.interval, loop=True, do_hint=False)
         self.async_task.publish(task, do_hint=False)
 
     def handler(self, queue, interval: Union[int, timedelta] = timedelta(seconds=1), *, poll=Redis.lpop, batch=100):

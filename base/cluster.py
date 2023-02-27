@@ -6,7 +6,7 @@ from binascii import crc32
 import gevent
 from pydantic import BaseModel
 from .mq import Publisher, Receiver, ProtoDispatcher
-from .utils import stream_name, timer_name
+from .utils import stream_name
 from .timer import Timer
 
 
@@ -91,15 +91,11 @@ class ShardedTimer(Timer):
         super().__init__(redis, hint)
         self._sharded_key = sharded_key
 
-    def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
+    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
                do_hint=True, stream=None):
         stream = stream or stream_name(message)
-        if key is None:
-            data = message.json(exclude_defaults=True)
-            key = f'{timer_name(message)}:{data}'
-        sharded_key, stream = self._sharded_key.sharded_keys(key, stream)
-        super().create(message, interval, loop=loop, key=sharded_key, maxlen=maxlen, do_hint=do_hint, stream=stream)
-        return key
+        key, stream = self._sharded_key.sharded_keys(key, stream)
+        return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)
 
     def kill(self, key):
         key = self._sharded_key.sharded_key(key)
@@ -113,7 +109,7 @@ class ShardedTimer(Timer):
         key = self._sharded_key.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+    def tick(self, key: str, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
         assert key in self._sharded_key.fixed, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharded_key.sharded_keys(key, stream)
         return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
@@ -124,13 +120,10 @@ class MigratingTimer(ShardedTimer):
         super().__init__(redis, sharded_key=sharded_new, hint=hint)
         self._timer_old = ShardedTimer(redis, sharded_key=sharded_old, hint=hint)
 
-    def create(self, message: BaseModel, interval: Union[int, timedelta], *, loop=False, key=None, maxlen=4096,
+    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
                do_hint=True, stream=None):
-        if key is None:
-            data = message.json(exclude_defaults=True)
-            key = f'{timer_name(message)}:{data}'
         self._timer_old.kill(key)
-        return super().create(message, interval, loop=loop, key=key, maxlen=maxlen, do_hint=do_hint, stream=stream)
+        return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)
 
     def kill(self, key):
         return super().kill(key) or self._timer_old.kill(key)
