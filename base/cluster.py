@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from typing import Union
 from datetime import timedelta
 from binascii import crc32
 import gevent
@@ -91,8 +90,8 @@ class ShardedTimer(Timer):
         super().__init__(redis, hint)
         self._sharded_key = sharded_key
 
-    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
-               do_hint=True, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, do_hint=True,
+               stream=None):
         stream = stream or stream_name(message)
         key, stream = self._sharded_key.sharded_keys(key, stream)
         return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)
@@ -109,10 +108,10 @@ class ShardedTimer(Timer):
         key = self._sharded_key.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key: str, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+    def tick(self, key: str, stream, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         assert key in self._sharded_key.fixed, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharded_key.sharded_keys(key, stream)
-        return super().tick(key, interval, stream, offset=offset, maxlen=maxlen)
+        return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
 
 class MigratingTimer(ShardedTimer):
@@ -120,7 +119,7 @@ class MigratingTimer(ShardedTimer):
         super().__init__(redis, sharded_key=sharded_new, hint=hint)
         self._timer_old = ShardedTimer(redis, sharded_key=sharded_old, hint=hint)
 
-    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096,
                do_hint=True, stream=None):
         self._timer_old.kill(key)
         return super().create(key, message, interval, loop=loop, maxlen=maxlen, do_hint=do_hint, stream=stream)

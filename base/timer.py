@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from redis import Redis
 from datetime import timedelta
-from typing import Union
 from pydantic import BaseModel
 from .utils import stream_name
 
@@ -48,10 +47,8 @@ class Timer:
         self.redis = redis
         self.hint = hint
 
-    def new(self, key: str, function: str, interval: Union[int, timedelta], loop: bool, num_keys: int,
-            keys_and_args):
-        if isinstance(interval, timedelta):
-            interval = int(interval.total_seconds() * 1000)
+    def new(self, key: str, function: str, interval: timedelta, loop: bool, num_keys: int, keys_and_args):
+        interval = int(interval.total_seconds() * 1000)
         assert interval >= 1
         params = [key, function, interval]
         if loop:
@@ -60,7 +57,7 @@ class Timer:
         params += keys_and_args
         return self.redis.execute_command('TIMER.NEW', *params)
 
-    def kill(self, key):
+    def kill(self, key: str):
         return self.redis.execute_command('TIMER.KILL', key)
 
     def exists(self, key: str):
@@ -72,7 +69,7 @@ class Timer:
             return dict(zip(res[::2], res[1::2]))
         return res
 
-    def create(self, key: str, message: BaseModel, interval: Union[int, timedelta], *, loop=False, maxlen=4096,
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096,
                do_hint=True, stream=None):
         stream = stream or stream_name(message)
         function = 'timer_xadd'
@@ -83,6 +80,6 @@ class Timer:
             keys_and_args.append(self.hint)
         return self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
-    def tick(self, key, interval: Union[int, timedelta], stream, offset=10, maxlen=1024):
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         keys_and_args = [stream, offset, maxlen]
         return self.new(key, 'timer_tick', interval, loop=True, num_keys=1, keys_and_args=keys_and_args)

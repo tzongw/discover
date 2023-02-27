@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import timedelta
 from importlib import import_module
-from typing import TypeVar, Callable, Union
+from typing import TypeVar, Callable
 import functools
 from redis import Redis
 from pydantic import BaseModel
@@ -76,7 +76,7 @@ class AsyncTask(_BaseTask):
         wrapper.wrapped = f
         return wrapper
 
-    def post(self, task_id: str, task: Task, interval: Union[int, timedelta], *, loop=False, do_hint=True):
+    def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False, do_hint=True):
         stream = self.stream_name(task)
         return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, do_hint=do_hint, stream=stream)
 

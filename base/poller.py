@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import timedelta
-from typing import Callable, Union
+from typing import Callable
 from dataclasses import dataclass
 from contextlib import suppress
 from redis import Redis
@@ -13,7 +13,7 @@ from .defer import deferrable, defer_if, Result
 @dataclass
 class Config:
     handler: Callable
-    interval: Union[int, timedelta]
+    interval: timedelta
     poll: Callable
     batch: int
 
@@ -53,7 +53,7 @@ class Poller:
         self.async_task.post(self.task_id(queue), task, config.interval, loop=True, do_hint=False)
         self.async_task.publish(task, do_hint=False)
 
-    def handler(self, queue, interval: Union[int, timedelta] = timedelta(seconds=1), *, poll=Redis.lpop, batch=100):
+    def handler(self, queue, interval=timedelta(seconds=1), *, poll=Redis.lpop, batch=100):
         def decorator(f):
             assert queue not in self.configs
             self.configs[queue] = Config(f, interval, poll, batch)
