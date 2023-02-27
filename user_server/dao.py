@@ -44,9 +44,9 @@ class GetterMixin(Generic[T]):
 
     @classmethod
     def mget(cls, keys) -> list[Optional[T]]:
-        query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query)}
-        return [mapping.get(cls.id.to_python(k)) for k in keys]
+        keys = [cls.id.to_python(k) for k in keys]
+        mapping = {o.id: o for o in cls.objects(_id__in=keys)}
+        return [mapping.get(k) for k in keys]
 
     @classmethod
     def get(cls, key, ensure_exists=True) -> Optional[T]:
@@ -62,7 +62,6 @@ class GetterMixin(Generic[T]):
 
 
 class CacheMixin:
-    _class_name: str
     id: Any
 
     def invalidate(self):
