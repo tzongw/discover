@@ -12,10 +12,8 @@ from .defer import deferrable, defer_if, Result
 
 @dataclass
 class Config:
-    handler: Callable
-    interval: timedelta
     poll: Callable
-    batch: int
+    interval: timedelta
 
 
 class Poller:
@@ -33,13 +31,12 @@ class Poller:
             task = poll_task(group, queue)
             defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
-                if jobs := config.poll(redis, queue, config.batch):
-                    config.handler(queue, jobs)
+                if not config.poll(queue):
                     return True  # notify next
                 logging.debug(f'no jobs, stop {queue}')
                 task_id = self.task_id(queue)
                 async_task.cancel(task_id)
-                if redis.exists(queue):  # race
+                if not config.poll(queue):  # race
                     logging.info(f'new jobs, restart {queue}')
                     async_task.post(task_id, task, config.interval, loop=True)
                     return True  # notify next
@@ -56,10 +53,10 @@ class Poller:
         self.async_task.post(self.task_id(queue), task, config.interval, loop=True)
         self.async_task.publish(task)
 
-    def handler(self, group, interval=timedelta(seconds=1), *, poll=Redis.lpop, batch=100):
-        def decorator(f):
+    def handler(self, group, interval=timedelta(seconds=1)):
+        def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(f, interval, poll, batch)
-            return f
+            self.configs[group] = Config(poll, interval)
+            return poll
 
         return decorator

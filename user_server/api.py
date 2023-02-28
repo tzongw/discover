@@ -72,9 +72,12 @@ def log(message):
         gevent.sleep(1)
 
 
-@poller.handler('hello', interval=timedelta(seconds=10), batch=1)
-def poll(queue, names):
-    logging.info(f'{queue} got {names}')
+@poller.handler('hello', interval=timedelta(seconds=10))
+def poll(queue):
+    name = redis.lpop(queue)
+    if not name:
+        return True
+    logging.info(f'{queue} got {name}')
     gevent.sleep(1)
 
 
