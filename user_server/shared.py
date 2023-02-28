@@ -26,5 +26,5 @@ def session(uid: int):
         return pipe.execute()
 
 
-session_cache = TTLCache[Session](get=session)
-session_cache.listen(invalidator, 'session')
+sessions: TTLCache[Session] = TTLCache(get=session)
+sessions.listen(invalidator, 'session')

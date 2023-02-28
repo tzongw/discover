@@ -86,7 +86,8 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
     addr = StringField(default='')
 
 
-cache = FullCache(mget=Profile.mget, make_key=Profile.id.to_python, get_keys=lambda: Profile.objects.distinct('id'))
+cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.id.to_python,
+                                      get_keys=lambda: Profile.objects.distinct('id'))
 cache.listen(invalidator, Profile.__name__)
 Profile.mget = cache.mget
 

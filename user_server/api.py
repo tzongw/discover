@@ -13,7 +13,7 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, session_cache, ctx, redis, poller
+from shared import app, parser, dispatcher, id_generator, sessions, ctx, redis, poller
 import gevent
 from gevent import pywsgi
 from config import options
@@ -214,7 +214,7 @@ bp = Blueprint('/', __name__)
 @bp.before_request
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
-    if not uid or not token or token != session_cache.get(uid).token:
+    if not uid or not token or token != sessions.get(uid).token:
         raise Unauthorized
     ctx.uid = g.uid = uid
 
