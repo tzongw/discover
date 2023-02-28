@@ -97,8 +97,8 @@ def main():
             raise ValueError(f'source({source}) == target({target})')
         migrate(redis, source, target, slot)
     else:
-        if not 0 <= slot <= 16384:
-            raise ValueError(f'slot({slot}) out of range')
+        if slot not in (0, 16384):
+            raise ValueError(f'slot({slot}) not support')
         slots = {redis.keyslot(str(i)) for i in range(len(redis.get_primaries()))}
         if slot > 0:
             slots = set(range(slot)) - slots
