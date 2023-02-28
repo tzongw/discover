@@ -67,16 +67,16 @@ class Parser:
         mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
         return self._redis.msetnx(mapping)
 
-    def hget(self, name, cls: Type[M], *, only=None, exclude=None) -> Optional[M]:
+    def hget(self, name, cls: Type[M], *, include=None, exclude=None) -> Optional[M]:
         if exclude is not None:
-            assert not only, '`only`, `exclude` are mutually exclusive'
-            only = [field for field in cls.__fields__ if field not in exclude]
-        if only:
+            assert not include, '`include`, `exclude` are mutually exclusive'
+            include = [field for field in cls.__fields__ if field not in exclude]
+        if include:
             def convert(values):
-                mapping = {k: v for k, v in zip(only, values) if v is not None}
+                mapping = {k: v for k, v in zip(include, values) if v is not None}
                 return cls.parse_obj(mapping)
 
-            return self._redis.execute_command('HMGET', name, *only, convert=convert)
+            return self._redis.execute_command('HMGET', name, *include, convert=convert)
         else:
             def convert(mapping):
                 return cls.parse_obj(mapping) if mapping else None

@@ -39,8 +39,9 @@ T = TypeVar('T')
 class GetterMixin(Generic[T]):
     id: Any
     objects: Callable
+    _fields: dict
     _data: dict
-    __fields__ = None
+    __include__ = None
 
     @classmethod
     def mget(cls, keys) -> list[Optional[T]]:
@@ -55,10 +56,13 @@ class GetterMixin(Generic[T]):
             raise KeyError(f'document {key} not exists')
         return value
 
-    def to_dict(self, fields=None):
-        if fields is None:
-            fields = self.__fields__
-        return {k: v for k, v in self._data.items() if k in fields} if fields else self._data
+    def to_dict(self, include=None, exclude=None):
+        if exclude is not None:
+            assert not include, '`include`, `exclude` are mutually exclusive'
+            include = [field for field in self._fields if field not in exclude]
+        if include is None:
+            include = self.__include__
+        return {k: v for k, v in self._data.items() if k in include} if include else self._data
 
 
 class CacheMixin:
@@ -79,7 +83,7 @@ def collection(coll):
 
 @collection
 class Profile(Document, GetterMixin['Profile'], CacheMixin):
-    __fields__ = ['name', 'addr']
+    __include__ = ['name', 'addr']
 
     id = IntField(primary_key=True)
     name = StringField(default='')

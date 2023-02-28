@@ -109,7 +109,7 @@ def hello(names):
 def get_documents(collection: str, cursor=0, limit=10, order_by=None, **kwargs):
     coll = collections[collection]
     order_by = order_by or [f'-{coll.id.name}']
-    docs = [doc.to_dict(fields=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(limit)]
+    docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(limit)]
     return {
         'documents': docs,
         'cursor': '' if len(docs) < limit else str(cursor + limit),
