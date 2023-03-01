@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import timedelta
-from typing import Callable
+from typing import Callable, Optional
 from dataclasses import dataclass
 from contextlib import suppress
 from redis import Redis
@@ -14,6 +14,7 @@ from .defer import deferrable, defer_if, Result
 class Config:
     poll: Callable
     interval: timedelta
+    spawn: Optional[Callable]
 
 
 class Poller:
@@ -22,12 +23,18 @@ class Poller:
         self.async_task = async_task
 
         @async_task
-        @deferrable
         def poll_task(group: str, queue: str):
             config = self.configs.get(group)
             if not config:
                 logging.info(f'no config, quit {queue}')  # deploying? other apps will poll again
                 return
+            if spawn := config.spawn:
+                spawn(do_poll, config, group, queue)
+            else:
+                do_poll(config, group, queue)
+
+        @deferrable
+        def do_poll(config: Config, group: str, queue: str):
             task = poll_task(group, queue)
             defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
@@ -53,10 +60,10 @@ class Poller:
         self.async_task.post(self.task_id(queue), task, config.interval, loop=True)
         self.async_task.publish(task)
 
-    def handler(self, group, interval=timedelta(seconds=1)):
+    def handler(self, group, interval=timedelta(seconds=1), spawn=None):
         def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(poll, interval)
+            self.configs[group] = Config(poll, interval, spawn)
             return poll
 
         return decorator

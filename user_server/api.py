@@ -13,7 +13,7 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, sessions, ctx, redis, poller
+from shared import app, parser, dispatcher, id_generator, sessions, ctx, redis, poller, spawn_worker
 import gevent
 from gevent import pywsgi
 from config import options
@@ -72,7 +72,7 @@ def log(message):
         gevent.sleep(1)
 
 
-@poller.handler('hello', interval=timedelta(seconds=10))
+@poller.handler('hello', interval=timedelta(seconds=10), spawn=spawn_worker)
 def poll(queue):
     name = redis.lpop(queue)
     if not name:
