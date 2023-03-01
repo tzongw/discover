@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from config import options
 import const
 from base import FullCache
-from common.shared import invalidator
+from common.shared import invalidator, id_generator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
 engine = create_engine('sqlite:///db.sqlite3', echo=echo)
@@ -86,7 +86,7 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
     __include__ = ['name', 'addr']
     meta = {'strict': False}
 
-    id = IntField(primary_key=True)
+    id = IntField(primary_key=True, default=id_generator.gen)
     name = StringField(default='')
     addr = StringField(default='')
     rank = IntField(required=True)

@@ -8,7 +8,7 @@ import json
 from datetime import datetime, date, timedelta
 import flask
 from flask import jsonify, Blueprint, g, request
-from flask.app import DefaultJSONProvider
+from flask.app import DefaultJSONProvider, Flask
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
@@ -48,6 +48,17 @@ class JSONProvider(DefaultJSONProvider):
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
+
+
+def make_response(rv):
+    if rv is None:
+        rv = {}
+    elif isinstance(rv, GetterMixin):
+        rv = rv.to_dict()
+    return Flask.make_response(app, rv)
+
+
+app.make_response = make_response
 
 
 def serve():
@@ -125,10 +136,16 @@ def upsert_document(collection: str, **kwargs):
     coll = collections[collection]
     doc = coll(**kwargs).save()
     doc.invalidate()
-    return {}
 
 
-@app.route('/collections/<collection>/documents/<doc_id>/fields/<field>', methods=['POST'])
+@app.route('/collections/<collection>/documents/<doc_id>', methods=['DELETE'])
+@use_kwargs({}, location='json_or_form')
+def delete_documents(collection: str, doc_id):
+    coll = collections[collection]
+    coll.objects(**{coll.id.name: doc_id}).delete()
+
+
+@app.route('/collections/<collection>/documents/<doc_id>/fields/<field>', methods=['PATCH'])
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
@@ -147,7 +164,6 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
         coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
         for doc in docs:
             doc.invalidate()
-    return {}
 
 
 @app.route('/eval', methods=['POST'])
