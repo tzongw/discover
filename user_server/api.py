@@ -128,6 +128,28 @@ def upsert_document(collection: str, **kwargs):
     return {}
 
 
+@app.route('/collections/<collection>/documents/<doc_id>/fields/<field>', methods=['POST'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def move_documents(collection: str, doc_id, field: str, **kwargs):
+    coll = collections[collection]
+    target = coll.get(doc_id)
+    value = target[field]
+    kwargs[f'{field}__gte'] = value
+    kwargs[f'{coll.id.name}__ne'] = doc_id
+    docs = []
+    for doc in coll.objects(**kwargs).only(field).order_by(field):
+        if doc[field] != value:
+            break
+        docs.append(doc)
+        value += 1
+    if docs:
+        doc_ids = [doc.id for doc in docs]
+        coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
+        for doc in docs:
+            doc.invalidate()
+    return {}
+
+
 @app.route('/eval', methods=['POST'])
 def eval_code():
     if request.remote_addr not in ['127.0.0.1', '::1', '::ffff:127.0.0.1']:

@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, Any, TypeVar, Generic, Optional
 from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect
+from mongoengine import Document, IntField, StringField, connect, DoesNotExist
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -53,7 +53,7 @@ class GetterMixin(Generic[T]):
     def get(cls, key, ensure_exists=True) -> Optional[T]:
         value = cls.mget([key])[0]
         if value is None and ensure_exists:
-            raise KeyError(f'document {key} not exists')
+            raise DoesNotExist(f'document {key} not exists')
         return value
 
     def to_dict(self, include=None, exclude=None):
@@ -84,14 +84,16 @@ def collection(coll):
 @collection
 class Profile(Document, GetterMixin['Profile'], CacheMixin):
     __include__ = ['name', 'addr']
+    meta = {'strict': False}
 
     id = IntField(primary_key=True)
     name = StringField(default='')
     addr = StringField(default='')
+    rank = IntField(required=True)
 
 
 cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.id.to_python,
-                                      get_keys=lambda: Profile.objects.distinct('id'))
+                                      get_keys=lambda: Profile.objects.distinct(Profile.id.name))
 cache.listen(invalidator, Profile.__name__)
 Profile.mget = cache.mget
 
