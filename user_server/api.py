@@ -9,6 +9,7 @@ from datetime import datetime, date, timedelta
 import flask
 from flask import jsonify, Blueprint, g, request
 from flask.app import DefaultJSONProvider, Flask
+from pydantic import BaseModel
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
@@ -33,6 +34,8 @@ class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, GetterMixin):
             return o.to_dict()
+        elif isinstance(o, BaseModel):
+            return o.dict()
         elif isinstance(o, datetime):
             return o.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(o, date):
@@ -55,6 +58,8 @@ def make_response(rv):
         rv = {}
     elif isinstance(rv, GetterMixin):
         rv = rv.to_dict()
+    elif isinstance(rv, BaseModel):
+        rv = rv.json()
     return Flask.make_response(app, rv)
 
 
