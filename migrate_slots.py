@@ -94,11 +94,19 @@ def main():
             addr = Addr(name)
             redis.nodes_manager.nodes_cache[name] = ClusterNode(host=addr.host, port=addr.port, server_type=PRIMARY)
     if target:
-        if not 0 <= slot < 16384:
+        if not -1 <= slot < 16384:
             raise ValueError(f'slot({slot}) out of range')
         if source == target:
             raise ValueError(f'source({source}) == target({target})')
-        migrate(redis, source, target, slot)
+        if slot == -1:
+            for slots, node in redis.cluster_slots().items():
+                addr = node['primary']
+                if addr != (source.host, source.port):
+                    continue
+                for slot in range(slots[0], slots[1] + 1):
+                    migrate(redis, source, target, slot)
+        else:
+            migrate(redis, source, target, slot)
     else:
         if slot not in (0, 16384):
             raise ValueError(f'slot({slot}) not support')
