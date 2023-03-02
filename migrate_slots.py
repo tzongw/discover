@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 import sys
-from collections import defaultdict
 from enum import Enum, auto
-from redis.cluster import ClusterNode
+from redis.cluster import ClusterNode, PRIMARY
 from tornado.options import define, options
 from redis import RedisCluster
 from base import Addr
@@ -90,6 +89,10 @@ def main():
     target = options.target
     slot = options.slot
     redis = RedisCluster(host=source.host, port=source.port, decode_responses=True)
+    for name, info in redis.cluster_nodes().items():
+        if 'master' in info['flags'] and not redis.get_node(node_name=name):  # primaries with no slots
+            addr = Addr(name)
+            redis.nodes_manager.nodes_cache[name] = ClusterNode(host=addr.host, port=addr.port, server_type=PRIMARY)
     if target:
         if not 0 <= slot < 16384:
             raise ValueError(f'slot({slot}) out of range')
