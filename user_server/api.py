@@ -5,7 +5,7 @@ import uuid
 from collections import OrderedDict
 import logging
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import flask
 from flask import jsonify, Blueprint, g, request
 from flask.app import DefaultJSONProvider, Flask
