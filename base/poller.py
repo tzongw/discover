@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from datetime import timedelta
+from enum import Enum, auto
 from typing import Callable, Optional
 from dataclasses import dataclass
 from contextlib import suppress
@@ -15,6 +16,16 @@ class Config:
     poll: Callable
     interval: timedelta
     spawn: Optional[Callable]
+
+
+class PollStatus(Enum):
+    ASAP = auto()  # default
+    YIELD = auto()
+    DONE = auto()
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.ASAP
 
 
 class Poller:
@@ -36,17 +47,19 @@ class Poller:
         @deferrable
         def do_poll(config: Config, group: str, queue: str):
             task = poll_task(group, queue)
-            defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock
+            defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock, notify next if true
             with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
-                if not config.poll(queue):
-                    return True  # notify next
+                status = PollStatus(config.poll(queue))
+                if status is not PollStatus.DONE:
+                    return status is PollStatus.ASAP
                 logging.debug(f'no jobs, stop {queue}')
                 task_id = self.task_id(queue)
                 async_task.cancel(task_id)
-                if not config.poll(queue):  # race
+                status = PollStatus(config.poll(queue))
+                if status is not PollStatus.DONE:  # race
                     logging.info(f'new jobs, restart {queue}')
                     async_task.post(task_id, task, config.interval, loop=True)
-                    return True  # notify next
+                    return status is PollStatus.ASAP
 
         self.poll_task = poll_task
 

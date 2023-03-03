@@ -15,6 +15,7 @@ from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
 from shared import app, parser, dispatcher, id_generator, sessions, ctx, redis, poller, spawn_worker
+from base.poller import PollStatus
 import gevent
 from gevent import pywsgi
 from config import options
@@ -88,13 +89,13 @@ def log(message):
         gevent.sleep(1)
 
 
-@poller.handler('hello', interval=timedelta(seconds=10), spawn=spawn_worker)
+@poller.handler('hello', spawn=spawn_worker)
 def poll(queue):
     name = redis.lpop(queue)
-    if not name:
-        return True
+    if name is None:
+        return PollStatus.DONE
     logging.info(f'{queue} got {name}')
-    gevent.sleep(1)
+    return PollStatus.YIELD if name == 'tang' else PollStatus.ASAP
 
 
 @app.route('/hello/<list:names>')
@@ -113,8 +114,8 @@ def hello(names):
         description: hello
     """
     if len(names) > 1:
-        redis.rpush('queue:hello', *names)
-        poller.notify('hello', 'queue:hello')
+        if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
+            poller.notify('hello', 'queue:hello')
     else:
         heavy_task.push(log('processing'))
     return f'say hello {names}'
