@@ -6,7 +6,6 @@ from .utils import stream_name
 
 
 class Timer:
-    _PREFIX = 'timer'
     _SCRIPT = """#!lua name=timer
         local function timer_xadd(keys, args)
             return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
