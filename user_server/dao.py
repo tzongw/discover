@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, Any, TypeVar, Generic, Optional
 from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect, DoesNotExist
+from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -72,6 +73,15 @@ class CacheMixin:
         key = f'{self.__class__.__name__}:{self.id}'
         invalidator.publish(key)
 
+    @staticmethod
+    def default_expire(*keys):
+        def get_expire(values):
+            now = datetime.now()
+            expires = [value[key] for value in values for key in keys if value[key] >= now]
+            return min(expires) if expires else None
+
+        return get_expire
+
 
 collections = {}
 
@@ -89,13 +99,21 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
     id = IntField(primary_key=True, default=id_generator.gen)
     name = StringField(default='')
     addr = StringField(default='')
-    rank = IntField(required=True)
+    rank = IntField()
+    expire = DateTimeField()
 
 
 cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.id.to_python,
-                                      get_keys=lambda: Profile.objects.distinct(Profile.id.name))
+                                      get_keys=lambda: Profile.objects(expire__gt=datetime.now()).distinct(
+                                          Profile.id.name))
 cache.listen(invalidator, Profile.__name__)
 Profile.mget = cache.mget
+
+
+@cache.cached(get_expire=Profile.default_expire('expire'))
+def valid_profiles():
+    now = datetime.now()
+    return [profile for profile in cache.values if profile.expire > now]
 
 
 class CommandLogger(monitoring.CommandListener):
