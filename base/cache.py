@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
-from typing import TypeVar, Optional, Generic, Callable
+from typing import TypeVar, Optional, Generic, Callable, Sequence
 from concurrent.futures import Future
 import functools
 
@@ -132,7 +132,7 @@ class TTLCache(Cache[T]):
         return results
 
 
-class FullMixin:
+class FullMixin(Generic[T]):
     full_cached: bool
     mget: Callable
 
@@ -148,7 +148,7 @@ class FullMixin:
         return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
 
     @property
-    def values(self):
+    def values(self) -> Sequence[T]:
         if self._fut:
             self.full_misses += 1
             return self._fut.result()
@@ -201,13 +201,13 @@ class FullMixin:
         return decorator
 
 
-class FullCache(FullMixin, Cache[T]):
+class FullCache(FullMixin[T], Cache[T]):
     def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys)
 
 
-class FullTTLCache(FullMixin, TTLCache[T]):
+class FullTTLCache(FullMixin[T], TTLCache[T]):
     def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys)
