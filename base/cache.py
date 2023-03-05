@@ -136,13 +136,11 @@ class FullMixin:
     full_cached: bool
     mget: Callable
 
-    def __init__(self, *, get_keys, get_expire=None):
+    def __init__(self, get_keys):
         self.get_keys = get_keys
-        self.get_expire = get_expire
         self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
-        self._expire_at = None
         self.full_hits = 0
         self.full_misses = 0
 
@@ -150,28 +148,19 @@ class FullMixin:
         return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
 
     @property
-    def version(self):
-        # noinspection PyStatementEffect
-        self.values
-        return self._version
-
-    @property
     def values(self):
         if self._fut:
             self.full_misses += 1
             return self._fut.result()
-        if self.full_cached and (self._expire_at is None or self._expire_at > datetime.now()):
+        if self.full_cached:
             self.full_hits += 1
             return self._values
         self.full_misses += 1
         self._fut = Future()
-        self.full_cached = True
+        self.full_cached = True  # BEFORE `get_keys` and `mget`, invalidate events may happen simultaneously
         try:
             keys = self.get_keys()
             self._values = self.mget(keys)
-            if self.get_expire:
-                expire = self.get_expire(self._values)
-                self._expire_at = expire_at(expire)
             self._version += 1
             self._fut.set_result(self._values)
             return self._values
@@ -182,21 +171,27 @@ class FullMixin:
         finally:
             self._fut = None
 
-    def cached(self, maxsize=128, typed=False):
+    def cached(self, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
             @functools.lru_cache(maxsize, typed)
             def inner(*args, **kwargs):
-                self.full_hits -= 1  # full_hits will +1 in f redundantly
+                self.full_hits -= 1  # full_hits will +1 in f redundantly because values was accessed in wrapper
                 return f(*args, **kwargs)
 
-            inner.version = 0
+            cache_version = 0
+            cache_expire: Optional[datetime] = None
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
-                v = self.version
-                if inner.version != v:
-                    inner.version = v
+                nonlocal cache_version
+                nonlocal cache_expire
+                values = self.values  # update version if needed
+                if cache_version != self._version or (cache_expire and cache_expire < datetime.now()):
                     inner.cache_clear()
+                    cache_version = self._version
+                    if get_expire:
+                        expire = get_expire(values)
+                        cache_expire = expire_at(expire)
                 return inner(*args, **kwargs)
 
             wrapper.cache_info = inner.cache_info
@@ -207,12 +202,12 @@ class FullMixin:
 
 
 class FullCache(FullMixin, Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys=get_keys, get_expire=get_expire)
+        super().__init__(get_keys)
 
 
 class FullTTLCache(FullMixin, TTLCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys=get_keys, get_expire=get_expire)
+        super().__init__(get_keys)
