@@ -136,11 +136,13 @@ class FullMixin(Generic[T]):
     full_cached: bool
     mget: Callable
 
-    def __init__(self, get_keys):
+    def __init__(self, *, get_keys, get_expire=None):
         self.get_keys = get_keys
+        self.get_expire = get_expire
         self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
+        self._expire_at = None
         self.full_hits = 0
         self.full_misses = 0
 
@@ -152,7 +154,7 @@ class FullMixin(Generic[T]):
         if self._fut:
             self.full_misses += 1
             return self._fut.result()
-        if self.full_cached:
+        if self.full_cached and (self._expire_at is None or self._expire_at > datetime.now()):
             self.full_hits += 1
             return self._values
         self.full_misses += 1
@@ -161,6 +163,9 @@ class FullMixin(Generic[T]):
         try:
             keys = self.get_keys()
             self._values = self.mget(keys)
+            if self.get_expire:
+                expire = self.get_expire(self._values)
+                self._expire_at = expire_at(expire)
             self._version += 1
             self._fut.set_result(self._values)
             return self._values
@@ -202,12 +207,12 @@ class FullMixin(Generic[T]):
 
 
 class FullCache(FullMixin[T], Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys)
+        super().__init__(get_keys=get_keys, get_expire=get_expire)
 
 
 class FullTTLCache(FullMixin[T], TTLCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys)
+        super().__init__(get_keys=get_keys, get_expire=get_expire)
