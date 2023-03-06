@@ -63,11 +63,11 @@ def rebalance(redis: RedisCluster, slots: set):
             pipe.cluster_countkeysinslot(slot)
         count_keys = dict(zip(slots, pipe.execute()))
     for node, owned in owners.items():
-        owned.sort(key=lambda slot: count_keys[slot])
+        owned.sort(key=lambda slot: (count_keys[slot], slot))
         logging.info(f'node: {node} slots: {len(owned)}')
     nodes = list(owners)
     while True:
-        nodes.sort(key=lambda n: len(owners[n]))
+        nodes.sort(key=lambda n: (len(owners[n]), n))
         low: ClusterNode = redis.get_node(node_name=nodes[0])
         high: ClusterNode = redis.get_node(node_name=nodes[-1])
         need = expect - len(owners[low.name])
@@ -76,9 +76,11 @@ def rebalance(redis: RedisCluster, slots: set):
         if need == 0 and can <= 1:
             logging.info('rebalance done!!')
             break
-        slot = owners[high.name].pop(0)
-        owners[low.name].append(slot)  # not sorted
-        migrate(redis, source=Addr(high.name), target=Addr(low.name), slot=slot)
+        count = min(need, can) or 1
+        for _ in range(count):
+            slot = owners[high.name].pop(0)
+            owners[low.name].append(slot)  # not sorted
+            migrate(redis, source=Addr(high.name), target=Addr(low.name), slot=slot)
     for node, owned in owners.items():
         logging.info(f'node: {node} slots: {len(owned)}')
 
