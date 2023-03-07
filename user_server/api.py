@@ -138,9 +138,18 @@ def get_documents(collection: str, cursor=0, limit=10, order_by=None, **kwargs):
 
 @app.route('/collections/<collection>/documents', methods=['POST'])
 @use_kwargs({}, location='json_or_form', unknown='include')
-def upsert_document(collection: str, **kwargs):
+def create_document(collection: str, **kwargs):
     coll = collections[collection]
     doc = coll(**kwargs).save()
+    doc.invalidate()  # notify full cache new document created
+
+
+@app.route('/collections/<collection>/documents/<doc_id>', methods=['PATCH'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def update_document(collection: str, doc_id, **kwargs):
+    coll = collections[collection]
+    doc = coll.get(doc_id)
+    doc.modify(**kwargs)
     doc.invalidate()
 
 
@@ -148,7 +157,9 @@ def upsert_document(collection: str, **kwargs):
 @use_kwargs({}, location='json_or_form')
 def delete_documents(collection: str, doc_id):
     coll = collections[collection]
-    coll.objects(**{coll.id.name: doc_id}).delete()
+    doc = coll.get(doc_id)
+    doc.delete()
+    doc.invalidate()
 
 
 @app.route('/collections/<collection>/documents/<doc_id>/fields/<field>', methods=['PATCH'])

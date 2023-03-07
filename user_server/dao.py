@@ -2,7 +2,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Any, TypeVar, Generic, Optional
+from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
 from pymongo import monitoring
 from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField
 from sqlalchemy import Column
@@ -83,7 +83,7 @@ class CacheMixin:
         return get_expire
 
 
-collections = {}
+collections: dict[str, Union[Type[Document], Type[GetterMixin], Type[CacheMixin]]] = {}
 
 
 def collection(coll):
