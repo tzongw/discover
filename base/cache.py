@@ -55,7 +55,7 @@ class Cache(Generic[T]):
 
     def mget(self, keys, *args, **kwargs):
         results = []
-        missed_keys = []
+        missing_keys = []
         made_keys = []
         indexes = []
         for index, key in enumerate(keys):
@@ -68,13 +68,13 @@ class Cache(Generic[T]):
                     self.lru.move_to_end(made_key)
             else:
                 self.misses += 1
-                missed_keys.append(key)
+                missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
-        if missed_keys:
-            values = self.single_flight.mget(missed_keys, *args, **kwargs)
+        if missing_keys:
+            values = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
                 results[index] = value
                 if made_key in self.lru:
@@ -104,7 +104,7 @@ class TTLCache(Cache[T]):
 
     def mget(self, keys, *args, **kwargs):
         results = []
-        missed_keys = []
+        missing_keys = []
         made_keys = []
         indexes = []
         for index, key in enumerate(keys):
@@ -117,13 +117,13 @@ class TTLCache(Cache[T]):
                     self.lru.move_to_end(made_key)
             else:
                 self.misses += 1
-                missed_keys.append(key)
+                missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
                 results.append(self.placeholder)
                 self._set(made_key, self.placeholder)
-        if missed_keys:
-            tuples = self.single_flight.mget(missed_keys, *args, **kwargs)
+        if missing_keys:
+            tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 results[index] = value
                 if made_key in self.lru:
