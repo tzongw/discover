@@ -48,6 +48,8 @@ def migrate(redis: RedisCluster, source: Addr, target: Addr, slot, confirm=Confi
     redis.cluster_setslot(target_node=target_node, node_id=target_id, slot_id=slot, state='NODE')
     redis.cluster_setslot(target_node=source_node, node_id=target_id, slot_id=slot, state='NODE')
     for node in redis.get_primaries():
+        if node in [source_node, target_node]:
+            continue
         redis.cluster_setslot(target_node=node, node_id=target_id, slot_id=slot, state='NODE')
     logging.info(f'migrate slot({slot} source({source}) -> target({target}) done')
 
