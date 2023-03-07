@@ -48,12 +48,13 @@ class Poller:
         def do_poll(config: Config, group: str, queue: str):
             task = poll_task(group, queue)
             defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock, notify next if true
-            with suppress(LockError), Lock(redis, f'lock:{queue}', timeout=timeout.total_seconds(), blocking=False):
+            with suppress(LockError), Lock(redis, f'lock:{group}:{queue}', timeout=timeout.total_seconds(),
+                                           blocking=False):
                 status = PollStatus(config.poll(queue))
                 if status is not PollStatus.DONE:
                     return status is PollStatus.ASAP
                 logging.debug(f'no jobs, stop {queue}')
-                task_id = self.task_id(queue)
+                task_id = self.task_id(group, queue)
                 async_task.cancel(task_id)
                 status = PollStatus(config.poll(queue))
                 if status is not PollStatus.DONE:  # race
@@ -64,13 +65,13 @@ class Poller:
         self.poll_task = poll_task
 
     @staticmethod
-    def task_id(queue: str):
-        return f'poll:{queue}'
+    def task_id(group: str, queue: str):
+        return f'poll:{group}:{queue}'
 
     def notify(self, group: str, queue: str):
         config = self.configs[group]
         task = self.poll_task(group, queue)
-        self.async_task.post(self.task_id(queue), task, config.interval, loop=True)
+        self.async_task.post(self.task_id(group, queue), task, config.interval, loop=True)
         self.async_task.publish(task)
 
     def handler(self, group, interval=timedelta(seconds=1), spawn=None):
