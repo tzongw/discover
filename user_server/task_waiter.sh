@@ -16,5 +16,5 @@ while true; do
   if [ ! -f "$py" ]; then
     py="/usr/bin/env python"
   fi
-  PYTHONPATH="./common/gen-py:." $py user_server/cron.py "+" "$task"
+  TZ="Asia/Shanghai" PYTHONPATH="./common/gen-py:." $py user_server/cron.py "+" "$task"
 done
