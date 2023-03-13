@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from typing import Iterable, Union
-
+from binascii import crc32
 from .executor import Executor
 from .utils import var_args
 
@@ -53,8 +53,8 @@ class TimeDispatcher:
 
     def dispatch(self, ts: int):
         dt = datetime.fromtimestamp(ts)
-        for period, handle in self._periodic_handlers:
-            if ts % period == 0:
+        for period, remain, handle in self._periodic_handlers:
+            if ts % period == remain:
                 self._executor.submit(handle, dt)
         now = _Crontab(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.weekday())
         for cron, handle in self._crontab_handlers:
@@ -67,7 +67,9 @@ class TimeDispatcher:
         assert isinstance(period, int) and period > 0
 
         def decorator(f):
-            self._periodic_handlers.append([period, var_args(f)])
+            # scatter handlers with same period, `remain` consistent across different processes
+            remain = crc32(f.__name__.encode()) % period
+            self._periodic_handlers.append([period, remain, var_args(f)])
             return f
 
         return decorator

@@ -23,7 +23,7 @@ class ShardedKey:
 
     def sharded_keys(self, *keys):
         assert all(not key.startswith('{') for key in keys)
-        # consistent across different runs
+        # `shard` consistent across different processes
         shard = 0 if keys[0] in self.fixed else crc32(keys[0].encode()) % self.shards
         return [f'{{{shard}}}:{key}' for key in keys]
 
