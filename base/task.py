@@ -11,7 +11,7 @@ from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .mq import Receiver, Publisher
 from .timer import Timer
-from .utils import var_args
+from .utils import var_args, func_desc
 
 
 class Task(BaseModel):
@@ -28,8 +28,8 @@ class _BaseTask:
     def __init__(self):
         self.paths = set()
 
-    def validate(self, f):
-        path = f'{f.__module__}.{f.__name__}'
+    def path(self, f):
+        path = func_desc(f)
         assert path not in self.paths
         self.paths.add(path)
         return path
@@ -56,7 +56,7 @@ class AsyncTask(_BaseTask):
         return f'{stream_name(task)}:{task.path}'
 
     def __call__(self, f: F) -> F:
-        path = self.validate(f)
+        path = self.path(f)
         stream = self.stream_name(Task(path=path))
         vf = var_args(f)
 
@@ -95,7 +95,7 @@ class HeavyTask(_BaseTask):
         self.key = key
 
     def __call__(self, f: F) -> F:
-        path = self.validate(f)
+        path = self.path(f)
         assert not path.startswith('__main__')  # __main__ is different in another process
 
         @functools.wraps(f)

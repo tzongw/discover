@@ -148,7 +148,8 @@ class Semaphore:
         self.names = [f'{name}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
-        self.release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
+        self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
+        self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
 
     def __enter__(self):
         token = str(uuid.uuid4())
@@ -163,4 +164,11 @@ class Semaphore:
     def __exit__(self, exctype, excinst, exctb):
         name, token = self.local.name, self.local.token
         self.local.name = self.local.token = None
-        self.release(keys=[name], args=[token])
+        self.lua_release(keys=[name], args=[token])
+
+    def reacquire(self):
+        timeout = int(self.timeout.total_seconds() * 1000)
+        name, token = self.local.name, self.local.token
+        if name and token and self.lua_reacquire(keys=[name], args=[token, timeout]):
+            return
+        raise LockError('Lock not owned')
