@@ -10,7 +10,7 @@ from typing import Type, Union
 from redis import Redis
 from redis.lock import Lock, LockError
 from werkzeug.routing import BaseConverter
-from random import choice
+from random import choice, shuffle
 from collections import defaultdict
 import gevent
 from pydantic import BaseModel
@@ -145,7 +145,7 @@ def zpop_by_score(redis: Redis, key, start, stop, limit=None):
 class Semaphore:
     def __init__(self, redis: Redis, name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'{name}_{i}' for i in range(value)]
+        self.names = [f'{{{name}}}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
@@ -153,8 +153,9 @@ class Semaphore:
 
     def __enter__(self):
         token = str(uuid.uuid4())
-        while names := [name for name, value in zip(self.names, self.redis.mget(self.names)) if value is None]:
-            name = choice(names)
+        names = [name for name, value in zip(self.names, self.redis.mget(self.names)) if value is None]
+        shuffle(names)
+        for name in names:
             if self.redis.set(name, token, nx=True, px=self.timeout):
                 self.local.name = name
                 self.local.token = token
