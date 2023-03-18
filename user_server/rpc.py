@@ -38,13 +38,13 @@ class Handler:
                                            ex=const.CLIENT_TTL, get=True)
             shared.publisher.publish(Login(uid=uid))
             if old_online:
-                logging.warning(f'kick conn {uid} {old_online}')
+                logging.info(f'kick conn {uid} {old_online}')
                 with shared.gate_service.client(old_online.address) as client:
                     client.send_text(old_online.conn_id, f'login other device')
                     client.remove_conn(old_online.conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
-                logging.warning(f'login fail {address} {conn_id} {params}')
+                logging.info(f'login fail {address} {conn_id} {params}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
             with shared.gate_service.client(address) as client:
@@ -64,8 +64,8 @@ class Handler:
             if online is None or online.conn_id != conn_id:
                 raise ValueError(f'{online} {conn_id}')
             redis.expire(key, const.CLIENT_TTL)
-        except Exception as e:
-            logging.warning(f'{address} {conn_id} {context} {e}')
+        except (KeyError, ValueError) as e:
+            logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
                 client.send_text(conn_id, f'not login')
                 client.remove_conn(conn_id)
@@ -77,7 +77,7 @@ class Handler:
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
 
-        def unset_login_status(pipe: Pipeline):
+        def unset_online(pipe: Pipeline):
             online = Parser(pipe).get(key, Online)
             if online and online.conn_id == conn_id:
                 logging.info(f'clear {uid} {online}')
@@ -85,7 +85,7 @@ class Handler:
                 pipe.delete(key)
                 Publisher(pipe).publish(Logout(uid=uid))
 
-        redis.transaction(unset_login_status, key)
+        redis.transaction(unset_online, key)
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
