@@ -14,7 +14,7 @@ from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
 from base import Invalidator
 from base import Dispatcher, TimeDispatcher
-from base.cluster import ShardedKey, ShardedTimer, ShardedReceiver, ShardedPublisher
+from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
@@ -41,10 +41,10 @@ heavy_task = HeavyTask(redis, 'heavy_tasks')
 
 if options.redis_cluster:
     redis_cluster = RedisCluster.from_url(options.redis_cluster, decode_responses=True)
-    sharded_key = ShardedKey(shards=len(redis_cluster.get_primaries()), fixed=[const.TICK_TIMER])
-    publisher = ShardedPublisher(redis_cluster, hint=hint, sharded_key=sharded_key)
-    timer = ShardedTimer(redis_cluster, hint=hint, sharded_key=sharded_key)
-    receiver = ShardedReceiver(redis_cluster, group=app_name, consumer=str(app_id), sharded_key=sharded_key)
+    sharding_key = ShardingKey(shards=len(redis_cluster.get_primaries()), fixed=[const.TICK_TIMER])
+    publisher = ShardingPublisher(redis_cluster, hint=hint, sharding_key=sharding_key)
+    timer = ShardingTimer(redis_cluster, hint=hint, sharding_key=sharding_key)
+    receiver = ShardingReceiver(redis_cluster, group=app_name, consumer=str(app_id), sharding_key=sharding_key)
     async_task = AsyncTask(timer, publisher, receiver)
 else:
     publisher = Publisher(redis, hint=hint)
