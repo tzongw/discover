@@ -51,7 +51,7 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardedReceiver(Receiver):
-    def __init__(self, redis, group: str, consumer: str, *, sharded_key: ShardedKey, batch=10):
+    def __init__(self, redis, group: str, consumer: str, *, sharded_key: ShardedKey, batch=100):
         super().__init__(redis, group, consumer, batch, dispatcher=NormalizedDispatcher)
         self._sharded_key = sharded_key
 
@@ -114,19 +114,19 @@ class ShardedTimer(Timer):
 
 
 class MigratingTimer(ShardedTimer):
-    def __init__(self, redis, *, sharded_new: ShardedKey, sharded_old: ShardedKey, hint=None):
-        super().__init__(redis, sharded_key=sharded_new, hint=hint)
-        self._timer_old = ShardedTimer(redis, sharded_key=sharded_old, hint=hint)
+    def __init__(self, redis, *, sharded_key: ShardedKey, old_timer: Timer, hint=None):
+        super().__init__(redis, sharded_key=sharded_key, hint=hint)
+        self.old_timer = old_timer
 
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
-        self._timer_old.kill(key)
+        self.old_timer.kill(key)
         return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
 
     def kill(self, key):
-        return super().kill(key) or self._timer_old.kill(key)
+        return super().kill(key) or self.old_timer.kill(key)
 
     def exists(self, key: str):
-        return super().exists(key) or self._timer_old.exists(key)
+        return super().exists(key) or self.old_timer.exists(key)
 
     def info(self, key: str):
-        return super().info(key) or self._timer_old.info(key)
+        return super().info(key) or self.old_timer.info(key)
