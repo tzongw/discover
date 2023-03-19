@@ -78,7 +78,7 @@ class Executor:
         return self.gather(*[partial(fn, arg) for arg in args], block=block)
 
     def _adjust_workers(self):
-        if self._unfinished > self._workers and self._workers < self._max_workers:
+        if self._workers < self._unfinished <= self._max_workers:
             self._workers += 1
             gevent.spawn(self._worker)
             logging.debug(f'+ worker {self}')
@@ -105,6 +105,7 @@ class Executor:
         finally:
             self._workers -= 1
             logging.debug(f'- worker {self}')
+            self._adjust_workers()  # race
 
 
 class WaitGroup(Executor):

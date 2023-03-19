@@ -173,3 +173,6 @@ class Semaphore:
         if name and token and self.lua_reacquire(keys=[name], args=[token, timeout]):
             return
         raise LockError('Lock not owned')
+
+    def exists(self):
+        return self.redis.exists(*self.names)
