@@ -123,16 +123,16 @@ def hello(names):
 
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
-             'limit': fields.Int(validate=Range(min=1, max=50)),
+             'count': fields.Int(validate=Range(min=1, max=50)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
-def get_documents(collection: str, cursor=0, limit=10, order_by=None, **kwargs):
+def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
     coll = collections[collection]
     order_by = order_by or [f'-{coll.id.name}']
-    docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(limit)]
+    docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
     return {
         'documents': docs,
-        'cursor': '' if len(docs) < limit else str(cursor + limit),
+        'cursor': '' if len(docs) < count else str(cursor + count),
     }
 
 
