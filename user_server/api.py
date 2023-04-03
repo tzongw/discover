@@ -7,7 +7,7 @@ import logging
 import json
 from datetime import datetime, date
 import flask
-from flask import jsonify, Blueprint, g, request
+from flask import jsonify, Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
 from pydantic import BaseModel
 from webargs import fields
@@ -119,6 +119,16 @@ def hello(names):
     else:
         heavy_task.push(log('processing'))
     return f'say hello {names}'
+
+
+@app.route('/stream')
+def streaming_response():
+    def generate():
+        yield 'Hello\n'
+        yield 'World\n'
+        yield '!'
+
+    return app.response_class(stream_with_context(generate()))
 
 
 @app.route('/collections/<collection>/documents')
