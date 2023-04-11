@@ -64,7 +64,7 @@ def var_args(f: Callable):
             args = args[:len(params)]
         if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
             kwargs = {k: v for k, v in kwargs.items() if k in params}
-        f(*args, **kwargs)
+        return f(*args, **kwargs)
 
     return wrapper
 
