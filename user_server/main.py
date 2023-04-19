@@ -28,8 +28,8 @@ def main():
     shared.registry.start()
     shared.invalidator.start()
     init_main()
-    shared.registry.register({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
     shared.receiver.start()
+    shared.registry.register({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
     gevent.joinall(workers, raise_error=True)
 
 
