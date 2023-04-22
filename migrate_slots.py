@@ -114,7 +114,10 @@ def main():
     else:
         if slot not in (0, 16384):
             raise ValueError(f'slot({slot}) not support')
-        slots = {redis.keyslot(str(i)) for i in range(len(redis.get_primaries()))}
+        primaries = len(redis.get_primaries())
+        slots = {redis.keyslot(str(i)) for i in range(primaries)}
+        if len(slots) != primaries:
+            raise ValueError(f'slots overlap slots: {len(slots)} primaries: {primaries}')
         if slot > 0:
             slots = set(range(slot)) - slots
         rebalance(redis, slots)
