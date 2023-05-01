@@ -76,7 +76,7 @@ if options.env != const.Environment.STAGING:
 @dataclass
 class Status:
     inited: bool = False
-    exited: bool = False
+    exiting: bool = False
 
 
 status = Status()
@@ -90,7 +90,7 @@ def at_main(fun):
 
 
 def at_exit(fun):
-    assert callable(fun) and not status.exited
+    assert callable(fun) and not status.exiting
     _exits.append(fun)
     return fun
 
@@ -106,7 +106,7 @@ atexit.register(unique_id.stop)  # after cleanup
 
 @atexit.register
 def _cleanup():
-    status.exited = True
+    status.exiting = True
     with LogSuppress():
         executor.gather(*_exits)
     _exits.clear()

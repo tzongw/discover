@@ -51,7 +51,7 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardingReceiver(Receiver):
-    def __init__(self, redis, group: str, consumer: str, *, sharding_key: ShardingKey, batch=100):
+    def __init__(self, redis, group: str, consumer: str, *, sharding_key: ShardingKey, batch=50):
         super().__init__(redis, group, consumer, batch, dispatcher=NormalizedDispatcher)
         self._sharding_key = sharding_key
 
