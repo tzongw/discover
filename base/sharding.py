@@ -131,3 +131,40 @@ class MigratingTimer(ShardingTimer):
 
     def info(self, key: str):
         return super().info(key) or self.old_timer.info(key)
+
+
+class MigratingReceiver(ShardingReceiver):
+    def __init__(self, redis, group: str, consumer: str, *, sharding_key: ShardingKey, batch=50,
+                 old_receiver: Receiver):
+        super().__init__(redis, group, consumer, sharding_key=sharding_key, batch=batch)
+        self.old_receiver = old_receiver
+
+    def start(self):
+        self.old_receiver.start()
+        super().start()
+
+    def stop(self):
+        self.old_receiver.stop()
+        super().stop()
+
+    def _group(self, *args, **kwargs):
+        def decorator(f):
+            self.old_receiver.group(*args, **kwargs)(f)
+            self._group_dispatcher.handler(*args, **kwargs)(f)
+
+        return decorator
+
+    def _fanout(self, *args, **kwargs):
+        def decorator(f):
+            self.old_receiver.fanout(*args, **kwargs)(f)
+            self._fanout_dispatcher.handler(*args, **kwargs)(f)
+
+        return decorator
+
+    @property
+    def group(self):
+        return self._group
+
+    @property
+    def fanout(self):
+        return self._fanout
