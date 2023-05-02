@@ -11,10 +11,12 @@ class Parser:
     def __init__(self, redis: Union[Redis, Pipeline]):
         self._redis = redis
         redis.response_callbacks['SET'] = self.set_callback
-        redis.response_callbacks['GET'] = redis.response_callbacks['GETDEL'] = self.callback
+        redis.response_callbacks['GET'] = self.callback
+        redis.response_callbacks['GETDEL'] = self.callback
+        redis.response_callbacks['GETEX'] = self.callback
+        redis.response_callbacks['HMGET'] = self.callback
         redis.response_callbacks['MGET'] = self.mget_callback
         redis.response_callbacks['HGETALL'] = self.hget_callback
-        redis.response_callbacks['HMGET'] = self.callback
 
     @staticmethod
     def set_callback(response, convert=None, **options):
@@ -46,6 +48,16 @@ class Parser:
                 options['convert'] = convert
             else:
                 response = convert(response)
+        return response
+
+    def getex(self, name: str, cls: Type[M], **kwargs) -> Optional[M]:
+        response = self._redis.getex(name, **kwargs)
+        convert = self._parser(cls)
+        if response is self._redis:  # pipeline command staged
+            _, options = self._redis.command_stack[-1]
+            options['convert'] = convert
+        else:
+            response = convert(response)
         return response
 
     def get(self, name: str, cls: Type[M]) -> Optional[M]:
