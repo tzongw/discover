@@ -130,7 +130,7 @@ def zpop_by_score(redis: Redis, key, start, stop, limit=None):
     kwargs = {'offset': 0, 'num': limit} if limit else {}
     members = {member: score for member, score in
                redis.zrange(key, start, stop, byscore=True, withscores=True, **kwargs)}
-    with redis.pipeline() as pipe:
+    with redis.pipeline(transaction=False) as pipe:
         for member in members:
             pipe.zrem(key, member)
         misses = []

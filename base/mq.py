@@ -78,7 +78,7 @@ class Receiver:
         return self._fanout_dispatcher.handler
 
     def start(self):
-        with self.redis.pipeline() as pipe:
+        with self.redis.pipeline(transaction=False) as pipe:
             streams = set(self._group_dispatcher.handlers) | set(self._fanout_dispatcher.handlers)
             for stream in streams:
                 # create group & stream
@@ -90,8 +90,8 @@ class Receiver:
     def stop(self):
         logging.info(f'stop')
         self._stopped = True
-        self.redis.xadd(self._waker, {'wake': 'up'})
-        with self.redis.pipeline() as pipe:
+        with self.redis.pipeline(transaction=False) as pipe:
+            pipe.xadd(self._waker, {'wake': 'up'})
             for stream in self._group_dispatcher.handlers:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
@@ -114,7 +114,7 @@ class Receiver:
         logging.info(f'group exit {streams.keys()}')
 
     def _fanout_run(self, streams):
-        with self.redis.pipeline() as pipe:
+        with self.redis.pipeline(transaction=False) as pipe:
             for stream in streams:
                 pipe.xinfo_stream(stream)
             last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
