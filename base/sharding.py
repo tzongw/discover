@@ -191,7 +191,7 @@ class ShardingParser(Parser):
                 patch_callbacks(redis.response_callbacks)
 
     def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
-        assert isinstance(self._redis, RedisCluster)
+        assert type(self._redis) is RedisCluster
         with self._redis.pipeline(transaction=False) as pipe:
             parser = ShardingParser(pipe)
             for key in keys:
@@ -199,7 +199,7 @@ class ShardingParser(Parser):
             return pipe.execute()
 
     def mset_nonatomic(self, mapping: Dict[str, M]) -> bool:
-        assert isinstance(self._redis, RedisCluster)
+        assert type(self._redis) is RedisCluster
         with self._redis.pipeline(transaction=False) as pipe:
             parser = ShardingParser(pipe)
             for k, v in mapping.items():

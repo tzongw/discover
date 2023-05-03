@@ -20,7 +20,7 @@ def session_key(uid: int):
 def session(uid: int):
     key = session_key(uid)
     with redis.pipeline(transaction=False) as pipe:
-        parser = Parser(pipe)
+        parser = SmartParser(pipe)
         parser.get(key, Session)
         pipe.ttl(key)
         return pipe.execute()

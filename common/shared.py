@@ -8,14 +8,13 @@ from weakref import WeakKeyDictionary
 import sys
 import gevent
 from redis import Redis, RedisCluster
-from base import Registry, LogSuppress, Parser
+from base import Registry, LogSuppress
 from base import Executor, Schedule
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
-from base import Invalidator
+from base import Invalidator, SmartParser
 from base import Dispatcher, TimeDispatcher
-from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
-from base.sharding import ShardingParser, ShardingInvalidator
+from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingInvalidator
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
@@ -31,27 +30,26 @@ tick = TimeDispatcher()
 app_name = options.app_name
 registry = Registry(Redis.from_url(options.registry, decode_responses=True))
 
-redis = Redis.from_url(options.redis, decode_responses=True)
+redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
+    Redis.from_url(options.redis, decode_responses=True)
 unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
+parser = SmartParser(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 
 if options.redis_cluster:
-    redis_cluster = RedisCluster.from_url(options.redis_cluster, decode_responses=True)
-    sharding_key = ShardingKey(shards=len(redis_cluster.get_primaries()), fixed=[const.TICK_TIMER])
-    publisher = ShardingPublisher(redis_cluster, hint=hint, sharding_key=sharding_key)
-    timer = ShardingTimer(redis_cluster, hint=hint, sharding_key=sharding_key)
-    receiver = ShardingReceiver(redis_cluster, group=app_name, consumer=hint, sharding_key=sharding_key)
-    invalidator = ShardingInvalidator(redis_cluster)
-    parser = ShardingParser(redis_cluster)
+    sharding_key = ShardingKey(shards=len(redis.get_primaries()), fixed=[const.TICK_TIMER])
+    publisher = ShardingPublisher(redis, hint=hint, sharding_key=sharding_key)
+    timer = ShardingTimer(redis, hint=hint, sharding_key=sharding_key)
+    receiver = ShardingReceiver(redis, group=app_name, consumer=hint, sharding_key=sharding_key)
+    invalidator = ShardingInvalidator(redis)
 else:
     publisher = Publisher(redis, hint=hint)
     timer = Timer(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
     invalidator = Invalidator(redis)
-    parser = Parser(redis)
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
