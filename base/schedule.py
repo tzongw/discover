@@ -83,9 +83,9 @@ class PeriodicCallback:
         self._schedule_next()
 
     def _run(self):
-        if self._callback:
+        if cb := self._callback:
             with LogSuppress():
-                self._callback()
+                cb()
         if self._handle:
             self._schedule_next()
 
