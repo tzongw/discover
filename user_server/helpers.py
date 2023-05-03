@@ -6,7 +6,7 @@ from models import Online
 def send(uid_or_uids, message):
     uids = [uid_or_uids] if isinstance(uid_or_uids, int) else uid_or_uids
     keys = [online_key(uid) for uid in uids]
-    for online in parser.mget(keys, Online):
+    for online in parser.mget_nonatomic(keys, Online):
         if not online:
             continue
         with gate_service.client(online.address) as client:
@@ -30,8 +30,9 @@ def kick(uid, message=None):
 
 
 def broadcast(group, message, *, exclude=()):
-    keys = [online_key(uid) for uid in exclude]
-    exclude = {online.conn_id for online in parser.mget(keys, Online) if online}
+    if exclude:
+        keys = [online_key(uid) for uid in exclude]
+        exclude = {online.conn_id for online in parser.mget_nonatomic(keys, Online) if online}
     if isinstance(message, str):
         gate_service.broadcast_text(group, exclude, message)
     else:
