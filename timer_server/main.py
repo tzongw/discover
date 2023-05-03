@@ -14,12 +14,10 @@ import gevent
 from service.timer import Processor
 from service.timeout import Client
 from typing import Dict, Callable
-from base.registry import Registry
-from redis import Redis
-from base.schedule import PeriodicCallback, Schedule
+from base.schedule import PeriodicCallback
 from base.service import Service
 from setproctitle import setproctitle
-from base import LogSuppress, Parser
+from base import LogSuppress
 import time
 from pydantic import BaseModel
 from dataclasses import dataclass
@@ -42,19 +40,15 @@ class Timer:
 class Handler:
     _PREFIX = 'TIMER'
 
-    def __init__(self, redis: Redis, schedule: Schedule, registry: Registry):
-        self._redis = redis
-        self._parser = Parser(redis)
-        self._schedule = schedule
-        self._registry = registry
+    def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
         self._services = {}  # type: Dict[str, Service]
 
     def load_timers(self):
-        full_keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
+        full_keys = set(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         for full_key in full_keys:
             with LogSuppress():
-                timer_info = self._parser.get(full_key, TimerInfo)
+                timer_info = shared.parser.get(full_key, TimerInfo)
                 if timer_info.deadline:
                     self.call_later(timer_info.key, timer_info.service, timer_info.data,
                                     timer_info.deadline - time.time())
@@ -71,7 +65,7 @@ class Handler:
         logging.debug(f'{key} {service_name}')
         service = self._services.get(service_name)
         if not service:
-            service = Service(self._registry, service_name)
+            service = Service(shared.registry, service_name)
             self._services[service_name] = service
         with service.connection() as conn:
             client = Client(conn)
@@ -80,36 +74,37 @@ class Handler:
     def call_later(self, key, service_name, data, delay):
         logging.info(f'{key} {service_name} {delay}')
         full_key = self._full_key(key, service_name)
-        self._delete_timer(full_key)
         deadline = time.time() + delay
         timer_info = TimerInfo(key=key, service=service_name, data=data, deadline=deadline)
-        self._parser.set(full_key, timer_info)
+        px = max(int(delay * 1000), 1)
+        shared.parser.set(full_key, timer_info, px=px)
 
         def callback():
-            self.remove_timer(key, service_name)
+            self._delete_timer(full_key)
             self._fire_timer(key, service_name, data)
 
-        handle = self._schedule.call_at(callback, deadline)
+        handle = shared.schedule.call_at(callback, deadline)
+        self._delete_timer(full_key)
         self._timers[full_key] = Timer(info=timer_info, cancel=handle.cancel)
 
     def call_repeat(self, key, service_name, data, interval):
         assert interval > 0
         logging.info(f'{key} {service_name} {interval}')
         full_key = self._full_key(key, service_name)
-        self._delete_timer(full_key)
         timer_info = TimerInfo(key=key, service=service_name, data=data, interval=interval)
-        self._parser.set(full_key, timer_info)
+        shared.parser.set(full_key, timer_info)
 
         def callback():
             self._fire_timer(key, service_name, data)
 
-        pc = PeriodicCallback(self._schedule, callback, interval)
+        pc = PeriodicCallback(shared.schedule, callback, interval)
+        self._delete_timer(full_key)
         self._timers[full_key] = Timer(info=timer_info, cancel=pc.stop)
 
     def remove_timer(self, key, service_name):
         logging.info(f'{key} {service_name}')
         full_key = self._full_key(key, service_name)
-        self._redis.delete(full_key)
+        shared.redis.delete(full_key)
         self._delete_timer(full_key)
 
     def _delete_timer(self, full_key):
@@ -134,7 +129,7 @@ def rpc_serve(handler):
 
 def main():
     logging.info(f'{shared.app_name} app id: {shared.app_id}')
-    handler = Handler(shared.redis, shared.schedule, shared.registry)
+    handler = Handler()
     g = rpc_serve(handler)
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     shared.registry.start()

@@ -44,17 +44,16 @@ if options.redis_cluster:
     publisher = ShardingPublisher(redis_cluster, hint=hint, sharding_key=sharding_key)
     timer = ShardingTimer(redis_cluster, hint=hint, sharding_key=sharding_key)
     receiver = ShardingReceiver(redis_cluster, group=app_name, consumer=hint, sharding_key=sharding_key)
-    async_task = AsyncTask(timer, publisher, receiver)
     invalidator = ShardingInvalidator(redis_cluster)
     parser = ShardingParser(redis_cluster)
 else:
     publisher = Publisher(redis, hint=hint)
     timer = Timer(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    async_task = AsyncTask(timer, publisher, receiver)
     invalidator = Invalidator(redis)
     parser = Parser(redis)
 
+async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
 
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
