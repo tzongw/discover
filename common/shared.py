@@ -61,6 +61,16 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 _exits = [registry.stop, receiver.stop]
 _mains = []
 
+
+def transaction(self: RedisCluster, func, *watches, **kwargs):
+    assert len({self.keyslot(key) for key in watches}) == 1
+    node = self.get_node_from_key(watches[0])
+    redis: Redis = self.get_redis_connection(node)
+    return redis.transaction(func, *watches, **kwargs)
+
+
+RedisCluster.transaction = transaction
+
 if options.env == const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
