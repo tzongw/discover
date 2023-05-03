@@ -2,8 +2,11 @@
 import logging
 from datetime import timedelta
 from binascii import crc32
+from typing import Type, List, Dict, TypeVar
 import gevent
 from pydantic import BaseModel
+from redis import RedisCluster
+from .parser import Parser, patch_callbacks
 from .invalidator import Invalidator
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name
@@ -176,3 +179,30 @@ class ShardingInvalidator(Invalidator):
         for node in self.redis.get_primaries():
             redis = self.redis.get_redis_connection(node)
             gevent.spawn(self._run, redis)
+
+
+M = TypeVar('M', bound=BaseModel)
+
+
+class ShardingParser(Parser):
+    def update_callbacks(self):
+        for node in self._redis.get_nodes():
+            if redis := node.redis_connection:
+                patch_callbacks(redis.response_callbacks)
+
+    def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
+        assert type(self._redis) is RedisCluster
+        with self._redis.pipeline(transaction=False) as pipe:
+            parser = ShardingParser(pipe)
+            for key in keys:
+                parser.get(key, cls)
+            return pipe.execute()
+
+    def mset_nonatomic(self, mapping: Dict[str, M]) -> bool:
+        assert type(self._redis) is RedisCluster
+        with self._redis.pipeline(transaction=False) as pipe:
+            parser = ShardingParser(pipe)
+            for k, v in mapping.items():
+                parser.set(k, v)
+            pipe.execute()
+        return True

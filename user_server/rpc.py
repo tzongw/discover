@@ -11,11 +11,10 @@ import const
 from common.messages import Login, Logout
 from models import Online, Session
 from redis.client import Pipeline
-from base.mq import Publisher
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key
 from config import options
-from base import Parser
+from base import SmartParser
 import helpers
 
 
@@ -78,14 +77,14 @@ class Handler:
         key = online_key(uid)
 
         def unset_online(pipe: Pipeline):
-            online = Parser(pipe).get(key, Online)
+            online = SmartParser(pipe).get(key, Online)
             if online and online.conn_id == conn_id:
                 logging.info(f'clear {uid} {online}')
                 pipe.multi()
                 pipe.delete(key)
-                Publisher(pipe).publish(Logout(uid=uid))
 
-        redis.transaction(unset_online, key)
+        if redis.transaction(unset_online, key):
+            shared.publisher.publish(Logout(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

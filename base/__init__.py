@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from redis import RedisCluster
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta
@@ -23,6 +24,7 @@ from .unique import UniqueId
 from .cache import Cache, TTLCache, FullCache, FullTTLCache
 from .task import AsyncTask, HeavyTask
 from .poller import Poller
+from .sharding import ShardingParser
 
 
 def represent_timedelta(self, data):
@@ -36,3 +38,7 @@ def construct_timedelta(self, node):
 
 SafeRepresenter.add_representer(timedelta, represent_timedelta)
 SafeConstructor.add_constructor('!timedelta', construct_timedelta)
+
+
+def SmartParser(redis):
+    return ShardingParser(redis) if isinstance(redis, RedisCluster) else Parser(redis)

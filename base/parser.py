@@ -1,39 +1,54 @@
 # -*- coding: utf-8 -*-
 from typing import Union, Type, Optional, List, Dict, TypeVar
-from redis import Redis
+from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
+from redis.cluster import ClusterPipeline
 
 M = TypeVar('M', bound=BaseModel)
 
 
+def set_callback(response, convert=None, **options):
+    return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET_ORIG'](response, **options)
+
+
+def callback(response, convert=None):
+    return convert(response) if convert else response
+
+
+def mget_callback(response, convert=None):
+    return [convert(value) for value in response] if convert else response
+
+
+def hget_callback(response, convert=None):
+    response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
+    return convert(response) if convert else response
+
+
+def patch_callbacks(callbacks):
+    if 'SET_ORIG' in callbacks:  # already done
+        return
+    callbacks['SET_ORIG'] = callbacks['SET']
+    callbacks['SET'] = set_callback
+    callbacks['GET'] = callback
+    callbacks['GETDEL'] = callback
+    callbacks['GETEX'] = callback
+    callbacks['HMGET'] = callback
+    callbacks['MGET'] = mget_callback
+    callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
+    callbacks['HGETALL'] = hget_callback
+
+
+patch_callbacks(Redis.RESPONSE_CALLBACKS)
+
+
 class Parser:
-    def __init__(self, redis: Union[Redis, Pipeline]):
+    def __init__(self, redis: Union[Redis, Pipeline, RedisCluster, ClusterPipeline]):
         self._redis = redis
-        redis.response_callbacks['SET'] = self.set_callback
-        redis.response_callbacks['GET'] = self.callback
-        redis.response_callbacks['GETDEL'] = self.callback
-        redis.response_callbacks['GETEX'] = self.callback
-        redis.response_callbacks['HMGET'] = self.callback
-        redis.response_callbacks['MGET'] = self.mget_callback
-        redis.response_callbacks['HGETALL'] = self.hget_callback
+        self.update_callbacks()
 
-    @staticmethod
-    def set_callback(response, convert=None, **options):
-        return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET'](response, **options)
-
-    @staticmethod
-    def callback(response, convert=None):
-        return convert(response) if convert else response
-
-    @staticmethod
-    def mget_callback(response, convert=None):
-        return [convert(value) for value in response] if convert else response
-
-    @staticmethod
-    def hget_callback(response, convert=None):
-        response = Redis.RESPONSE_CALLBACKS['HGETALL'](response)
-        return convert(response) if convert else response
+    def update_callbacks(self):
+        patch_callbacks(self._redis.response_callbacks)
 
     @staticmethod
     def _parser(cls: M):
@@ -67,17 +82,11 @@ class Parser:
         return self._redis.execute_command('GETDEL', name, convert=self._parser(cls))
 
     def mget(self, keys, cls: Type[M]) -> List[M]:
-        if not keys:
-            return []
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
     def mset(self, mapping: Dict[str, M]) -> bool:
         mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
         return self._redis.mset(mapping)
-
-    def msetnx(self, mapping: Dict[str, M]) -> bool:
-        mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
-        return self._redis.msetnx(mapping)
 
     def hget(self, name, cls: Type[M], *, include=None, exclude=None) -> Optional[M]:
         if exclude is not None:
@@ -95,6 +104,9 @@ class Parser:
 
             return self._redis.execute_command('HGETALL', name, convert=convert)
 
-    def hset(self, name: str, model: M):
+    def hset(self, name: str, model: M) -> int:
         mapping = model.dict(exclude_unset=True)
         return self._redis.hset(name, mapping=mapping)
+
+    mget_nonatomic = mget
+    mset_nonatomic = mset
