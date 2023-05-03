@@ -1,39 +1,44 @@
 # -*- coding: utf-8 -*-
 from typing import Union, Type, Optional, List, Dict, TypeVar
-from redis import Redis
+from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
+from redis.cluster import ClusterPipeline
 
 M = TypeVar('M', bound=BaseModel)
 
 
+def set_callback(response, convert=None, **options):
+    return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET_ORIG'](response, **options)
+
+
+def callback(response, convert=None):
+    return convert(response) if convert else response
+
+
+def mget_callback(response, convert=None):
+    return [convert(value) for value in response] if convert else response
+
+
+def hget_callback(response, convert=None):
+    response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
+    return convert(response) if convert else response
+
+
+Redis.RESPONSE_CALLBACKS['SET_ORIG'] = Redis.RESPONSE_CALLBACKS['SET']
+Redis.RESPONSE_CALLBACKS['SET'] = set_callback
+Redis.RESPONSE_CALLBACKS['GET'] = callback
+Redis.RESPONSE_CALLBACKS['GETDEL'] = callback
+Redis.RESPONSE_CALLBACKS['GETEX'] = callback
+Redis.RESPONSE_CALLBACKS['HMGET'] = callback
+Redis.RESPONSE_CALLBACKS['MGET'] = mget_callback
+Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'] = Redis.RESPONSE_CALLBACKS['HGETALL']
+Redis.RESPONSE_CALLBACKS['HGETALL'] = hget_callback
+
+
 class Parser:
-    def __init__(self, redis: Union[Redis, Pipeline]):
+    def __init__(self, redis: Union[Redis, Pipeline, RedisCluster, ClusterPipeline]):
         self._redis = redis
-        redis.response_callbacks['SET'] = self.set_callback
-        redis.response_callbacks['GET'] = self.callback
-        redis.response_callbacks['GETDEL'] = self.callback
-        redis.response_callbacks['GETEX'] = self.callback
-        redis.response_callbacks['HMGET'] = self.callback
-        redis.response_callbacks['MGET'] = self.mget_callback
-        redis.response_callbacks['HGETALL'] = self.hget_callback
-
-    @staticmethod
-    def set_callback(response, convert=None, **options):
-        return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET'](response, **options)
-
-    @staticmethod
-    def callback(response, convert=None):
-        return convert(response) if convert else response
-
-    @staticmethod
-    def mget_callback(response, convert=None):
-        return [convert(value) for value in response] if convert else response
-
-    @staticmethod
-    def hget_callback(response, convert=None):
-        response = Redis.RESPONSE_CALLBACKS['HGETALL'](response)
-        return convert(response) if convert else response
 
     @staticmethod
     def _parser(cls: M):
