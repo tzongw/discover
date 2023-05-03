@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import dataclasses
 import functools
 import time
 import uuid
@@ -41,12 +42,12 @@ class JSONEncoder(json.JSONEncoder):
             return o.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(o, date):
             return o.strftime('%Y-%m-%d')
-        return json.JSONEncoder.default(self, o)
+        return super().default(o)
 
 
 class JSONProvider(DefaultJSONProvider):
     def dumps(self, obj, **kwargs) -> str:
-        return json.dumps(obj, cls=JSONEncoder, **kwargs)
+        return super().dumps(obj, cls=JSONEncoder, **kwargs)
 
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
@@ -61,6 +62,8 @@ def make_response(rv):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
         rv = rv.json()
+    elif dataclasses.is_dataclass(rv):
+        rv = jsonify(rv)
     return Flask.make_response(app, rv)
 
 
@@ -239,7 +242,7 @@ def register(username: str, password: str):
     session.add(account)
     session.commit()
     dispatcher.signal(account)
-    return jsonify(account)
+    return account
 
 
 @app.route('/login', methods=['POST'])
@@ -273,7 +276,7 @@ def login(username: str, password: str):
         flask.session.permanent = True
         key = session_key(account.id)
         parser.set(key, models.Session(token=token), ex=app.permanent_session_lifetime)
-        return jsonify(account)
+        return account
 
 
 bp = Blueprint('/', __name__)
@@ -282,7 +285,10 @@ bp = Blueprint('/', __name__)
 @bp.before_request
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
-    if not uid or not token or token != sessions.get(uid).token:
+    if not uid or not token:
+        raise Unauthorized
+    session = sessions.get(uid)
+    if not session or token != session.token:
         raise Unauthorized
     ctx.uid = g.uid = uid
 
@@ -327,7 +333,7 @@ def whoami():
     """
     logging.info(f'{ctx.__dict__}')
     account = Account(id=g.uid)
-    return jsonify(account)
+    return account
 
 
 app.register_blueprint(bp)
