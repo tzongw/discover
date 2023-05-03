@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from redis import Redis
+from typing import Union
+from redis import Redis, RedisCluster
 import gevent
 import logging
 from .executor import Executor
@@ -7,7 +8,7 @@ from .dispatcher import Dispatcher
 
 
 class Invalidator:
-    def __init__(self, redis: Redis, sep=':'):
+    def __init__(self, redis: Union[Redis, RedisCluster], sep=':'):
         self.redis = redis
         self.sep = sep
         self.dispatcher = Dispatcher(executor=Executor(name='invalidator'))
@@ -21,7 +22,7 @@ class Invalidator:
         return self.dispatcher.handlers.keys()
 
     def start(self):
-        gevent.spawn(self._run)
+        gevent.spawn(self._run, self.redis)
 
     def invalidate(self, key, *args, **kwargs):
         self.dispatcher.dispatch(key, *args, **kwargs)
@@ -33,12 +34,12 @@ class Invalidator:
     def publish(self, key):
         self.redis.publish('__redis__:invalidate', key)
 
-    def _run(self):
+    def _run(self, redis):
         sub = None
         while True:
             try:
                 if not sub:
-                    sub = self.redis.pubsub()
+                    sub = redis.pubsub()
                     sub.execute_command('CLIENT ID')
                     client_id = sub.parse_response()
                     prefixes = ' '.join([f'PREFIX {prefix}{self.sep}' for prefix in self.prefixes])

@@ -4,6 +4,7 @@ from datetime import timedelta
 from binascii import crc32
 import gevent
 from pydantic import BaseModel
+from .invalidator import Invalidator
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name
 from .timer import Timer
@@ -168,3 +169,10 @@ class MigratingReceiver(ShardingReceiver):
     @property
     def fanout(self):
         return self._fanout
+
+
+class ShardingInvalidator(Invalidator):
+    def start(self):
+        for node in self.redis.get_primaries():
+            redis = self.redis.get_redis_connection(node)
+            gevent.spawn(self._run, redis)
