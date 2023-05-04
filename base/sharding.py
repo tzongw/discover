@@ -155,6 +155,7 @@ class MigratingReceiver(ShardingReceiver):
         def decorator(f):
             self.old_receiver.group(*args, **kwargs)(f)
             self._group_dispatcher.handler(*args, **kwargs)(f)
+            return f
 
         return decorator
 
@@ -162,6 +163,7 @@ class MigratingReceiver(ShardingReceiver):
         def decorator(f):
             self.old_receiver.fanout(*args, **kwargs)(f)
             self._fanout_dispatcher.handler(*args, **kwargs)(f)
+            return f
 
         return decorator
 
