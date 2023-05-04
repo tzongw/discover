@@ -2,10 +2,11 @@
 import logging
 from datetime import timedelta
 from binascii import crc32
-from typing import Type, List, Dict, TypeVar
+from random import shuffle
+from typing import Type, List, Dict, TypeVar, Union, Optional
 import gevent
 from pydantic import BaseModel
-from redis import RedisCluster
+from redis import Redis, RedisCluster
 from .parser import Parser, patch_callbacks
 from .invalidator import Invalidator
 from .mq import Publisher, Receiver, ProtoDispatcher
@@ -38,9 +39,9 @@ class ShardingKey:
 
 
 class ShardingPublisher(Publisher):
-    def __init__(self, redis, *, sharding_key: ShardingKey, hint=None):
+    def __init__(self, redis: Union[Redis, RedisCluster], *, hint=None):
         super().__init__(redis, hint)
-        self._sharding_key = sharding_key
+        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
     def publish(self, message: BaseModel, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
@@ -55,9 +56,9 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardingReceiver(Receiver):
-    def __init__(self, redis, group: str, consumer: str, *, sharding_key: ShardingKey, batch=50):
+    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, batch=50):
         super().__init__(redis, group, consumer, batch, dispatcher=NormalizedDispatcher)
-        self._sharding_key = sharding_key
+        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
     def start(self):
         with self.redis.pipeline(transaction=False) as pipe:
@@ -138,9 +139,8 @@ class MigratingTimer(ShardingTimer):
 
 
 class MigratingReceiver(ShardingReceiver):
-    def __init__(self, redis, group: str, consumer: str, *, sharding_key: ShardingKey, batch=50,
-                 old_receiver: Receiver):
-        super().__init__(redis, group, consumer, sharding_key=sharding_key, batch=batch)
+    def __init__(self, redis, group: str, consumer: str, *, batch=50, old_receiver: Receiver):
+        super().__init__(redis, group, consumer, batch=batch)
         self.old_receiver = old_receiver
 
     def start(self):
@@ -206,3 +206,39 @@ class ShardingParser(Parser):
                 parser.set(k, v)
             pipe.execute()
         return True
+
+
+class Stock:
+    def __init__(self, redis: RedisCluster):
+        self.redis = redis
+        self.sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+
+    def fair_amounts(self, total):
+        shards = self.sharding_key.shards
+        amounts = [total // shards] * shards
+        for i in range(total - sum(amounts)):
+            amounts[i] += 1
+        shuffle(amounts)
+        return amounts
+
+    def reset(self, key, total=0, expire=None):
+        assert total >= 0
+        with self.redis.pipeline(transaction=False) as pipe:
+            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self.fair_amounts(total)):
+                pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
+                if expire is not None:
+                    pipe.expire(sharded_key, expire)
+            pipe.execute()
+
+    def incrby(self, key, total):
+        assert total > 0
+        with self.redis.pipeline(transaction=False) as pipe:
+            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self.fair_amounts(total)):
+                if amount > 0:
+                    pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
+            pipe.execute()
+
+    def try_lock(self, key, hint) -> Optional[int]:
+        _, sharded_key = self.sharding_key.sharded_keys(str(hint), key)
+        bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
+        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0]

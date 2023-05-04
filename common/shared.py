@@ -41,13 +41,13 @@ heavy_task = HeavyTask(redis, 'heavy_tasks')
 
 if options.redis_cluster:
     sharding_key = ShardingKey(shards=len(redis.get_primaries()), fixed=[const.TICK_TIMER])
-    publisher = ShardingPublisher(redis, hint=hint, sharding_key=sharding_key)
     timer = ShardingTimer(redis, hint=hint, sharding_key=sharding_key)
-    receiver = ShardingReceiver(redis, group=app_name, consumer=hint, sharding_key=sharding_key)
+    publisher = ShardingPublisher(redis, hint=hint)
+    receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
     invalidator = ShardingInvalidator(redis)
 else:
-    publisher = Publisher(redis, hint=hint)
     timer = Timer(redis, hint=hint)
+    publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
     invalidator = Invalidator(redis)
 
