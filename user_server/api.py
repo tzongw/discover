@@ -6,7 +6,7 @@ import uuid
 from collections import OrderedDict
 import logging
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import flask
 from flask import jsonify, Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
@@ -21,7 +21,7 @@ import gevent
 from gevent import pywsgi
 from config import options
 from const import CTX_UID, CTX_TOKEN
-from shared import session_key, heavy_task
+from shared import session_key, async_task, async_heavy
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 from base.utils import ListConverter
 from flasgger import Swagger
@@ -85,7 +85,7 @@ def init_trace():
     ctx.trace = id_generator.gen()
 
 
-@heavy_task
+@async_heavy
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')
@@ -120,7 +120,7 @@ def hello(names):
         if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
             poller.notify('hello', 'queue:hello')
     else:
-        heavy_task.push(log('processing'))
+        async_task.post('task:hello', log(names[0]), timedelta(seconds=5))
     return f'say hello {names}'
 
 

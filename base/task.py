@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import timedelta
 from importlib import import_module
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, Optional
 import functools
 from redis import Redis
 from pydantic import BaseModel
@@ -112,7 +112,7 @@ class HeavyTask(_BaseTask):
         logging.info(f'+task {task}')
         self.redis.rpush(self.key, task.json(exclude_defaults=True))
 
-    def pop(self, *, timeout=0, block=True):
+    def pop(self, *, timeout=0, block=True) -> Optional[Task]:
         r = self.redis.blpop([self.key], timeout) if block else self.redis.lpop(self.key)
         if r is None:
             return
@@ -120,7 +120,7 @@ class HeavyTask(_BaseTask):
         return self.parse(value)
 
     @staticmethod
-    def parse(value):
+    def parse(value) -> Task:
         task = Task.parse_raw(value)
         return task
 
