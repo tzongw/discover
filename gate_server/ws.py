@@ -6,8 +6,6 @@ from urllib import parse
 from collections import defaultdict
 from typing import DefaultDict, Set
 import gevent
-from flask import Flask
-from flask_sockets import Sockets
 from gevent import pywsgi
 from gevent import queue
 from geventwebsocket.exceptions import WebSocketError
@@ -17,8 +15,14 @@ from base.schedule import PeriodicCallback
 import shared, const
 from config import options
 
-app = Flask(__name__)
-sockets = Sockets(app)
+
+def app(environ, start_response):
+    if environ["PATH_INFO"] == '/ws':
+        ws = environ["wsgi.websocket"]
+        client_serve(ws)
+    else:
+        start_response('404 Not Found', [])
+        return b''
 
 
 def serve():
@@ -136,7 +140,6 @@ def normalize_header(name: str):
     return name[len('HTTP_X_'):].replace('_', '-')
 
 
-@sockets.route('/ws')
 def client_serve(ws: WebSocket):
     conn_id = str(uuid.uuid4())
     client = Client(ws, conn_id)
