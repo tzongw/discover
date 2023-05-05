@@ -30,9 +30,22 @@ class _BaseTask:
 
     def path(self, f):
         path = func_desc(f)
-        assert path not in self.paths
+        assert '<' not in path, 'CAN NOT be lambda or local function'
+        assert path not in self.paths, 'duplicated path'
         self.paths.add(path)
         return path
+
+    @staticmethod
+    def wraps(f, path):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs) -> Task:
+            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
+            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
+                logging.warning(f'task parameters too big {task}')
+            return task
+
+        wrapper.wrapped = f
+        return wrapper
 
 
 class AsyncTask(_BaseTask):
@@ -66,15 +79,7 @@ class AsyncTask(_BaseTask):
             kwargs = loads(task.kwargs)  # type: dict
             vf(*args, **kwargs)
 
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs) -> Task:
-            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
-            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
-                logging.warning(f'task parameters too big {task}')
-            return task
-
-        wrapper.wrapped = f
-        return wrapper
+        return self.wraps(f, path)
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
         stream = self.stream_name(task)
@@ -96,17 +101,8 @@ class HeavyTask(_BaseTask):
 
     def __call__(self, f: F) -> F:
         path = self.path(f)
-        assert not path.startswith('__main__')  # __main__ is different in another process
-
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs) -> Task:
-            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
-            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
-                logging.warning(f'task parameters too big {task}')
-            return task
-
-        wrapper.wrapped = f
-        return wrapper
+        assert not path.startswith('__main__'), '__main__ is different in another process'
+        return self.wraps(f, path)
 
     def push(self, task: Task):
         logging.info(f'+task {task}')
