@@ -2,9 +2,9 @@
 from gevent import monkey
 
 monkey.patch_all()
+from config import options, remaining
 import time
 from importlib import import_module
-from config import options, remaining
 import shared
 from shared import app_name, app_id, init_main
 from setproctitle import setproctitle
