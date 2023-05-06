@@ -22,10 +22,9 @@ def app(environ, start_response):
             client_serve(ws)
         else:
             start_response('400 Bad Request', [])
-            return b''
     else:
         start_response('404 Not Found', [])
-        return b''
+    return b''
 
 
 def serve():
