@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+import uuid
 from datetime import timedelta
 from importlib import import_module
 from typing import TypeVar, Callable, Optional
@@ -18,6 +19,12 @@ class Task(BaseModel):
     path: str
     args: str = dumps(())
     kwargs: str = dumps({})
+
+
+class Info(BaseModel):
+    remaining: timedelta
+    interval: timedelta
+    loop: bool
 
 
 F = TypeVar('F', bound=Callable)
@@ -82,11 +89,25 @@ class AsyncTask(_BaseTask):
         return self.wraps(f, path)
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
+        if not task_id:
+            assert not loop, 'loop task CAN NOT be anonymous'
+            task_id = f'task:{uuid.uuid4()}'
         stream = self.stream_name(task)
         return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, stream=stream)
 
     def cancel(self, task_id: str):
         return self.timer.kill(task_id)
+
+    def exists(self, task_id: str):
+        return self.timer.exists(task_id)
+
+    def info(self, task_id: str) -> Optional[Info]:
+        res = self.timer.info(task_id)
+        if res is None:
+            return
+        return Info(remaining=timedelta(milliseconds=res['remaining']),
+                    interval=timedelta(milliseconds=res['interval']),
+                    loop=res['loop'])
 
     def publish(self, task):
         stream = self.stream_name(task)

@@ -8,7 +8,7 @@ import logging
 import json
 from datetime import datetime, date, timedelta
 import flask
-from flask import jsonify, Blueprint, g, request, stream_with_context
+from flask import Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
 from pydantic import BaseModel
 from webargs import fields
@@ -47,7 +47,7 @@ class JSONEncoder(json.JSONEncoder):
 
 class JSONProvider(DefaultJSONProvider):
     def dumps(self, obj, **kwargs) -> str:
-        return super().dumps(obj, cls=JSONEncoder, **kwargs)
+        return json.dumps(obj, cls=JSONEncoder, **kwargs)
 
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
@@ -61,9 +61,9 @@ def make_response(rv):
     elif isinstance(rv, GetterMixin):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
-        rv = rv.json()
+        rv = rv.dict()
     elif dataclasses.is_dataclass(rv):
-        rv = jsonify(rv)
+        rv = dataclasses.asdict(rv)
     return Flask.make_response(app, rv)
 
 
@@ -120,7 +120,7 @@ def hello(names):
         if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
             poller.notify('hello', 'queue:hello')
     else:
-        async_task.post('task:hello', log(names[0]), timedelta(seconds=5))
+        async_task.post('', log(names[0]), timedelta(seconds=5))
     return f'say hello {names}'
 
 
