@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import socket
+import string
 import uuid
 from datetime import timedelta
 from typing import Callable
@@ -176,3 +177,16 @@ class Semaphore:
 
     def exists(self):
         return self.redis.exists(*self.names)
+
+
+def base62(n):
+    assert n >= 0
+    charset = string.ascii_letters + string.digits
+    base = len(charset)
+    chars = []
+    while True:
+        n, r = divmod(n, base)
+        chars.append(charset[r])
+        if n == 0:
+            break
+    return ''.join(chars[::-1])
