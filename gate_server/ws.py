@@ -18,8 +18,11 @@ from config import options
 
 def app(environ, start_response):
     if environ["PATH_INFO"] == '/ws':
-        ws = environ["wsgi.websocket"]
-        client_serve(ws)
+        if ws := environ.get("wsgi.websocket"):
+            client_serve(ws)
+        else:
+            start_response('400 Bad Request', [])
+            return b''
     else:
         start_response('404 Not Found', [])
         return b''
