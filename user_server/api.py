@@ -174,7 +174,10 @@ def get_document(collection: str, doc_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id)
-    doc.modify(**kwargs)
+    if not doc.modify(**kwargs):
+        kwargs[coll.id.name] = doc_id
+        logging.info(f'create doc {kwargs}')
+        doc = coll(**kwargs).save()
     doc.invalidate()
 
 

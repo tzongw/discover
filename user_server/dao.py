@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,7 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import options
 import const
-from base import FullCache
+from base import FullCache, Cache
 from common.shared import invalidator, id_generator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
@@ -114,6 +115,31 @@ Profile.mget = cache.mget
 def valid_profiles():
     now = datetime.now()
     return [profile for profile in cache.values if profile.expire > now]
+
+
+@collection
+class Setting(Document, GetterMixin['Setting'], CacheMixin):
+    meta = {'strict': False, 'allow_inheritance': True}
+
+    id = StringField(primary_key=True)
+
+
+cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.id.to_python, maxsize=None)
+cache.listen(invalidator, Setting.__name__)
+Setting.mget = cache.mget
+
+
+@collection
+class TokenSetting(Setting):
+    expire = IntField(default=3600)
+
+    @classmethod
+    def get(cls, key=None, ensure_exists=False) -> TokenSetting:
+        assert key is None or key == cls.__name__, 'key is NOT support'
+        return super().get(cls.__name__, ensure_exists) or cls(id=cls.__name__)
+
+
+cache.listen(invalidator, TokenSetting.__name__)
 
 
 class CommandLogger(monitoring.CommandListener):
