@@ -2,6 +2,7 @@
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 from importlib import import_module
 from typing import TypeVar, Callable, Optional
@@ -21,7 +22,8 @@ class Task(BaseModel):
     kwargs: str = dumps({})
 
 
-class Info(BaseModel):
+@dataclass
+class Info:
     remaining: timedelta
     interval: timedelta
     loop: bool

@@ -97,7 +97,7 @@ class Executor:
                 start = time.time()
                 item.run()
                 t = time.time() - start
-                if t > self._slow_log:
+                if t >= self._slow_log:
                     logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
         except queue.Empty:

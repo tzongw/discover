@@ -42,6 +42,8 @@ class JSONEncoder(json.JSONEncoder):
             return o.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(o, date):
             return o.strftime('%Y-%m-%d')
+        elif isinstance(o, timedelta):
+            return o.total_seconds()
         return super().default(o)
 
 
