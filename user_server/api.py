@@ -144,6 +144,9 @@ def streaming_response():
 def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
     coll = collections[collection]
     order_by = order_by or [f'-{coll.id.name}']
+    for key, value in kwargs.items():
+        if key.endswith('__in'):
+            kwargs[key] = value.split(',')
     docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
     return {
         'documents': docs,
@@ -157,6 +160,13 @@ def create_document(collection: str, **kwargs):
     coll = collections[collection]
     doc = coll(**kwargs).save()
     doc.invalidate()  # notify full cache new document created
+
+
+@app.route('/collections/<collection>/documents/<doc_id>')
+def get_document(collection: str, doc_id):
+    coll = collections[collection]
+    doc = coll.get(doc_id)
+    return doc.to_dict(exclude=[])
 
 
 @app.route('/collections/<collection>/documents/<doc_id>', methods=['PATCH'])

@@ -59,7 +59,7 @@ class Service:
     def _clean_pools(self):
         available = self.addresses()
         holding = set(self._pools.keys())
-        for removed in (holding - available):
+        for removed in holding - available:
             logging.info(f'clean {self._name} {removed}')
             pool = self._pools.pop(removed)
             pool.close_all()
