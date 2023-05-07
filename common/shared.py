@@ -97,7 +97,7 @@ if options.env != const.Environment.STAGING:
     @receiver.group(const.TICK_STREAM)
     def _on_tick(data: dict):
         ts = int(data.pop(''))
-        # if not redis.set(f'tick:{ts}', '', nx=True, ex=300):  # deduplicate ticks when migrating
+        # if not redis.set(f'tick:{ts}', '', nx=True, ex=3600):  # deduplicate ticks when migrating
         #     return
         tick.dispatch(ts)
 

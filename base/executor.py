@@ -11,7 +11,7 @@ from .utils import func_desc
 
 
 class _WorkItem:
-    __slots__ = ["future", "fn", "args", "kwargs"]
+    __slots__ = ['future', 'fn', 'args', 'kwargs']
 
     def __init__(self, fut: Future, fn, *args, **kwargs):
         self.future = fut
@@ -33,7 +33,7 @@ class _WorkItem:
             self.future = None
 
     def __str__(self):
-        return f'{func_desc(self.fn)}:{self.args}:{self.kwargs}'
+        return f'fn: {func_desc(self.fn)} args: {self.args} kwargs: {self.kwargs}'
 
 
 class Executor:

@@ -7,12 +7,12 @@ from typing import List, Union
 import gevent
 import heapq
 from typing import Optional, Callable
-from .utils import LogSuppress
+from .utils import LogSuppress, func_desc
 from .executor import Executor
 
 
 class Handle:
-    __slots__ = ["when", "callback"]
+    __slots__ = ['when', 'callback']
 
     def __init__(self, callback: Callable, when):
         assert callback is not None
@@ -32,6 +32,9 @@ class Handle:
     def __call__(self, *args, **kwargs):
         if cb := self.callback:
             cb(*args, **kwargs)
+
+    def __str__(self):
+        return f'handle: {func_desc(self.callback)} at: {datetime.fromtimestamp(self.when)}'
 
 
 class Schedule:
@@ -70,7 +73,7 @@ class Schedule:
 
 
 class PeriodicCallback:
-    __slots__ = ["_schedule", "_callback", "_period", "_handle"]
+    __slots__ = ['_schedule', '_callback', '_period', '_handle']
 
     def __init__(self, schedule: Schedule, callback: Callable, period: Union[int, float, timedelta]):
         if isinstance(period, timedelta):
