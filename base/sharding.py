@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
 from typing import Type, List, Dict, TypeVar, Union, Optional
@@ -120,13 +120,17 @@ class ShardingTimer(Timer):
 
 
 class MigratingTimer(ShardingTimer):
-    def __init__(self, redis, *, sharding_key: ShardingKey, old_timer: Timer, hint=None):
+    def __init__(self, redis, *, sharding_key: ShardingKey, old_timer: Timer, start_time: datetime, hint=None):
         super().__init__(redis, sharding_key=sharding_key, hint=hint)
         self.old_timer = old_timer
+        self.start_time = start_time  # migration start time, after deployment
 
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
-        self.old_timer.kill(key)
-        return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        if datetime.now() >= self.start_time:
+            self.old_timer.kill(key)
+            return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        else:
+            return self.old_timer.create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
 
     def kill(self, key):
         return super().kill(key) or self.old_timer.kill(key)
@@ -177,10 +181,22 @@ class MigratingReceiver(ShardingReceiver):
 
 
 class ShardingInvalidator(Invalidator):
+    def __init__(self, redis: RedisCluster, sep=':'):
+        super(ShardingInvalidator, self).__init__(redis, sep)
+        self.monitoring = set()
+
     def start(self):
-        for node in self.redis.get_primaries():
-            redis = self.redis.get_redis_connection(node)
-            gevent.spawn(self._run, redis)
+        gevent.spawn(self.monitor)
+
+    def monitor(self):
+        while True:
+            for node in self.redis.get_primaries():
+                if node.name in self.monitoring:
+                    continue
+                redis = self.redis.get_redis_connection(node)
+                gevent.spawn(self._run, redis)
+                self.monitoring.add(node.name)
+            gevent.sleep(1)
 
 
 M = TypeVar('M', bound=BaseModel)
@@ -210,7 +226,7 @@ class ShardingParser(Parser):
         return True
 
 
-class Stock:
+class ShardingStock:
     def __init__(self, redis: RedisCluster):
         self.redis = redis
         self.sharding_key = ShardingKey(shards=len(redis.get_primaries()))
