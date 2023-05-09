@@ -95,10 +95,8 @@ if options.env == const.Environment.DEV:
 if options.env != const.Environment.STAGING:
     # staging should not impact prod
     @receiver.group(const.TICK_STREAM)
-    def _on_tick(data: dict):
-        ts = int(data.pop(''))
-        # if not redis.set(f'tick:{ts}', '', nx=True, ex=3600):  # deduplicate ticks when migrating
-        #     return
+    def _on_tick(_, sid):
+        ts = int(sid[:-2])
         tick.dispatch(ts)
 
 

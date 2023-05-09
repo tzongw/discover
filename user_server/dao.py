@@ -48,7 +48,7 @@ class GetterMixin(Generic[T]):
     @classmethod
     def mget(cls, keys) -> list[Optional[T]]:
         query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query)}
+        mapping = {o.id: o for o in cls.objects(**query).limit(len(keys))}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
