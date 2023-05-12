@@ -144,8 +144,8 @@ class MigratingTimer(ShardingTimer):
 
 class MigratingReceiver(ShardingReceiver):
     def __init__(self, redis, group: str, consumer: str, *, batch=50, old_receiver: Receiver):
-        super().__init__(redis, group, consumer, batch=batch)
         self.old_receiver = old_receiver
+        super().__init__(redis, group, consumer, batch=batch)
 
     def start(self):
         self.old_receiver.start()
@@ -155,7 +155,7 @@ class MigratingReceiver(ShardingReceiver):
         self.old_receiver.stop()
         super().stop()
 
-    def _group(self, *args, **kwargs):
+    def _group_handler(self, *args, **kwargs):
         def decorator(f):
             self.old_receiver.group(*args, **kwargs)(f)
             self._group_dispatcher.handler(*args, **kwargs)(f)
@@ -163,7 +163,7 @@ class MigratingReceiver(ShardingReceiver):
 
         return decorator
 
-    def _fanout(self, *args, **kwargs):
+    def _fanout_handler(self, *args, **kwargs):
         def decorator(f):
             self.old_receiver.fanout(*args, **kwargs)(f)
             self._fanout_dispatcher.handler(*args, **kwargs)(f)
@@ -173,11 +173,11 @@ class MigratingReceiver(ShardingReceiver):
 
     @property
     def group(self):
-        return self._group
+        return self._group_handler
 
     @property
     def fanout(self):
-        return self._fanout
+        return self._fanout_handler
 
 
 class ShardingInvalidator(Invalidator):
