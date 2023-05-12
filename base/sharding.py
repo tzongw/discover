@@ -183,19 +183,20 @@ class MigratingReceiver(ShardingReceiver):
 class ShardingInvalidator(Invalidator):
     def __init__(self, redis: RedisCluster, sep=':'):
         super(ShardingInvalidator, self).__init__(redis, sep)
-        self.monitoring = set()
 
     def start(self):
         gevent.spawn(self.monitor)
 
     def monitor(self):
+        monitoring = set()
         while True:
             for node in self.redis.get_primaries():
-                if node.name in self.monitoring:
+                if node.name in monitoring:
                     continue
                 redis = self.redis.get_redis_connection(node)
-                gevent.spawn(self._run, redis)
-                self.monitoring.add(node.name)
+                first_node = not monitoring
+                gevent.spawn(self._run, redis, subscribe=first_node)
+                monitoring.add(node.name)
             gevent.sleep(1)
 
 

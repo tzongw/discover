@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from typing import Union
+import uuid
 from redis import Redis, RedisCluster
 import gevent
 import logging
@@ -34,7 +35,7 @@ class Invalidator:
     def publish(self, key):
         self.redis.publish('__redis__:invalidate', key)
 
-    def _run(self, redis):
+    def _run(self, redis, subscribe=True):
         sub = None
         while True:
             try:
@@ -47,7 +48,7 @@ class Invalidator:
                     sub.execute_command(command)
                     res = sub.parse_response()
                     logging.info(f'{command} {res}')
-                    sub.subscribe('__redis__:invalidate')
+                    sub.subscribe('__redis__:invalidate' if subscribe else str(uuid.uuid4()))
                     res = sub.parse_response()
                     logging.info(res)
                     self._invalidate_all()
