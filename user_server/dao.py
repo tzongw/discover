@@ -61,10 +61,11 @@ class GetterMixin(Generic[T]):
     def to_dict(self, include=None, exclude=None):
         if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
-            include = [field for field in self._fields if field not in exclude]
+            include = [field for field in self._fields if field not in exclude and not field.startswith('_')]
         if include is None:
             include = self.__include__
-        return {k: v for k, v in self._data.items() if k in include} if include else self._data
+        assert include, 'NO specified fields'
+        return {k: v for k, v in self._data.items() if k in include}
 
 
 class CacheMixin:
