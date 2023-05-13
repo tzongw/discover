@@ -88,11 +88,11 @@ def transaction(self: RedisCluster, func, *watches, **kwargs):
 
 RedisCluster.transaction = transaction
 
-if options.env == const.Environment.DEV:
+if options.env is const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
-if options.env != const.Environment.STAGING:
+if options.env is not const.Environment.STAGING:
     # staging should not impact prod
     @receiver.group(const.TICK_STREAM)
     def _on_tick(_, sid):
@@ -135,7 +135,11 @@ atexit.register(unique_id.stop)  # after cleanup
 def _cleanup():
     status.exiting = True
     with LogSuppress():
-        executor.gather(*_exits)
+        if options.env is const.Environment.DEV:  # ptpython compatible
+            for fn in _exits:
+                fn()
+        else:
+            executor.gather(*_exits)
     _exits.clear()
 
 

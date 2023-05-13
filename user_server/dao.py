@@ -158,6 +158,6 @@ class CommandLogger(monitoring.CommandListener):
 
 
 if host := options.mongo:
-    if options.env == const.Environment.DEV:
+    if options.env is const.Environment.DEV:
         monitoring.register(CommandLogger())
     connect(host=host)

@@ -31,7 +31,7 @@ class Handler:
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
             session = shared.parser.get(session_key(uid), Session)
-            if (session is None or session.token != token) and options.env != const.Environment.DEV:
+            if (session is None or session.token != token) and options.env is not const.Environment.DEV:
                 raise ValueError("token error")
             old_online = shared.parser.set(online_key(uid), Online(address=address, conn_id=conn_id),
                                            ex=const.CLIENT_TTL, get=True)
