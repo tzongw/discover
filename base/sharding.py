@@ -83,8 +83,9 @@ class ShardingReceiver(Receiver):
             for waker in self._sharding_key.all_sharded_keys(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
-            self._group_dispatcher.handlers.pop(self._waker)  # already deleted
             for stream in self._group_dispatcher.handlers:
+                if stream == self._waker:  # already deleted
+                    continue
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):
                     pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
             pipe.execute(raise_on_error=False)  # stop but no start
@@ -155,8 +156,8 @@ class MigratingTimer(ShardingTimer):
 
 class MigratingReceiver(ShardingReceiver):
     def __init__(self, redis, group: str, consumer: str, *, batch=50, old_receiver: Receiver):
-        self.old_receiver = old_receiver
         super().__init__(redis, group, consumer, batch=batch)
+        self.old_receiver = old_receiver
 
     def start(self):
         self.old_receiver.start()

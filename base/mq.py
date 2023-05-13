@@ -61,11 +61,11 @@ class Receiver:
         self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='fanout_dispatch'))
         self._batch = batch
 
-        @self.group(self._waker)
+        @self._group_dispatcher.handler(self._waker)
         def group_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
-        @self.fanout(self._waker)
+        @self._fanout_dispatcher.handler(self._waker)
         def fanout_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
