@@ -8,7 +8,7 @@ from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
 from typing import Type, Union
-from redis import Redis
+from redis import Redis, RedisCluster
 from redis.lock import Lock, LockError
 from werkzeug.routing import BaseConverter
 from random import choice, shuffle
@@ -190,3 +190,22 @@ def base62(n):
         if n == 0:
             break
     return ''.join(chars[::-1])
+
+
+class Stocks:
+    def __init__(self, redis: Union[Redis, RedisCluster]):
+        self.redis = redis
+
+    def reset(self, key, total=0, expire=None):
+        assert total >= 0
+        self.redis.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+        if expire is not None:
+            self.redis.expire(key, expire)
+
+    def incrby(self, key, total):
+        assert total >= 0
+        self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()
+
+    def try_lock(self, key, hint=None) -> bool:
+        bitfield = self.redis.bitfield(key, default_overflow='FAIL')
+        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None

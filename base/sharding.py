@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
+import random
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
-from typing import Type, List, Dict, TypeVar, Union, Optional
+from typing import Type, List, Dict, TypeVar, Union
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .parser import Parser, patch_callbacks
 from .invalidator import Invalidator
 from .mq import Publisher, Receiver, ProtoDispatcher
-from .utils import stream_name
+from .utils import stream_name, Stocks
 from .timer import Timer
 
 
@@ -239,12 +240,12 @@ class ShardingParser(Parser):
         return True
 
 
-class ShardingStock:
+class ShardingStocks(Stocks):
     def __init__(self, redis: RedisCluster):
-        self.redis = redis
+        super().__init__(redis)
         self.sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
-    def fair_amounts(self, total):
+    def _fair_amounts(self, total):
         shards = self.sharding_key.shards
         amounts = [total // shards] * shards
         for i in range(total - sum(amounts)):
@@ -255,21 +256,23 @@ class ShardingStock:
     def reset(self, key, total=0, expire=None):
         assert total >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self.fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self._fair_amounts(total)):
                 pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
                 if expire is not None:
                     pipe.expire(sharded_key, expire)
             pipe.execute()
 
     def incrby(self, key, total):
-        assert total > 0
+        assert total >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self.fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self._fair_amounts(total)):
                 if amount > 0:
                     pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
             pipe.execute()
 
-    def try_lock(self, key, hint) -> Optional[int]:
+    def try_lock(self, key, hint=None) -> bool:
+        if hint is None:
+            hint = random.randrange(self.sharding_key.shards)
         _, sharded_key = self.sharding_key.sharded_keys(str(hint), key)
         bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
-        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0]
+        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
