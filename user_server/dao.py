@@ -54,10 +54,10 @@ class GetterMixin(Generic[T]):
     mget = mget_raw
 
     @classmethod
-    def get(cls, key, ensure_exists=True) -> Optional[T]:
+    def get(cls, key, ensure=True) -> Optional[T]:
         value = cls.mget([key])[0]
-        if value is None and ensure_exists:
-            raise DoesNotExist(f'document {key} not exists')
+        if value is None and ensure:
+            raise DoesNotExist(f'document {key} does not exist')
         return value
 
     def to_dict(self, include=None, exclude=None):
@@ -137,9 +137,9 @@ class TokenSetting(Setting):
     expire = IntField(default=3600)
 
     @classmethod
-    def get(cls, key=None, ensure_exists=False) -> TokenSetting:
+    def get(cls, key=None, ensure=False) -> TokenSetting:
         assert key is None or key == cls.__name__, 'key is NOT support'
-        return super().get(cls.__name__, ensure_exists) or cls(id=cls.__name__)
+        return super().get(cls.__name__, ensure) or cls(id=cls.__name__)
 
 
 cache.listen(invalidator, TokenSetting.__name__)
