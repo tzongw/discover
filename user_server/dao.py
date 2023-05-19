@@ -51,7 +51,9 @@ class GetterMixin(Generic[T]):
         mapping = {o.id: o for o in cls.objects(**query).only(*only).limit(len(keys))}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
-    mget = mget_raw
+    @classmethod
+    def mget(cls, keys) -> list[Optional[T]]:
+        return cls.mget_raw(keys)
 
     @classmethod
     def get(cls, key, ensure=True) -> Optional[T]:
