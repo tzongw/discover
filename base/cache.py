@@ -40,7 +40,7 @@ class Cache(Generic[T]):
         return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids} ' \
                f'size: {len(self.lru)} maxsize: {self.maxsize}'
 
-    def get(self, key, *args, **kwargs) -> Optional[T]:
+    def get(self, key, *args, **kwargs) -> T:
         value, = self.mget([key], *args, **kwargs)
         return value
 
@@ -53,7 +53,7 @@ class Cache(Generic[T]):
             elif len(self.lru) > self.maxsize:
                 self.lru.popitem(last=False)
 
-    def mget(self, keys, *args, **kwargs):
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = []
         missing_keys = []
         made_keys = []
@@ -102,7 +102,7 @@ class Cache(Generic[T]):
 class TTLCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
-    def mget(self, keys, *args, **kwargs):
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = []
         missing_keys = []
         made_keys = []
