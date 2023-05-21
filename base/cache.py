@@ -44,9 +44,9 @@ class Cache(Generic[T]):
         value, = self.mget([key], *args, **kwargs)
         return value
 
-    def _set(self, key, value):
+    def _hold(self, key):
         replace = key in self.lru
-        self.lru[key] = value
+        self.lru[key] = self.placeholder
         if self.maxsize is not None:
             if replace:
                 self.lru.move_to_end(key)
@@ -54,7 +54,7 @@ class Cache(Generic[T]):
                 self.lru.popitem(last=False)
 
     def mget(self, keys, *args, **kwargs) -> Sequence[T]:
-        results = []
+        results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
@@ -63,7 +63,7 @@ class Cache(Generic[T]):
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
                 self.hits += 1
-                results.append(value)
+                results[index] = value
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
@@ -71,8 +71,7 @@ class Cache(Generic[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                results.append(self.placeholder)
-                self._set(made_key, self.placeholder)
+                self._hold(made_key)
         if missing_keys:
             values = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
@@ -103,7 +102,7 @@ class TTLCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
     def mget(self, keys, *args, **kwargs) -> Sequence[T]:
-        results = []
+        results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
@@ -112,7 +111,7 @@ class TTLCache(Cache[T]):
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
                 self.hits += 1
-                results.append(pair.value)
+                results[index] = pair.value
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
@@ -120,8 +119,7 @@ class TTLCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                results.append(self.placeholder)
-                self._set(made_key, self.placeholder)
+                self._hold(made_key)
         if missing_keys:
             tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
