@@ -262,13 +262,18 @@ class ShardingStocks(Stocks):
                     pipe.expire(sharded_key, expire)
             pipe.execute()
 
+    def get(self, key):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for sharded_key in self.sharding_key.all_sharded_keys(key):
+                pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
+            return sum(values[0] for values in pipe.execute())
+
     def incrby(self, key, total):
         assert total >= 0
         with self.redis.pipeline(transaction=False) as pipe:
             for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self._fair_amounts(total)):
-                if amount > 0:
-                    pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
-            pipe.execute()
+                pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
+            return sum(values[0] for values in pipe.execute())
 
     def try_lock(self, key, hint=None) -> bool:
         if hint is None:

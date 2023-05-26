@@ -202,9 +202,12 @@ class Stocks:
         if expire is not None:
             self.redis.expire(key, expire)
 
+    def get(self, key):
+        return self.redis.bitfield(key).get(fmt='u32', offset=0).execute()[0]
+
     def incrby(self, key, total):
         assert total >= 0
-        self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()
+        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()[0]
 
     def try_lock(self, key, hint=None) -> bool:
         bitfield = self.redis.bitfield(key, default_overflow='FAIL')

@@ -181,7 +181,7 @@ class FullMixin(Generic[T]):
                 self.full_hits -= 1  # full_hits will +1 in f redundantly because values was accessed in wrapper
                 return f(*args, **kwargs)
 
-            cache_version = 0
+            cache_version = self._version
             cache_expire: Optional[datetime] = None
 
             @functools.wraps(f)
