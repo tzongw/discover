@@ -46,14 +46,14 @@ class GetterMixin(Generic[T]):
     __include__ = None
 
     @classmethod
-    def mget(cls, keys) -> list[Optional[T]]:
+    def mget(cls, keys, *, only=()) -> list[Optional[T]]:
         query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query).limit(len(keys))}
+        mapping = {o.id: o for o in cls.objects(**query).only(*only).limit(len(keys))}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
-    def get(cls, key, ensure=True) -> Optional[T]:
-        value = cls.mget([key])[0]
+    def get(cls, key, *, ensure=True, only=()) -> Optional[T]:
+        value = cls.mget([key], only=only)[0]
         if value is None and ensure:
             raise DoesNotExist(f'document {key} does not exist')
         return value
@@ -68,8 +68,16 @@ class GetterMixin(Generic[T]):
         return {k: v for k, v in self._data.items() if k in include}
 
 
-class CacheMixin:
+class CacheMixin(Generic[T]):
     id: Any
+
+    @classmethod
+    def make_key(cls, key, *_, **__):
+        return cls.id.to_python(key)  # ignore only
+
+    @classmethod
+    def mget(cls, keys, *_, **__) -> list[Optional[T]]:
+        return super().mget(keys)  # ignore only
 
     def invalidate(self):
         key = f'{self.__class__.__name__}:{self.id}'
@@ -94,7 +102,7 @@ def collection(coll):
 
 
 @collection
-class Profile(Document, GetterMixin['Profile'], CacheMixin):
+class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
     __include__ = ['name', 'addr']
     meta = {'strict': False}
 
@@ -105,7 +113,7 @@ class Profile(Document, GetterMixin['Profile'], CacheMixin):
     expire = DateTimeField()
 
 
-cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.id.to_python,
+cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
                                       get_keys=lambda: Profile.objects(expire__gt=datetime.now()).distinct(
                                           Profile.id.name))
 cache.listen(invalidator, Profile.__name__)
@@ -119,13 +127,13 @@ def valid_profiles():
 
 
 @collection
-class Setting(Document, GetterMixin['Setting'], CacheMixin):
+class Setting(Document, CacheMixin['Setting'], GetterMixin['Setting']):
     meta = {'strict': False, 'allow_inheritance': True}
 
     id = StringField(primary_key=True)
 
 
-cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.id.to_python, maxsize=None)
+cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
 cache.listen(invalidator, Setting.__name__)
 Setting.mget = cache.mget
 
@@ -135,9 +143,9 @@ class TokenSetting(Setting):
     expire = IntField(default=3600)
 
     @classmethod
-    def get(cls, key=None, ensure=False) -> TokenSetting:
+    def get(cls, key=None, *, ensure=False, only=()) -> TokenSetting:
         assert key is None or key == cls.__name__, 'key is NOT support'
-        return super().get(cls.__name__, ensure) or cls(id=cls.__name__)
+        return super().get(cls.__name__, ensure=ensure, only=only) or cls(id=cls.__name__)
 
 
 cache.listen(invalidator, TokenSetting.__name__)
