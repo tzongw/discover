@@ -3,7 +3,7 @@ import logging
 import const
 from common.messages import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, redis, registry, timer, invalidator, \
-    async_task, at_main, tick
+    async_task, at_main, tick, run_in_worker
 from datetime import timedelta, datetime
 from dao import Account
 
@@ -49,6 +49,7 @@ def on_10s(dt: datetime):
 
 
 @async_task
+@run_in_worker
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
     async_task.cancel('task:hello')

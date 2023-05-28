@@ -158,6 +158,14 @@ def spawn_worker(f, *args, **kwargs):
     _workers[g] = desc
 
 
+def run_in_worker(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        spawn_worker(f, *args, **kwargs)
+
+    return wrapper
+
+
 def _sig_handler(sig, frame):
     def graceful_exit():
         logging.info(f'exit {sig} {frame}')
