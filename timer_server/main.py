@@ -67,7 +67,8 @@ class Handler:
         if not service:
             service = Service(shared.registry, service_name)
             self._services[service_name] = service
-        with service.connection() as conn:
+        addr = service.address(hint=key)
+        with service.connection(addr) as conn:
             client = Client(conn)
             client.timeout(key, data)
 
