@@ -3,7 +3,7 @@ import logging
 from typing import Dict
 from urllib import parse
 from collections import defaultdict
-from typing import DefaultDict, Set
+from typing import Set
 import gevent
 from gevent import pywsgi
 from gevent import queue
@@ -129,7 +129,7 @@ class Client:
 
 
 clients = {}  # type: Dict[str, Client]
-groups = defaultdict(set)  # type: DefaultDict[str, Set[Client]]
+groups = defaultdict(set)  # type: Dict[str, Set[Client]]
 
 
 def remove_from_group(client: Client, group):

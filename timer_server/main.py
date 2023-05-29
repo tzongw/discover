@@ -18,6 +18,7 @@ from base.schedule import PeriodicCallback
 from base.service import Service
 from setproctitle import setproctitle
 from base import LogSuppress
+from base.utils import DefaultDict
 import time
 from pydantic import BaseModel
 from dataclasses import dataclass
@@ -42,7 +43,8 @@ class Handler:
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
-        self._services = {}  # type: Dict[str, Service]
+        self._services = DefaultDict(
+            lambda service_name: Service(shared.registry, service_name))  # type: Dict[str, Service]
 
     def load_timers(self):
         full_keys = set(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
@@ -63,10 +65,7 @@ class Handler:
 
     def _fire_timer(self, key, service_name, data):
         logging.debug(f'{key} {service_name}')
-        service = self._services.get(service_name)
-        if not service:
-            service = Service(shared.registry, service_name)
-            self._services[service_name] = service
+        service = self._services[service_name]
         addr = service.address(hint=key)
         with service.connection(addr) as conn:
             client = Client(conn)

@@ -7,16 +7,15 @@ import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
 from .thrift_pool import ThriftPool
-from .utils import ip_address, Addr
+from .utils import ip_address, Addr, DefaultDict
 
 
 class Service:
     def __init__(self, registry: Registry, name, **settings):
         self._name = name
         self._registry = registry
-        self._pools = {}  # type: Dict[str, ThriftPool]
+        self._pools = DefaultDict(lambda address: ThriftPool(Addr(address), **settings))  # type: Dict[str, ThriftPool]
         self._cooldown = {}  # type: Dict[str, float]
-        self._settings = settings
         self._local_addresses = []
         self._good_addresses = []
         self._all_addresses = []  # same as addresses, but as a list
@@ -36,11 +35,7 @@ class Service:
             addresses = self._local_addresses or self._good_addresses or self._all_addresses
             address = choice(addresses)
 
-        pool = self._pools.get(address)
-        if not pool:
-            addr = Addr(address)
-            pool = ThriftPool(addr.host, addr.port, **self._settings)
-            self._pools[address] = pool
+        pool = self._pools[address]
         with pool.connection() as conn:
             try:
                 yield conn
