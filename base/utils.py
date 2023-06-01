@@ -58,12 +58,14 @@ def ip_address(ipv6=False):
 
 def var_args(f: Callable):
     params = signature(f).parameters
+    var_positional = any(p.kind == Parameter.VAR_POSITIONAL for p in params.values())
+    var_keyword = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
+        if not var_positional:
             args = args[:len(params)]
-        if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
+        if not var_keyword:
             kwargs = {k: v for k, v in kwargs.items() if k in params}
         return f(*args, **kwargs)
 

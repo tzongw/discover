@@ -37,7 +37,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=1024, queue_size=None, idle=60, slow_log=3, name='executor'):
+    def __init__(self, max_workers=256, queue_size=None, idle=60, slow_log=3, name='executor'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
