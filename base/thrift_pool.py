@@ -8,7 +8,7 @@ from .pool import Pool
 
 class ThriftPool(Pool):
     def __init__(self, addr: Addr, **settings):
-        super().__init__(**settings, biz_exception=self.biz_exception)
+        super().__init__(**settings)
         self.addr = addr
 
     def create_connection(self):
