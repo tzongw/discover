@@ -23,7 +23,7 @@ from config import options
 from const import CTX_UID, CTX_TOKEN
 from shared import session_key, async_task, async_heavy
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
-from base.utils import ListConverter
+from base.utils import ListConverter, base62
 from flasgger import Swagger
 from hashlib import sha1
 import models
@@ -84,7 +84,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = id_generator.gen()
+    ctx.trace = base62(id_generator.gen())
 
 
 @async_heavy
