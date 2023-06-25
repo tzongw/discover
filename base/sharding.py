@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-import random
+import uuid
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
@@ -277,7 +277,7 @@ class ShardingStocks(Stocks):
 
     def try_lock(self, key, hint=None) -> bool:
         if hint is None:
-            hint = random.randrange(self.sharding_key.shards)
+            hint = uuid.uuid4()
         _, sharded_key = self.sharding_key.sharded_keys(str(hint), key)
         bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
