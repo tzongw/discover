@@ -20,7 +20,7 @@ def mget_callback(response, convert=None):
     return [convert(value) for value in response] if convert else response
 
 
-def hget_callback(response, convert=None):
+def hgetall_callback(response, convert=None):
     response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
     return convert(response) if convert else response
 
@@ -36,7 +36,7 @@ def patch_callbacks(callbacks):
     callbacks['HMGET'] = callback
     callbacks['MGET'] = mget_callback
     callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
-    callbacks['HGETALL'] = hget_callback
+    callbacks['HGETALL'] = hgetall_callback
 
 
 patch_callbacks(Redis.RESPONSE_CALLBACKS)

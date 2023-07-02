@@ -97,6 +97,7 @@ collections: dict[str, Union[Type[Document], Type[GetterMixin], Type[CacheMixin]
 
 
 def collection(coll):
+    assert coll.__name__ not in collections
     collections[coll.__name__] = coll
     return coll
 
