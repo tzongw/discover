@@ -129,9 +129,8 @@ def hello(names):
 @app.route('/stream')
 def streaming_response():
     def generate():
-        yield 'Hello\n'
-        yield 'World\n'
-        yield '!'
+        for line in ['Hell\no', 'World', '!']:
+            yield f'{json.dumps(line)}'
 
     return app.response_class(stream_with_context(generate()))
 
