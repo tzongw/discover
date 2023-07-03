@@ -129,22 +129,6 @@ class DefaultDict(defaultdict):
         return value
 
 
-def zpop_by_score(redis: Redis, key, start, stop, limit=None):
-    kwargs = {'offset': 0, 'num': limit} if limit else {}
-    members = {member: score for member, score in
-               redis.zrange(key, start, stop, byscore=True, withscores=True, **kwargs)}
-    with redis.pipeline(transaction=False) as pipe:
-        for member in members:
-            pipe.zrem(key, member)
-        misses = []
-        for member, removed in zip(members, pipe.execute()):
-            if not removed:
-                misses.append(member)
-    for member in misses:
-        members.pop(member)
-    return members
-
-
 class Semaphore:
     def __init__(self, redis: Redis, name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
