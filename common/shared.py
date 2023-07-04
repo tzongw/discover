@@ -86,7 +86,20 @@ def transaction(self: RedisCluster, func, *watches, **kwargs):
     return redis.transaction(func, *watches, **kwargs)
 
 
+def pipeline(self: RedisCluster, transaction=None, shard_hint=None):
+    if transaction is None:
+        transaction = shard_hint is not None
+    if transaction:
+        node = self.get_node_from_key(shard_hint)
+        redis: Redis = self.get_redis_connection(node)
+        return redis.pipeline(transaction=transaction, shard_hint=shard_hint)
+    else:
+        return _pipeline(self, transaction=transaction, shard_hint=shard_hint)
+
+
 RedisCluster.transaction = transaction
+_pipeline = RedisCluster.pipeline
+RedisCluster.pipeline = pipeline
 
 if options.env is const.Environment.DEV:
     # in dev, run in worker to debug
