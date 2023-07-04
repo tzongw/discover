@@ -25,10 +25,10 @@ def main():
         server = BackdoorServer(('127.0.0.1', options.back_port), locals={'shared': shared})
         workers.append(gevent.spawn(server.serve_forever))
     setproctitle(f'{app_name}-{app_id}-{options.http_port}-{options.rpc_port}')
-    shared.registry.start()
-    shared.invalidator.start()
+    workers += shared.registry.start()
+    workers += shared.invalidator.start()
     init_main()
-    shared.receiver.start()
+    workers += shared.receiver.start()
     shared.registry.register({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
     gevent.joinall(workers, raise_error=True)
 

@@ -40,7 +40,7 @@ class Registry:
     def start(self):
         logging.info(f'start')
         self._refresh()
-        gevent.spawn(self._run)
+        return [gevent.spawn(self._run)]
 
     def stop(self):
         logging.info(f'stop {self._services}')

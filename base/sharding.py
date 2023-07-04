@@ -69,13 +69,14 @@ class ShardingReceiver(Receiver):
                     # create group & stream
                     pipe.xgroup_create(sharded_stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-
+        workers = []
         for streams in zip(
                 *[self._sharding_key.all_sharded_keys(stream) for stream in self._group_dispatcher.handlers]):
-            gevent.spawn(self._group_run, streams)
+            workers.append(gevent.spawn(self._group_run, streams))
         for streams in zip(
                 *[self._sharding_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.handlers]):
-            gevent.spawn(self._fanout_run, streams)
+            workers.append(gevent.spawn(self._fanout_run, streams))
+        return workers
 
     def stop(self):
         logging.info(f'stop')
@@ -162,7 +163,7 @@ class MigratingReceiver(ShardingReceiver):
 
     def start(self):
         self.old_receiver.start()
-        super().start()
+        return super().start()
 
     def stop(self):
         self.old_receiver.stop()
@@ -198,7 +199,7 @@ class ShardingInvalidator(Invalidator):
         super(ShardingInvalidator, self).__init__(redis, sep)
 
     def start(self):
-        gevent.spawn(self.monitor)
+        return [gevent.spawn(self.monitor)]
 
     def monitor(self):
         monitoring = set()

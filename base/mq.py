@@ -84,8 +84,8 @@ class Receiver:
                 # create group & stream
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        gevent.spawn(self._group_run, self._group_dispatcher.handlers)
-        gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)
+        return [gevent.spawn(self._group_run, self._group_dispatcher.handlers),
+                gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)]
 
     def stop(self):
         logging.info(f'stop')

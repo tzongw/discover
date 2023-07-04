@@ -23,7 +23,7 @@ class Invalidator:
         return self.dispatcher.handlers.keys()
 
     def start(self):
-        gevent.spawn(self._run, self.redis)
+        return [gevent.spawn(self._run, self.redis)]
 
     def invalidate(self, key, *args, **kwargs):
         self.dispatcher.dispatch(key, *args, **kwargs)
