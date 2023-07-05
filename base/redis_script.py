@@ -15,7 +15,20 @@ _SCRIPT = """#!lua name=utils
         end
     end
 
+    local function limited_consume(keys, args)
+        local cur = redis.call('GET', keys[1])
+        if not cur then
+            return
+        end
+        local consume = math.min(tonumber(cur), tonumber(args[1]))
+        if consume > 0 then
+            redis.call('DECRBY', keys[1], consume)
+        end
+        return consume
+    end
+
     redis.register_function('limited_incr', limited_incr)
+    redis.register_function('limited_consume', limited_consume)
 """
 
 
@@ -27,3 +40,8 @@ def _ensure_script(redis):
 def limited_incr(redis: Union[Redis, RedisCluster], key: str, limit: int, expire: timedelta):
     _ensure_script(redis)
     return redis.fcall('limited_incr', 1, key, limit, int(expire.total_seconds() * 1000))
+
+
+def limited_consume(redis: Union[Redis, RedisCluster], key: str, consume):
+    _ensure_script(redis)
+    return redis.fcall('limited_consume', 1, key, consume)
