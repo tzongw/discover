@@ -130,19 +130,19 @@ class DefaultDict(defaultdict):
 
 
 class Semaphore:
-    def __init__(self, redis: Redis, name, value: int, timeout=timedelta(minutes=1)):
+    def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'{{{name}}}_{i}' for i in range(value)]
+        self.names = [f'{name}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
         self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
 
     def __enter__(self):
+        assert not self.local.__dict__, 'recursive lock'
         token = str(uuid.uuid4())
-        names = [name for name, value in zip(self.names, self.redis.mget(self.names)) if value is None]
-        shuffle(names)
-        for name in names:
+        shuffle(self.names)
+        for name in self.names:
             if self.redis.set(name, token, nx=True, px=self.timeout):
                 self.local.name = name
                 self.local.token = token
@@ -151,7 +151,8 @@ class Semaphore:
 
     def __exit__(self, exctype, excinst, exctb):
         name, token = self.local.name, self.local.token
-        self.local.name = self.local.token = None
+        del self.local.name
+        del self.local.token
         self.lua_release(keys=[name], args=[token])
 
     def reacquire(self):
