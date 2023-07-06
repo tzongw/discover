@@ -46,7 +46,6 @@ class Executor:
         self._slow_log = slow_log
         self._name = name
         self._overload = False
-        self._slow_count = 0
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
@@ -54,16 +53,7 @@ class Executor:
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
-        start = time.time()
         self._items.put(item)
-        t = time.time() - start
-        if t >= self._slow_log:
-            self._slow_count += 1
-            if self._slow_count <= 10:
-                logging.warning(f'+ slow put {t} {self} {item}')
-        elif self._slow_count > 0:
-            logging.warning(f'- slow put {t} {self} {item}')
-            self._slow_count = 0
         if not self._overload and self._items.qsize() >= self._max_workers * 2:
             self._overload = True
             logging.warning(f'+ overload {self} {item}')
@@ -85,7 +75,7 @@ class Executor:
 
     def __str__(self):
         return f'{self._name}: unfinished: {self._unfinished}, workers: {self._workers} queue: {self._items.qsize()}' \
-               f' overload: {self._overload} slow_count: {self._slow_count}'
+               f' overload: {self._overload}'
 
     def _worker(self):
         try:
@@ -97,7 +87,7 @@ class Executor:
                 start = time.time()
                 item.run()
                 t = time.time() - start
-                if t >= self._slow_log:
+                if t > self._slow_log:
                     logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
         except queue.Empty:
