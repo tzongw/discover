@@ -150,10 +150,11 @@ class Semaphore:
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exctype, excinst, exctb):
-        name, token = self.local.name, self.local.token
+        keys = [self.local.name]
+        args = [self.local.token]
         del self.local.name
         del self.local.token
-        self.lua_release(keys=[name], args=[token])
+        self.lua_release(keys=keys, args=args)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)

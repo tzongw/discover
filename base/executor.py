@@ -99,7 +99,7 @@ class Executor:
 
 
 class WaitGroup(Executor):
-    def __init__(self, max_workers=10, slow_log=600, name='wait_group'):
+    def __init__(self, max_workers=10, slow_log=30, name='wait_group'):
         super().__init__(max_workers, queue_size=max_workers, idle=0, slow_log=slow_log, name=name)
         self._futures = WeakSet()
 

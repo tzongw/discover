@@ -131,6 +131,7 @@ def streaming_response():
     def generate():
         for line in ['Hell\no', 'World', '!']:
             yield f'{json.dumps(line)}'
+            gevent.sleep(1)
 
     return app.response_class(stream_with_context(generate()))
 
