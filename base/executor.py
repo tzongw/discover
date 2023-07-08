@@ -37,13 +37,14 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=256, queue_size=None, idle=60, slow_log=3, name='executor'):
+    def __init__(self, max_workers=256, queue_size=None, idle=60, slow_time=3, name='executor'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
-        self._items = queue.Channel() if queue_size == 0 else queue.Queue(queue_size)
+        assert queue_size is None or queue_size > 0
+        self._items = queue.Queue(queue_size)
         self._idle = idle
-        self._slow_log = slow_log
+        self._slow_time = slow_time
         self._name = name
         self._overload = False
 
@@ -54,7 +55,7 @@ class Executor:
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
         self._items.put(item)
-        if not self._overload and self._items.qsize() >= self._max_workers * 2:
+        if not self._overload and len(self._items) >= self._max_workers * 2:
             self._overload = True
             logging.warning(f'+ overload {self} {item}')
         return fut
@@ -81,13 +82,13 @@ class Executor:
         try:
             while True:
                 item = self._items.get(block=self._idle > 0, timeout=self._idle)  # type: _WorkItem
-                if self._overload and self._items.qsize() <= self._max_workers // 2:
+                if self._overload and len(self._items) <= self._max_workers:
                     self._overload = False
                     logging.warning(f'- overload {self} {item}')
                 start = time.time()
                 item.run()
                 t = time.time() - start
-                if t > self._slow_log:
+                if t > self._slow_time:
                     logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
         except queue.Empty:
@@ -99,8 +100,8 @@ class Executor:
 
 
 class WaitGroup(Executor):
-    def __init__(self, max_workers=10, slow_log=30, name='wait_group'):
-        super().__init__(max_workers, queue_size=max_workers, idle=0, slow_log=slow_log, name=name)
+    def __init__(self, max_workers=10, slow_time=10, name='wait_group'):
+        super().__init__(max_workers, queue_size=max_workers, idle=0, slow_time=slow_time, name=name)
         self._futures = WeakSet()
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:

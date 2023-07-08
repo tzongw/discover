@@ -57,8 +57,8 @@ class Receiver:
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
-        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='fanout_dispatch'))
+        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='group_dispatch'))
+        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='fanout_dispatch'))
         self._batch = batch
 
         @self._group_dispatcher.handler(self._waker)
