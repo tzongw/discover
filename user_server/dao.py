@@ -2,10 +2,10 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
 from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField
+from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -100,6 +100,17 @@ def collection(coll):
     assert coll.__name__ not in collections
     collections[coll.__name__] = coll
     return coll
+
+
+class TimeDeltaField(FloatField):
+    def to_mongo(self, value):
+        if isinstance(value, timedelta):
+            return value.total_seconds()
+        return value
+
+    def to_python(self, value):
+        value = super().to_python(value)
+        return timedelta(seconds=value)
 
 
 @collection
