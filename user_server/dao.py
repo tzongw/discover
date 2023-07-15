@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum, auto
 from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
 from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField
+from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -103,14 +104,27 @@ def collection(coll):
 
 
 class TimeDeltaField(FloatField):
+    def __init__(self, min_value=None, max_value=None, **kwargs):
+        if isinstance(min_value, timedelta):
+            min_value = min_value.total_seconds()
+        if isinstance(max_value, timedelta):
+            max_value = max_value.total_seconds()
+        super().__init__(min_value, max_value, **kwargs)
+
+    def validate(self, value):
+        value = self.to_mongo(value)
+        return super().validate(value)
+
+    def prepare_query_value(self, op, value):
+        value = self.to_mongo(value)
+        return super().prepare_query_value(op, value)
+
     def to_mongo(self, value):
-        if isinstance(value, timedelta):
-            return value.total_seconds()
-        return value
+        return value.total_seconds() if isinstance(value, timedelta) else super().to_python(value)  # yes, to_python
 
     def to_python(self, value):
         value = super().to_python(value)
-        return timedelta(seconds=value)
+        return timedelta(seconds=value) if isinstance(value, float) else value
 
 
 @collection
@@ -150,9 +164,15 @@ cache.listen(invalidator, Setting.__name__)
 Setting.mget = cache.mget
 
 
+class Status(StrEnum):
+    OK = auto()
+    ERROR = auto()
+
+
 @collection
 class TokenSetting(Setting):
-    expire = IntField(default=3600)
+    expire = TimeDeltaField(default=timedelta(hours=1), max_value=timedelta(days=1))
+    status = EnumField(Status, default=Status.OK)
 
     @classmethod
     def get(cls, key=None, *, ensure=False, only=()) -> TokenSetting:
