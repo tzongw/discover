@@ -129,6 +129,13 @@ class DefaultDict(defaultdict):
         return value
 
 
+class CaseDict(dict):
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            item = ''.join(s[0].upper() + s[1:] for s in item.split('-'))
+        return super().__getitem__(item)
+
+
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis

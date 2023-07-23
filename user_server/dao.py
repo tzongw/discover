@@ -14,6 +14,7 @@ from sqlalchemy import BigInteger
 from sqlalchemy import String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from base.utils import CaseDict
 from config import options
 import const
 from base import FullCache, Cache
@@ -97,7 +98,7 @@ class CacheMixin(Generic[T]):
         return get_expire
 
 
-collections: dict[str, Union[Type[Document], Type[GetterMixin], Type[CacheMixin]]] = {}
+collections: dict[str, Union[Type[Document], Type[GetterMixin], Type[CacheMixin]]] = CaseDict()
 
 
 def collection(coll):
