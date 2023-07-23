@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from enum import StrEnum, auto
 from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
 from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField
+from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField, \
+    EmbeddedDocument, ListField, EmbeddedDocumentListField
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -48,6 +49,8 @@ class GetterMixin(Generic[T]):
 
     @classmethod
     def mget(cls, keys, *, only=()) -> list[Optional[T]]:
+        if not keys:
+            return []
         query = {f'{cls.id.name}__in': keys}
         mapping = {o.id: o for o in cls.objects(**query).only(*only).limit(len(keys))}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
@@ -56,7 +59,7 @@ class GetterMixin(Generic[T]):
     def get(cls, key, *, ensure=True, only=()) -> Optional[T]:
         value = cls.mget([key], only=only)[0]
         if value is None and ensure:
-            raise DoesNotExist(f'document {key} does not exist')
+            raise DoesNotExist(f'document `{key}` does not exist')
         return value
 
     def to_dict(self, include=None, exclude=None):
@@ -127,6 +130,35 @@ class TimeDeltaField(FloatField):
         return timedelta(seconds=value) if isinstance(value, float) else value
 
 
+class CRUD(StrEnum):
+    CREATE = auto()
+    READ = auto()
+    UPDATE = auto()
+    DELETE = auto()
+
+
+class Privilege(EmbeddedDocument):
+    coll = StringField(required=True)
+    ops = ListField(EnumField(CRUD), required=True)
+
+    def can_access(self, coll, op: CRUD):
+        return coll == self.coll and op in self.ops
+
+
+@collection
+class Role(Document, CacheMixin['Role'], GetterMixin['Role']):
+    id = StringField(primary_key=True)
+    privileges = EmbeddedDocumentListField(Privilege, required=True)
+
+    def can_access(self, coll, op: CRUD):
+        return any(privilege.can_access(coll, op) for privilege in self.privileges)
+
+
+cache: Cache[Role] = Cache(mget=Role.mget, make_key=Role.make_key, maxsize=None)
+cache.listen(invalidator, Role.__name__)
+Role.mget = cache.mget
+
+
 @collection
 class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
     __include__ = ['name', 'addr']
@@ -137,6 +169,10 @@ class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
     addr = StringField(default='')
     rank = IntField()
     expire = DateTimeField()
+    roles = ListField(StringField())
+
+    def can_access(self, coll, op: CRUD):
+        return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
 cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,

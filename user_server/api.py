@@ -10,6 +10,7 @@ from datetime import datetime, date, timedelta
 import flask
 from flask import Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
+from mongoengine import NotUniqueError
 from pydantic import BaseModel
 from webargs import fields
 from webargs.flaskparser import use_kwargs
@@ -158,6 +159,9 @@ def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def create_document(collection: str, **kwargs):
     coll = collections[collection]
+    key = kwargs.get(coll.id.name)
+    if key is not None and coll.get(key, ensure=False):
+        raise NotUniqueError(f'document `{key}` already exists')
     doc = coll(**kwargs).save()
     doc.invalidate()  # notify full cache new document created
 
