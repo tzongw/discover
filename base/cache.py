@@ -5,7 +5,7 @@ from typing import TypeVar, Optional, Generic, Callable, Sequence
 from concurrent.futures import Future
 import functools
 
-from .utils import make_key
+from . import utils
 from .single_flight import SingleFlight
 from .invalidator import Invalidator
 
@@ -26,7 +26,7 @@ class Cache(Generic[T]):
     # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=make_key):
+    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
         self.single_flight = SingleFlight(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.make_key = make_key
@@ -205,12 +205,12 @@ class FullMixin(Generic[T]):
 
 
 class FullCache(FullMixin[T], Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)
 
 
 class FullTTLCache(FullMixin[T], TTLCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)
