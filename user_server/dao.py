@@ -115,10 +115,6 @@ class TimeDeltaField(FloatField):
             max_value = max_value.total_seconds()
         super().__init__(min_value, max_value, **kwargs)
 
-    def validate(self, value):
-        value = self.to_mongo(value)
-        return super().validate(value)
-
     def prepare_query_value(self, op, value):
         value = self.to_mongo(value)
         return super().prepare_query_value(op, value)
