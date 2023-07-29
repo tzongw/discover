@@ -19,7 +19,7 @@ class Invalidator:
         return self.dispatcher.handler
 
     @property
-    def prefixes(self):
+    def groups(self):
         return self.dispatcher.handlers.keys()
 
     def start(self):
@@ -29,11 +29,13 @@ class Invalidator:
         self.dispatcher.dispatch(key, *args, **kwargs)
 
     def _invalidate_all(self):
-        for key in self.prefixes:
-            self.dispatcher.dispatch(key, '')
+        for group in self.groups:
+            self.dispatcher.dispatch(group, '')
 
-    def publish(self, key):
-        self.redis.publish('__redis__:invalidate', key)
+    def publish(self, group, key):
+        assert self.sep not in group
+        full_key = f'{group}{self.sep}{key}'
+        self.redis.publish('__redis__:invalidate', full_key)
 
     def _run(self, redis, subscribe=True):
         sub = None
@@ -43,7 +45,7 @@ class Invalidator:
                     sub = redis.pubsub()
                     sub.execute_command('CLIENT ID')
                     client_id = sub.parse_response()
-                    prefixes = ' '.join([f'PREFIX {prefix}{self.sep}' for prefix in self.prefixes])
+                    prefixes = ' '.join([f'PREFIX {group}{self.sep}' for group in self.groups])
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
                     sub.execute_command(command)
                     res = sub.parse_response()
@@ -63,8 +65,8 @@ class Invalidator:
                     continue
                 if isinstance(data, (bytes, str)):
                     data = [data]
-                for key in data:
-                    group, key = key.split(self.sep, maxsplit=1)
+                for full_key in data:
+                    group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
             except Exception:
                 logging.exception(f'')

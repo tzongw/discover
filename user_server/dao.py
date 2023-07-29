@@ -85,8 +85,7 @@ class CacheMixin(Generic[T]):
         return super().mget(keys)  # ignore only
 
     def invalidate(self):
-        key = f'{self.__class__.__name__}:{self.id}'
-        invalidator.publish(key)
+        invalidator.publish(self.__class__.__name__, self.id)
 
     @staticmethod
     def default_expire(*keys):

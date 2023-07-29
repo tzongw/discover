@@ -2,7 +2,7 @@
 import logging
 import const
 from common.messages import Login, Logout, Alarm
-from shared import dispatcher, receiver, timer_service, at_exit, redis, registry, timer, invalidator, \
+from shared import dispatcher, receiver, timer_service, at_exit, registry, timer, invalidator, \
     async_task, at_main, tick, run_in_worker
 from datetime import timedelta, datetime
 from dao import Account
