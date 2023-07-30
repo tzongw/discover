@@ -21,7 +21,7 @@ from . import const
 from .config import options
 import service
 from .rpc_service import UserService, GateService, TimerService
-from base import AsyncTask, HeavyTask, Poller
+from base import AsyncTask, HeavyTask, Poller, Script
 
 executor = Executor(name='shared')
 schedule = Schedule()
@@ -39,6 +39,7 @@ id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = SmartParser(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
+script = Script(redis)
 
 if options.redis_cluster:
     sharding_key = ShardingKey(shards=len(redis.get_primaries()), fixed=[const.TICK_TIMER])

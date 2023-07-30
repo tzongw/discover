@@ -25,6 +25,7 @@ from .cache import Cache, TTLCache, FullCache, FullTTLCache
 from .task import AsyncTask, HeavyTask
 from .poller import Poller
 from .sharding import ShardingParser
+from .redis_script import Script
 
 
 def represent_timedelta(self, data):
