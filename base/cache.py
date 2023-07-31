@@ -80,8 +80,8 @@ class Cache(Generic[T]):
                     self.lru[made_key] = value
         return results
 
-    def listen(self, invalidator: Invalidator, prefix: str, handler: Optional[Callable] = None):
-        @invalidator.handler(prefix)
+    def listen(self, invalidator: Invalidator, group: str, handler: Optional[Callable] = None):
+        @invalidator.handler(group)
         def invalidate(key: str, *args, **kwargs):
             self.full_cached = False
             self.invalids += 1
@@ -94,7 +94,7 @@ class Cache(Generic[T]):
                 for key in keys:
                     self.lru.pop(key, None)
             else:
-                made_key = self.make_key(key)
+                made_key = self.make_key(key, *args, **kwargs)
                 self.lru.pop(made_key, None)
 
 
