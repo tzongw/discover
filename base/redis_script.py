@@ -5,7 +5,8 @@ from redis import Redis, RedisCluster
 
 _SCRIPT = """#!lua name=utils
 local function limited_incrby(keys, args)
-    local cur = tonumber(redis.call('GET', keys[1])) or 0
+    local val = redis.call('GET', keys[1])
+    local cur = tonumber(val) or 0
     local amount = tonumber(args[1])
     local limit = tonumber(args[2])
     if amount > 0 then
@@ -24,7 +25,7 @@ local function limited_incrby(keys, args)
         end
     end 
     redis.call('INCRBY', keys[1], amount)
-    if cur == 0 then
+    if not val then
         redis.call('PEXPIRE', keys[1], args[3])
     end
     return amount
