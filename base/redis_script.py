@@ -25,7 +25,7 @@ local function limited_incrby(keys, args)
         end
     end 
     redis.call('INCRBY', keys[1], amount)
-    if not val then
+    if not val and args[3] then
         redis.call('PEXPIRE', keys[1], args[3])
     end
     return amount
@@ -40,5 +40,8 @@ class Script:
         redis.function_load(_SCRIPT, replace=True)
         self.redis = redis
 
-    def limited_incrby(self, key: str, amount: int, limit: int, expire: timedelta):
-        return self.redis.fcall('limited_incrby', 1, key, amount, limit, int(expire.total_seconds() * 1000))
+    def limited_incrby(self, key: str, amount: int, limit: int, expire: timedelta = None):
+        keys_and_args = [key, amount, limit]
+        if expire:
+            keys_and_args.append(int(expire.total_seconds() * 1000))
+        return self.redis.fcall('limited_incrby', 1, *keys_and_args)
