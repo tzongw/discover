@@ -193,12 +193,20 @@ class Stocks:
 
     def reset(self, key, total=0, expire=None):
         assert total >= 0
-        self.redis.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
-        if expire is not None:
-            self.redis.expire(key, expire)
+        with self.redis.pipeline(transaction=False) as pipe:
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            if expire is not None:
+                pipe.expire(key, expire)
+            pipe.execute()
 
     def get(self, key):
-        return self.redis.bitfield(key).get(fmt='u32', offset=0).execute()[0]
+        return self.mget([key])
+
+    def mget(self, keys):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                pipe.bitfield(key).get(fmt='u32', offset=0).execute()
+            return [values[0] for values in pipe.execute()]
 
     def incrby(self, key, total):
         assert total >= 0

@@ -13,6 +13,7 @@ from .invalidator import Invalidator
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, Stocks
 from .timer import Timer
+from .chunk import chunks
 
 
 class ShardingKey:
@@ -263,11 +264,12 @@ class ShardingStocks(Stocks):
                     pipe.expire(sharded_key, expire)
             pipe.execute()
 
-    def get(self, key):
+    def mget(self, keys):
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key in self.sharding_key.all_sharded_keys(key):
-                pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            return sum(values[0] for values in pipe.execute())
+            for key in keys:
+                for sharded_key in self.sharding_key.all_sharded_keys(key):
+                    pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
+            return [sum(values[0] for values in chunk) for chunk in chunks(pipe.execute(), self.sharding_key.shards)]
 
     def incrby(self, key, total):
         assert total >= 0
