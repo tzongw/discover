@@ -4,11 +4,10 @@ import uuid
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
-from typing import Type, List, Dict, TypeVar, Union
+from typing import Union
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
-from .parser import Parser, patch_callbacks
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, Stocks
 from .timer import Timer
@@ -192,33 +191,6 @@ class MigratingReceiver(ShardingReceiver):
     @property
     def fanout(self):
         return self._fanout_handler
-
-
-M = TypeVar('M', bound=BaseModel)
-
-
-class ShardingParser(Parser):
-    def update_callbacks(self):
-        for node in self._redis.get_nodes():
-            if redis := node.redis_connection:
-                patch_callbacks(redis.response_callbacks)
-
-    def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
-        assert type(self._redis) is RedisCluster
-        with self._redis.pipeline(transaction=False) as pipe:
-            parser = ShardingParser(pipe)
-            for key in keys:
-                parser.get(key, cls)
-            return pipe.execute()
-
-    def mset_nonatomic(self, mapping: Dict[str, M]) -> bool:
-        assert type(self._redis) is RedisCluster
-        with self._redis.pipeline(transaction=False) as pipe:
-            parser = ShardingParser(pipe)
-            for k, v in mapping.items():
-                parser.set(k, v)
-            pipe.execute()
-        return True
 
 
 class ShardingStocks(Stocks):
