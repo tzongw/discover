@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from redis import RedisCluster
+from redis import Redis, RedisCluster
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta
@@ -38,3 +38,26 @@ def construct_timedelta(self, node):
 
 SafeRepresenter.add_representer(timedelta, represent_timedelta)
 SafeConstructor.add_constructor('!timedelta', construct_timedelta)
+
+
+def transaction(self: RedisCluster, func, *watches, **kwargs):
+    assert len({self.keyslot(key) for key in watches}) == 1
+    node = self.get_node_from_key(watches[0])
+    redis: Redis = self.get_redis_connection(node)
+    return redis.transaction(func, *watches, **kwargs)
+
+
+def pipeline(self: RedisCluster, transaction=None, shard_hint=None):
+    if transaction is None:
+        transaction = shard_hint is not None
+    if transaction:
+        node = self.get_node_from_key(shard_hint)
+        redis: Redis = self.get_redis_connection(node)
+        return redis.pipeline(transaction=transaction, shard_hint=shard_hint)
+    else:
+        return _pipeline(self, transaction=transaction, shard_hint=shard_hint)
+
+
+RedisCluster.transaction = transaction
+_pipeline = RedisCluster.pipeline
+RedisCluster.pipeline = pipeline
