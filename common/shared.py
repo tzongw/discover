@@ -13,9 +13,9 @@ from base import Registry, LogSuppress
 from base import Executor, Schedule
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
-from base import Invalidator, SmartParser
+from base import SmartInvalidator, SmartParser
 from base import Dispatcher, TimeDispatcher
-from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingInvalidator
+from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
@@ -38,6 +38,7 @@ app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = SmartParser(redis)
+invalidator = SmartInvalidator(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 script = Script(redis)
 
@@ -46,12 +47,10 @@ if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=sharding_key)
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    invalidator = ShardingInvalidator(redis)
 else:
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    invalidator = Invalidator(redis)
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)

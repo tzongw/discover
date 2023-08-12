@@ -15,7 +15,7 @@ from .thrift_pool import ThriftPool
 from .executor import Executor
 from .dispatcher import Dispatcher, TimeDispatcher
 from .schedule import Schedule
-from .invalidator import Invalidator
+from .invalidator import SmartInvalidator
 from .mq import Receiver, Publisher
 from .registry import Registry
 from .service import Service

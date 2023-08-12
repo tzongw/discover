@@ -72,3 +72,27 @@ class Invalidator:
                 logging.exception(f'')
                 sub = None
                 gevent.sleep(1)
+
+
+class InvalidatorCluster(Invalidator):
+    def __init__(self, redis: RedisCluster, sep=':'):
+        super().__init__(redis, sep)
+
+    def start(self):
+        return [gevent.spawn(self.monitor)]
+
+    def monitor(self):
+        monitoring = set()
+        while True:
+            for node in self.redis.get_primaries():
+                if node.name in monitoring:
+                    continue
+                redis = self.redis.get_redis_connection(node)
+                first_node = not monitoring
+                gevent.spawn(self._run, redis, subscribe=first_node)
+                monitoring.add(node.name)
+            gevent.sleep(1)
+
+
+def SmartInvalidator(redis, sep=':'):
+    return InvalidatorCluster(redis, sep) if isinstance(redis, RedisCluster) else Invalidator(redis, sep)
