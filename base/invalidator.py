@@ -75,9 +75,6 @@ class Invalidator:
 
 
 class InvalidatorCluster(Invalidator):
-    def __init__(self, redis: RedisCluster, sep=':'):
-        super().__init__(redis, sep)
-
     def start(self):
         return [gevent.spawn(self.monitor)]
 
