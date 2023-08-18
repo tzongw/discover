@@ -30,7 +30,7 @@ def main():
             options.parse_command_line(remaining, final=False)
             start = time.time()
             logging.info(f'doing task {entry}')
-            getattr(module, 'main')()
+            module.main()
             logging.info(f'done task {entry} {time.time() - start}')
     elif task := shared.heavy_task.pop(block=False):
         setproctitle(f'{app_name}-{app_id}-{task.path}')
