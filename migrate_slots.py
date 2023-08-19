@@ -29,7 +29,7 @@ def migrate(redis: RedisCluster, source: Addr, target: Addr, slot, confirm=Confi
         raise ValueError(f'source({source}) not own slot({slot})')
     count = redis.cluster_countkeysinslot(slot)
     logging.info(f'migrate slot({slot} source({source}) -> target({target}) begin')
-    if confirm == Confirm.ALWAYS or confirm == Confirm.SOME and count > 0:
+    if confirm is Confirm.ALWAYS or confirm is Confirm.SOME and count > 0:
         logging.info(f'{count} keys in slot({slot}), continue? (Y/n)')
         answer = sys.stdin.readline()
         if answer.strip() != 'Y':

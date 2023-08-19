@@ -1,13 +1,14 @@
 import contextlib
 import logging
 import socket
+import string
 import uuid
 from datetime import timedelta
 from typing import Callable
 from inspect import signature, Parameter
 from functools import lru_cache, wraps
 from typing import Type, Union
-from redis import Redis
+from redis import Redis, RedisCluster
 from redis.lock import Lock, LockError
 from werkzeug.routing import BaseConverter
 from random import choice, shuffle
@@ -57,12 +58,14 @@ def ip_address(ipv6=False):
 
 def var_args(f: Callable):
     params = signature(f).parameters
+    var_positional = any(p.kind == Parameter.VAR_POSITIONAL for p in params.values())
+    var_keyword = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not any(p.kind == Parameter.VAR_POSITIONAL for p in params.values()):
+        if not var_positional:
             args = args[:len(params)]
-        if not any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
+        if not var_keyword:
             kwargs = {k: v for k, v in kwargs.items() if k in params}
         return f(*args, **kwargs)
 
@@ -126,36 +129,27 @@ class DefaultDict(defaultdict):
         return value
 
 
-def zpop_by_score(redis: Redis, key, start, stop, limit=None):
-    kwargs = {'offset': 0, 'num': limit} if limit else {}
-    members = {member: score for member, score in
-               redis.zrange(key, start, stop, byscore=True, withscores=True, **kwargs)}
-    with redis.pipeline(transaction=False) as pipe:
-        for member in members:
-            pipe.zrem(key, member)
-        misses = []
-        for member, removed in zip(members, pipe.execute()):
-            if not removed:
-                misses.append(member)
-    for member in misses:
-        members.pop(member)
-    return members
+class CaseDict(dict):
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            item = ''.join(s[0].upper() + s[1:] for s in item.split('-'))
+        return super().__getitem__(item)
 
 
 class Semaphore:
-    def __init__(self, redis: Redis, name, value: int, timeout=timedelta(minutes=1)):
+    def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'{{{name}}}_{i}' for i in range(value)]
+        self.names = [f'{name}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
         self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
 
     def __enter__(self):
+        assert not self.local.__dict__, 'recursive lock'
         token = str(uuid.uuid4())
-        names = [name for name, value in zip(self.names, self.redis.mget(self.names)) if value is None]
-        shuffle(names)
-        for name in names:
+        shuffle(self.names)
+        for name in self.names:
             if self.redis.set(name, token, nx=True, px=self.timeout):
                 self.local.name = name
                 self.local.token = token
@@ -163,9 +157,11 @@ class Semaphore:
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exctype, excinst, exctb):
-        name, token = self.local.name, self.local.token
-        self.local.name = self.local.token = None
-        self.lua_release(keys=[name], args=[token])
+        keys = [self.local.name]
+        args = [self.local.token]
+        del self.local.name
+        del self.local.token
+        self.lua_release(keys=keys, args=args)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
@@ -176,3 +172,46 @@ class Semaphore:
 
     def exists(self):
         return self.redis.exists(*self.names)
+
+
+def base62(n):
+    assert n >= 0
+    charset = string.ascii_letters + string.digits
+    base = len(charset)
+    chars = []
+    while True:
+        n, r = divmod(n, base)
+        chars.append(charset[r])
+        if n == 0:
+            break
+    return ''.join(chars[::-1])
+
+
+class Stocks:
+    def __init__(self, redis: Union[Redis, RedisCluster]):
+        self.redis = redis
+
+    def reset(self, key, total=0, expire=None):
+        assert total >= 0
+        with self.redis.pipeline(transaction=False) as pipe:
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            if expire is not None:
+                pipe.expire(key, expire)
+            pipe.execute()
+
+    def get(self, key):
+        return self.mget([key])
+
+    def mget(self, keys):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                pipe.bitfield(key).get(fmt='u32', offset=0).execute()
+            return [values[0] for values in pipe.execute()]
+
+    def incrby(self, key, total):
+        assert total >= 0
+        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()[0]
+
+    def try_lock(self, key, hint=None) -> bool:
+        bitfield = self.redis.bitfield(key, default_overflow='FAIL')
+        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None

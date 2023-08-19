@@ -18,12 +18,13 @@ from base.schedule import PeriodicCallback
 from base.service import Service
 from setproctitle import setproctitle
 from base import LogSuppress
+from base.utils import DefaultDict
 import time
 from pydantic import BaseModel
 from dataclasses import dataclass
 
 
-class TimerInfo(BaseModel):
+class Info(BaseModel):
     key: str
     service: str
     data: str
@@ -33,7 +34,7 @@ class TimerInfo(BaseModel):
 
 @dataclass
 class Timer:
-    info: TimerInfo
+    info: Info
     cancel: Callable
 
 
@@ -42,20 +43,21 @@ class Handler:
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
-        self._services = {}  # type: Dict[str, Service]
+        self._services = DefaultDict(
+            lambda service_name: Service(shared.registry, service_name))  # type: Dict[str, Service]
 
     def load_timers(self):
         full_keys = set(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
         for full_key in full_keys:
             with LogSuppress():
-                timer_info = shared.parser.get(full_key, TimerInfo)
-                if timer_info.deadline:
-                    self.call_later(timer_info.key, timer_info.service, timer_info.data,
-                                    timer_info.deadline - time.time())
-                elif timer_info.interval:
-                    self.call_repeat(timer_info.key, timer_info.service, timer_info.data, timer_info.interval)
+                info = shared.parser.get(full_key, Info)
+                if info.deadline:
+                    self.call_later(info.key, info.service, info.data,
+                                    info.deadline - time.time())
+                elif info.interval:
+                    self.call_repeat(info.key, info.service, info.data, info.interval)
                 else:
-                    logging.error(f'invalid timer: {timer_info}')
+                    logging.error(f'invalid timer: {info}')
 
     @classmethod
     def _full_key(cls, key, service_name):
@@ -63,11 +65,9 @@ class Handler:
 
     def _fire_timer(self, key, service_name, data):
         logging.debug(f'{key} {service_name}')
-        service = self._services.get(service_name)
-        if not service:
-            service = Service(shared.registry, service_name)
-            self._services[service_name] = service
-        with service.connection() as conn:
+        service = self._services[service_name]
+        addr = service.address(hint=key)
+        with service.connection(addr) as conn:
             client = Client(conn)
             client.timeout(key, data)
 
@@ -75,9 +75,9 @@ class Handler:
         logging.info(f'{key} {service_name} {delay}')
         full_key = self._full_key(key, service_name)
         deadline = time.time() + delay
-        timer_info = TimerInfo(key=key, service=service_name, data=data, deadline=deadline)
+        info = Info(key=key, service=service_name, data=data, deadline=deadline)
         px = max(int(delay * 1000), 1)
-        shared.parser.set(full_key, timer_info, px=px)
+        shared.parser.set(full_key, info, px=px)
 
         def callback():
             self._delete_timer(full_key)
@@ -85,21 +85,21 @@ class Handler:
 
         handle = shared.schedule.call_at(callback, deadline)
         self._delete_timer(full_key)
-        self._timers[full_key] = Timer(info=timer_info, cancel=handle.cancel)
+        self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
 
     def call_repeat(self, key, service_name, data, interval):
         assert interval > 0
         logging.info(f'{key} {service_name} {interval}')
         full_key = self._full_key(key, service_name)
-        timer_info = TimerInfo(key=key, service=service_name, data=data, interval=interval)
-        shared.parser.set(full_key, timer_info)
+        info = Info(key=key, service=service_name, data=data, interval=interval)
+        shared.parser.set(full_key, info)
 
         def callback():
             self._fire_timer(key, service_name, data)
 
         pc = PeriodicCallback(shared.schedule, callback, interval)
         self._delete_timer(full_key)
-        self._timers[full_key] = Timer(info=timer_info, cancel=pc.stop)
+        self._timers[full_key] = Timer(info=info, cancel=pc.stop)
 
     def remove_timer(self, key, service_name):
         logging.info(f'{key} {service_name}')
@@ -130,13 +130,13 @@ def rpc_serve(handler):
 def main():
     logging.info(f'{shared.app_name} app id: {shared.app_id}')
     handler = Handler()
-    g = rpc_serve(handler)
+    workers = [rpc_serve(handler)]
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
-    shared.registry.start()
+    workers += shared.registry.start()
     shared.init_main()
     shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
     handler.load_timers()
-    gevent.joinall([g], raise_error=True)
+    gevent.joinall(workers, raise_error=True)
 
 
 if __name__ == '__main__':

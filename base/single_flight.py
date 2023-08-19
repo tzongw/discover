@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import functools
 from concurrent.futures import Future
-from .utils import make_key
+from . import utils
 
 
 class SingleFlight:
-    def __init__(self, *, get=None, mget=None, make_key=make_key):
+    def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
         assert get or mget
         if mget is None:
             # simulate mget to reuse code

@@ -5,7 +5,7 @@ from typing import TypeVar, Optional, Generic, Callable, Sequence
 from concurrent.futures import Future
 import functools
 
-from .utils import make_key
+from . import utils
 from .single_flight import SingleFlight
 from .invalidator import Invalidator
 
@@ -26,7 +26,7 @@ class Cache(Generic[T]):
     # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
-    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=make_key):
+    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
         self.single_flight = SingleFlight(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.make_key = make_key
@@ -40,21 +40,21 @@ class Cache(Generic[T]):
         return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids} ' \
                f'size: {len(self.lru)} maxsize: {self.maxsize}'
 
-    def get(self, key, *args, **kwargs) -> Optional[T]:
+    def get(self, key, *args, **kwargs) -> T:
         value, = self.mget([key], *args, **kwargs)
         return value
 
-    def _set(self, key, value):
+    def _hold(self, key):
         replace = key in self.lru
-        self.lru[key] = value
+        self.lru[key] = self.placeholder
         if self.maxsize is not None:
             if replace:
                 self.lru.move_to_end(key)
             elif len(self.lru) > self.maxsize:
                 self.lru.popitem(last=False)
 
-    def mget(self, keys, *args, **kwargs):
-        results = []
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+        results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
@@ -63,7 +63,7 @@ class Cache(Generic[T]):
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
                 self.hits += 1
-                results.append(value)
+                results[index] = value
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
@@ -71,8 +71,7 @@ class Cache(Generic[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                results.append(self.placeholder)
-                self._set(made_key, self.placeholder)
+                self._hold(made_key)
         if missing_keys:
             values = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
@@ -81,8 +80,8 @@ class Cache(Generic[T]):
                     self.lru[made_key] = value
         return results
 
-    def listen(self, invalidator: Invalidator, prefix: str, handler: Optional[Callable] = None):
-        @invalidator.handler(prefix)
+    def listen(self, invalidator: Invalidator, group: str, handler: Optional[Callable] = None):
+        @invalidator.handler(group)
         def invalidate(key: str, *args, **kwargs):
             self.full_cached = False
             self.invalids += 1
@@ -95,15 +94,15 @@ class Cache(Generic[T]):
                 for key in keys:
                     self.lru.pop(key, None)
             else:
-                made_key = self.make_key(key)
+                made_key = self.make_key(key, *args, **kwargs)
                 self.lru.pop(made_key, None)
 
 
 class TTLCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
-    def mget(self, keys, *args, **kwargs):
-        results = []
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+        results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
@@ -112,7 +111,7 @@ class TTLCache(Cache[T]):
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
                 self.hits += 1
-                results.append(pair.value)
+                results[index] = pair.value
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
@@ -120,8 +119,7 @@ class TTLCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                results.append(self.placeholder)
-                self._set(made_key, self.placeholder)
+                self._hold(made_key)
         if missing_keys:
             tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
@@ -183,7 +181,7 @@ class FullMixin(Generic[T]):
                 self.full_hits -= 1  # full_hits will +1 in f redundantly because values was accessed in wrapper
                 return f(*args, **kwargs)
 
-            cache_version = 0
+            cache_version = self._version
             cache_expire: Optional[datetime] = None
 
             @functools.wraps(f)
@@ -207,12 +205,12 @@ class FullMixin(Generic[T]):
 
 
 class FullCache(FullMixin[T], Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)
 
 
 class FullTTLCache(FullMixin[T], TTLCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)

@@ -4,45 +4,45 @@ from datetime import timedelta
 from pydantic import BaseModel
 from .utils import stream_name
 
+_SCRIPT = """#!lua name=timer
+local function timer_xadd(keys, args)
+    return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
+end
+
+local function timer_xadd_hint(keys, args)
+    return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
+end
+
+local function array_to_table(array)
+    local t = {}
+    for i = 1, #array, 2
+    do
+        t[array[i]] = array[i + 1]
+    end
+    return t
+end
+
+local function timer_tick(keys, args)
+    local cur_ts = redis.call('TIME')[1]
+    local info = array_to_table(redis.call('XINFO', 'STREAM', keys[1]))
+    local tick_ts = string.sub(info['last-generated-id'], 1, -3)
+    local init_ts = math.max(tick_ts + 1, cur_ts - args[1])
+    for ts = init_ts, cur_ts
+    do
+        redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], ts, '', '')
+    end
+    return math.max(cur_ts - init_ts + 1, 0)
+end
+
+redis.register_function('timer_xadd', timer_xadd)
+redis.register_function('timer_xadd_hint', timer_xadd_hint)
+redis.register_function('timer_tick', timer_tick)
+"""
+
 
 class Timer:
-    _SCRIPT = """#!lua name=timer
-        local function timer_xadd(keys, args)
-            return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
-        end
-        
-        local function timer_xadd_hint(keys, args)
-            return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
-        end
-        
-        local function array_to_table(array)
-            local t = {}
-            for i = 1, #array, 2
-            do
-                t[array[i]] = array[i + 1]
-            end
-            return t
-        end
-        
-        local function timer_tick(keys, args)
-            local cur_ts = redis.call('TIME')[1]
-            local info = array_to_table(redis.call('XINFO', 'STREAM', keys[1]))
-            local tick_ts = string.sub(info['last-generated-id'], 1, -3)
-            local init_ts = math.max(tick_ts + 1, cur_ts - args[1])
-            for ts = init_ts, cur_ts
-            do
-                redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], ts, '', ts)
-            end
-            return math.max(cur_ts - init_ts + 1, 0)
-        end
-        
-        redis.register_function('timer_xadd', timer_xadd)
-        redis.register_function('timer_xadd_hint', timer_xadd_hint)
-        redis.register_function('timer_tick', timer_tick)
-    """
-
     def __init__(self, redis: Redis, hint=None):
-        redis.function_load(self._SCRIPT, replace=True)
+        redis.function_load(_SCRIPT, replace=True)
         self.redis = redis
         self.hint = hint
 

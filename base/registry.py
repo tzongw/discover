@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from typing import Set, DefaultDict, Dict
+from typing import Set, Dict
 import gevent
 from redis import Redis
 
@@ -31,7 +31,7 @@ class Registry:
         self._redis = redis
         self._services = {}  # type: Dict[str, str]
         self._stopped = False
-        self._addresses = defaultdict(set)  # type: DefaultDict[str, Set[str]]
+        self._addresses = {}  # type: Dict[str, Set[str]]
         self._callbacks = []
 
     def add_callback(self, cb):
@@ -40,7 +40,7 @@ class Registry:
     def start(self):
         logging.info(f'start')
         self._refresh()
-        gevent.spawn(self._run)
+        return [gevent.spawn(self._run)]
 
     def stop(self):
         logging.info(f'stop {self._services}')

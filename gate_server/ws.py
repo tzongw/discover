@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
 import logging
-import uuid
 from typing import Dict
 from urllib import parse
 from collections import defaultdict
-from typing import DefaultDict, Set
+from typing import Set
 import gevent
 from gevent import pywsgi
 from gevent import queue
 from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
+from base import utils
 from base.schedule import PeriodicCallback
-import shared, const
+import shared
+import const
 from config import options
 
 
 def app(environ, start_response):
-    if environ["PATH_INFO"] == '/ws':
-        if ws := environ.get("wsgi.websocket"):
+    if environ['PATH_INFO'] == '/ws':
+        if ws := environ.get('wsgi.websocket'):
             client_serve(ws)
         else:
             start_response('400 Bad Request', [])
-            return b''
     else:
         start_response('404 Not Found', [])
-        return b''
+    return b''
 
 
 def serve():
@@ -129,7 +129,7 @@ class Client:
 
 
 clients = {}  # type: Dict[str, Client]
-groups = defaultdict(set)  # type: DefaultDict[str, Set[Client]]
+groups = defaultdict(set)  # type: Dict[str, Set[Client]]
 
 
 def remove_from_group(client: Client, group):
@@ -144,7 +144,7 @@ def normalize_header(name: str):
 
 
 def client_serve(ws: WebSocket):
-    conn_id = str(uuid.uuid4())
+    conn_id = utils.base62(shared.id_generator.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
     logging.info(f'new client {client}')

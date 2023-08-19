@@ -65,19 +65,22 @@ class IdGenerator:
     def __init__(self, datacenter_id: int, worker_id: int):
         self._datacenter_id = datacenter_id
         self._worker_id = worker_id
-        self._timestamp_ms = 0
+        self._last_ms = 0
         self._sequence_id = 0
 
     def gen(self) -> int:
-        timestamp_ms = time.time_ns() // 1_000_000
-        if timestamp_ms < self._timestamp_ms:
-            raise ValueError(f'clock go backwards {timestamp_ms} < {self._timestamp_ms}')
-        if timestamp_ms == self._timestamp_ms:
+        cur_ms = time.time_ns() // 1_000_000
+        if cur_ms < self._last_ms:
+            cur_ms = self._last_ms
+        if cur_ms == self._last_ms:
             self._sequence_id += 1
+            if self._sequence_id >= max_sequence_id:
+                self._last_ms = cur_ms = cur_ms + 1  # borrow next ms
+                self._sequence_id = 0
         else:
-            self._timestamp_ms = timestamp_ms
+            self._last_ms = cur_ms
             self._sequence_id = 0
-        return make(timestamp_ms, self._datacenter_id, self._worker_id, self._sequence_id)
+        return make(cur_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
 
 if __name__ == '__main__':

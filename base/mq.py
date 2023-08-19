@@ -57,15 +57,15 @@ class Receiver:
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='group_dispatch'))
-        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=0, name='fanout_dispatch'))
+        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='group_dispatch'))
+        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='fanout_dispatch'))
         self._batch = batch
 
-        @self.group(self._waker)
+        @self._group_dispatcher.handler(self._waker)
         def group_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
-        @self.fanout(self._waker)
+        @self._fanout_dispatcher.handler(self._waker)
         def fanout_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
@@ -84,8 +84,8 @@ class Receiver:
                 # create group & stream
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        gevent.spawn(self._group_run, self._group_dispatcher.handlers)
-        gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)
+        return [gevent.spawn(self._group_run, self._group_dispatcher.handlers),
+                gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)]
 
     def stop(self):
         logging.info(f'stop')

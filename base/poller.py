@@ -71,8 +71,8 @@ class Poller:
     def notify(self, group: str, queue: str):
         config = self.configs[group]
         task = self.poll_task(group, queue)
-        self.async_task.post(self.task_id(group, queue), task, config.interval, loop=True)
-        self.async_task.publish(task)
+        if self.async_task.post(self.task_id(group, queue), task, config.interval, loop=True):
+            self.async_task.publish(task)
 
     def handler(self, group, interval=timedelta(seconds=1), spawn=None):
         def decorator(poll):

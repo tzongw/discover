@@ -59,10 +59,9 @@ def main():
     logging.info(f'{shared.app_name} app id: {shared.app_id}')
     setproctitle(f'{shared.app_name}-{shared.app_id}')
     shared.registry.add_callback(update_upstreams)
-    shared.registry.start()
+    workers = shared.registry.start()
     shared.init_main()
-    while True:
-        gevent.sleep(3600)
+    gevent.joinall(workers, raise_error=True)
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ from .schedule import Schedule, PeriodicCallback
 class UniqueId:
     _PREFIX = 'unique'
     _INTERVAL = 10
-    _TTL = 300
+    _TTL = 3600
 
     def __init__(self, schedule: Schedule, redis: Redis):
         self._schedule = schedule

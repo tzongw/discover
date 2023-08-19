@@ -8,8 +8,9 @@ import logging
 import json
 from datetime import datetime, date, timedelta
 import flask
-from flask import jsonify, Blueprint, g, request, stream_with_context
+from flask import Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
+from mongoengine import NotUniqueError
 from pydantic import BaseModel
 from webargs import fields
 from webargs.flaskparser import use_kwargs
@@ -23,7 +24,7 @@ from config import options
 from const import CTX_UID, CTX_TOKEN
 from shared import session_key, async_task, async_heavy
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
-from base.utils import ListConverter
+from base.utils import ListConverter, base62
 from flasgger import Swagger
 from hashlib import sha1
 import models
@@ -42,12 +43,14 @@ class JSONEncoder(json.JSONEncoder):
             return o.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(o, date):
             return o.strftime('%Y-%m-%d')
+        elif isinstance(o, timedelta):
+            return o.total_seconds()
         return super().default(o)
 
 
 class JSONProvider(DefaultJSONProvider):
     def dumps(self, obj, **kwargs) -> str:
-        return super().dumps(obj, cls=JSONEncoder, **kwargs)
+        return json.dumps(obj, cls=JSONEncoder, **kwargs)
 
 
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
@@ -61,9 +64,9 @@ def make_response(rv):
     elif isinstance(rv, GetterMixin):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
-        rv = rv.json()
+        rv = rv.dict()
     elif dataclasses.is_dataclass(rv):
-        rv = jsonify(rv)
+        rv = dataclasses.asdict(rv)
     return Flask.make_response(app, rv)
 
 
@@ -82,7 +85,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = id_generator.gen()
+    ctx.trace = base62(id_generator.gen())
 
 
 @async_heavy
@@ -120,16 +123,16 @@ def hello(names):
         if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
             poller.notify('hello', 'queue:hello')
     else:
-        async_task.post('task:hello', log(names[0]), timedelta(seconds=5))
+        async_task.post('', log(names[0]), timedelta(seconds=5))
     return f'say hello {names}'
 
 
 @app.route('/stream')
 def streaming_response():
     def generate():
-        yield 'Hello\n'
-        yield 'World\n'
-        yield '!'
+        for line in ['Hell\no', 'World', '!']:
+            yield f'{json.dumps(line)}'
+            gevent.sleep(1)
 
     return app.response_class(stream_with_context(generate()))
 
@@ -142,6 +145,9 @@ def streaming_response():
 def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
     coll = collections[collection]
     order_by = order_by or [f'-{coll.id.name}']
+    for key, value in kwargs.items():
+        if key.endswith('__in'):
+            kwargs[key] = value.split(',')
     docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
     return {
         'documents': docs,
@@ -153,8 +159,18 @@ def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def create_document(collection: str, **kwargs):
     coll = collections[collection]
+    key = kwargs.get(coll.id.name)
+    if key is not None and coll.get(key, ensure=False):
+        raise NotUniqueError(f'document `{key}` already exists')
     doc = coll(**kwargs).save()
     doc.invalidate()  # notify full cache new document created
+
+
+@app.route('/collections/<collection>/documents/<doc_id>')
+def get_document(collection: str, doc_id):
+    coll = collections[collection]
+    doc = coll.get(doc_id)
+    return doc.to_dict(exclude=[])
 
 
 @app.route('/collections/<collection>/documents/<doc_id>', methods=['PATCH'])
@@ -162,7 +178,10 @@ def create_document(collection: str, **kwargs):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id)
-    doc.modify(**kwargs)
+    if not doc.modify(**kwargs):
+        kwargs[coll.id.name] = doc_id
+        logging.info(f'create doc {kwargs}')
+        doc = coll(**kwargs).save()
     doc.invalidate()
 
 

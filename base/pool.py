@@ -3,13 +3,12 @@ import contextlib
 from gevent.queue import Queue
 
 
-class Pool:
-    def __init__(self, maxsize=128, timeout=1, biz_exception=lambda e: False):
+class Pool(metaclass=abc.ABCMeta):
+    def __init__(self, maxsize=128, timeout=1):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
         self._size = 0
-        self._biz_exception = biz_exception
 
     def __del__(self):
         self.close_all()
@@ -21,6 +20,10 @@ class Pool:
     @abc.abstractmethod
     def close_connection(self, conn):
         raise NotImplementedError
+
+    @staticmethod
+    def biz_exception(e: Exception):
+        return False
 
     def close_all(self):
         self._maxsize = 0
@@ -62,7 +65,7 @@ class Pool:
         try:
             yield conn
         except Exception as e:
-            if self._biz_exception(e):
+            if self.biz_exception(e):
                 return_conn()
             else:
                 close_conn()

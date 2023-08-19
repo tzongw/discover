@@ -20,7 +20,7 @@ def mget_callback(response, convert=None):
     return [convert(value) for value in response] if convert else response
 
 
-def hget_callback(response, convert=None):
+def hgetall_callback(response, convert=None):
     response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
     return convert(response) if convert else response
 
@@ -36,7 +36,7 @@ def patch_callbacks(callbacks):
     callbacks['HMGET'] = callback
     callbacks['MGET'] = mget_callback
     callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
-    callbacks['HGETALL'] = hget_callback
+    callbacks['HGETALL'] = hgetall_callback
 
 
 patch_callbacks(Redis.RESPONSE_CALLBACKS)
@@ -110,3 +110,31 @@ class Parser:
 
     mget_nonatomic = mget
     mset_nonatomic = mset
+
+
+class ParserCluster(Parser):
+    def update_callbacks(self):
+        for node in self._redis.get_nodes():
+            if redis := node.redis_connection:
+                patch_callbacks(redis.response_callbacks)
+
+    def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
+        assert type(self._redis) is RedisCluster
+        with self._redis.pipeline(transaction=False) as pipe:
+            parser = ParserCluster(pipe)
+            for key in keys:
+                parser.get(key, cls)
+            return pipe.execute()
+
+    def mset_nonatomic(self, mapping: Dict[str, M]) -> bool:
+        assert type(self._redis) is RedisCluster
+        with self._redis.pipeline(transaction=False) as pipe:
+            parser = ParserCluster(pipe)
+            for k, v in mapping.items():
+                parser.set(k, v)
+            pipe.execute()
+        return True
+
+
+def SmartParser(redis):
+    return ParserCluster(redis) if isinstance(redis, RedisCluster) else Parser(redis)

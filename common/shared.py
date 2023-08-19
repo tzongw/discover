@@ -13,15 +13,15 @@ from base import Registry, LogSuppress
 from base import Executor, Schedule
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
-from base import Invalidator, SmartParser
+from base import SmartInvalidator, SmartParser
 from base import Dispatcher, TimeDispatcher
-from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingInvalidator
+from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
 from . import const
 from .config import options
 import service
 from .rpc_service import UserService, GateService, TimerService
-from base import AsyncTask, HeavyTask, Poller
+from base import AsyncTask, HeavyTask, Poller, Script
 
 executor = Executor(name='shared')
 schedule = Schedule()
@@ -38,19 +38,19 @@ app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = SmartParser(redis)
+invalidator = SmartInvalidator(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
+script = Script(redis)
 
 if options.redis_cluster:
     sharding_key = ShardingKey(shards=len(redis.get_primaries()), fixed=[const.TICK_TIMER])
     timer = ShardingTimer(redis, hint=hint, sharding_key=sharding_key)
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    invalidator = ShardingInvalidator(redis)
 else:
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    invalidator = Invalidator(redis)
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -78,27 +78,15 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 _exits = [registry.stop, receiver.stop]
 _mains = []
 
-
-def transaction(self: RedisCluster, func, *watches, **kwargs):
-    assert len({self.keyslot(key) for key in watches}) == 1
-    node = self.get_node_from_key(watches[0])
-    redis: Redis = self.get_redis_connection(node)
-    return redis.transaction(func, *watches, **kwargs)
-
-
-RedisCluster.transaction = transaction
-
-if options.env == const.Environment.DEV:
+if options.env is const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
-if options.env != const.Environment.STAGING:
+if options.env is not const.Environment.STAGING:
     # staging should not impact prod
     @receiver.group(const.TICK_STREAM)
-    def _on_tick(data: dict):
-        ts = int(data.pop(''))
-        # if not redis.set(f'tick:{ts}', '', nx=True, ex=300):  # deduplicate ticks when migrating
-        #     return
+    def _on_tick(_, sid):
+        ts = int(sid[:-2])
         tick.dispatch(ts)
 
 
@@ -137,7 +125,11 @@ atexit.register(unique_id.stop)  # after cleanup
 def _cleanup():
     status.exiting = True
     with LogSuppress():
-        executor.gather(*_exits)
+        if options.env is const.Environment.DEV:  # ptpython compatible
+            for fn in _exits:
+                fn()
+        else:
+            executor.gather(*_exits)
     _exits.clear()
 
 
@@ -154,6 +146,14 @@ def spawn_worker(f, *args, **kwargs):
 
     g = gevent.spawn(worker)
     _workers[g] = desc
+
+
+def run_in_worker(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        spawn_worker(f, *args, **kwargs)
+
+    return wrapper
 
 
 def _sig_handler(sig, frame):
