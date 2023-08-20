@@ -22,14 +22,10 @@ def make(timestamp_ms: int, datacenter_id: int, worker_id: int, sequence_id: int
     """generate a twitter-snowflake id, based on 
     https://github.com/twitter/snowflake/blob/master/src/main/scala/com/twitter/service/snowflake/IdWorker.scala
     :param: timestamp_ms time since UNIX epoch in milliseconds"""
-    if timestamp_ms >= max_timestamp or datacenter_id >= max_datacenter_id or \
-            worker_id >= max_worker_id or sequence_id >= max_sequence_id:
-        raise ValueError(f'overflow {timestamp_ms} {datacenter_id} {worker_id} {sequence_id}')
-    sid = (timestamp_ms - twepoch) & timestamp_mask
-    sid = (sid << datacenter_id_bits) | (datacenter_id & datacenter_id_mask)
-    sid = (sid << worker_id_bits) | (worker_id & worker_id_mask)
-    sid = (sid << sequence_id_bits) | (sequence_id & sequence_id_mask)
-
+    sid = timestamp_ms - twepoch
+    sid = (sid << datacenter_id_bits) | datacenter_id
+    sid = (sid << worker_id_bits) | worker_id
+    sid = (sid << sequence_id_bits) | sequence_id
     return sid
 
 
@@ -63,6 +59,7 @@ def from_datetime(dt: datetime):
 
 class IdGenerator:
     def __init__(self, datacenter_id: int, worker_id: int):
+        assert 0 <= datacenter_id < max_datacenter_id and 0 <= worker_id < max_worker_id
         self._datacenter_id = datacenter_id
         self._worker_id = worker_id
         self._last_ms = 0
