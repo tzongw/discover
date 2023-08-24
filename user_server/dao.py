@@ -171,17 +171,17 @@ class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
         return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
-cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
-                                      get_keys=lambda: Profile.objects(expire__gt=datetime.now()).distinct(
-                                          Profile.id.name))
-cache.listen(invalidator, Profile.__name__)
-Profile.mget = cache.mget
+full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
+                                           get_keys=lambda: Profile.objects(expire__gt=datetime.now()).distinct(
+                                               Profile.id.name))
+full_cache.listen(invalidator, Profile.__name__)
+Profile.mget = full_cache.mget
 
 
-@cache.cached(get_expire=Profile.default_expire('expire'))
+@full_cache.cached(get_expire=Profile.default_expire('expire'))
 def valid_profiles():
     now = datetime.now()
-    return [profile for profile in cache.values if profile.expire > now]
+    return [profile for profile in full_cache.values if profile.expire > now]
 
 
 @collection
