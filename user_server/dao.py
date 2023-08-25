@@ -88,10 +88,10 @@ class CacheMixin(Generic[T]):
         invalidator.publish(self.__class__.__name__, self.id)
 
     @staticmethod
-    def default_expire(*keys):
+    def fields_expire(*fields):
         def get_expire(values):
             now = datetime.now()
-            expires = [value[key] for value in values for key in keys if value[key] >= now]
+            expires = [doc[field] for doc in values for field in fields if doc[field] >= now]
             return min(expires) if expires else None
 
         return get_expire
@@ -172,13 +172,12 @@ class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
 
 
 full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
-                                           get_keys=lambda: Profile.objects(expire__gt=datetime.now()).distinct(
-                                               Profile.id.name))
+                                           get_keys=lambda: Profile.objects.distinct('id'))
 full_cache.listen(invalidator, Profile.__name__)
 Profile.mget = full_cache.mget
 
 
-@full_cache.cached(get_expire=Profile.default_expire('expire'))
+@full_cache.cached(get_expire=Profile.fields_expire('expire'))
 def valid_profiles():
     now = datetime.now()
     return [profile for profile in full_cache.values if profile.expire > now]
