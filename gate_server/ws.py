@@ -52,9 +52,6 @@ class Client:
         self.groups = set()
         self.writing = False
 
-    def __del__(self):
-        logging.debug(f'del {self}')
-
     def __str__(self):
         return f'{self.conn_id} {self.context}'
 
