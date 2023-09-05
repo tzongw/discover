@@ -104,27 +104,14 @@ def poll(queue):
     return PollStatus.YIELD if name == 'tang' else PollStatus.ASAP
 
 
+
 @app.route('/hello/<list:names>')
 def hello(names):
-    """say hello
-    ---
-    tags:
-      - hello
-    parameters:
-      - name: names
-        in: path
-        type: string
-        required: true
-    responses:
-      200:
-        description: hello
-    """
-    if len(names) > 1:
-        if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
-            poller.notify('hello', 'queue:hello')
-    else:
-        async_task.post('', log(names[0]), timedelta(seconds=5))
-    return f'say hello {names}'
+    from shared import get_user_coupons
+    get_user_coupons(names[0])
+    get_user_coupons(names[0])
+    get_user_coupons(names[0])
+    get_user_coupons(names[0])
 
 
 @app.route('/stream')
