@@ -73,9 +73,7 @@ class GetterMixin(Generic[T]):
         return {k: v for k, v in self._data.items() if k in include}
 
 
-class CacheMixin(Generic[T]):
-    id: Any
-
+class CacheMixin(GetterMixin[T]):
     @classmethod
     def make_key(cls, key, *_, **__):
         return cls.id.to_python(key)  # ignore only
@@ -97,7 +95,7 @@ class CacheMixin(Generic[T]):
         return get_expire
 
 
-collections: dict[str, Union[Type[Document], Type[GetterMixin], Type[CacheMixin]]] = CaseDict()
+collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = CaseDict()
 
 
 def collection(coll):
@@ -142,7 +140,7 @@ class Privilege(EmbeddedDocument):
 
 
 @collection
-class Role(Document, CacheMixin['Role'], GetterMixin['Role']):
+class Role(Document, CacheMixin['Role']):
     id = StringField(primary_key=True)
     privileges = EmbeddedDocumentListField(Privilege, required=True)
 
@@ -156,7 +154,7 @@ Role.mget = cache.mget
 
 
 @collection
-class Profile(Document, CacheMixin['Profile'], GetterMixin['Profile']):
+class Profile(Document, CacheMixin['Profile']):
     __include__ = ['name', 'addr']
     meta = {'strict': False}
 
@@ -184,7 +182,7 @@ def valid_profiles():
 
 
 @collection
-class Setting(Document, CacheMixin['Setting'], GetterMixin['Setting']):
+class Setting(Document, CacheMixin['Setting']):
     meta = {'strict': False, 'allow_inheritance': True}
 
     id = StringField(primary_key=True)
