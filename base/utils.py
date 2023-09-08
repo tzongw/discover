@@ -170,9 +170,6 @@ class Semaphore:
             return
         raise LockError('Lock not owned')
 
-    def exists(self):
-        return self.redis.exists(*self.names)
-
 
 def base62(n):
     assert n >= 0
