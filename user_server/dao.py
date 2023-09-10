@@ -95,6 +95,12 @@ class CacheMixin(GetterMixin[T]):
         return get_expire
 
 
+class FlashCacheMixin(CacheMixin[T]):
+    @classmethod
+    def mget(cls, keys, *_, **__) -> list[Optional[T]]:
+        return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
+
+
 collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = CaseDict()
 
 
