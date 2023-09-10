@@ -3,10 +3,8 @@ from common.shared import *
 from flask import Flask
 from base.cache import TTLCache
 from models import Session
-from gevent.local import local
 
 app = Flask(__name__)
-ctx = local()
 
 
 def online_key(uid: int):

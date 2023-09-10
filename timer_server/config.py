@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from common.config import define, options
+from common.config import *
 from base import utils
 import const
 

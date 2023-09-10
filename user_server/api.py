@@ -16,11 +16,11 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, sessions, ctx, redis, poller, spawn_worker
+from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker
 from base.poller import PollStatus
 import gevent
 from gevent import pywsgi
-from config import options
+from config import options, ctx
 from const import CTX_UID, CTX_TOKEN
 from shared import session_key, async_task, async_heavy
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
