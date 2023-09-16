@@ -19,6 +19,8 @@ import helpers
 
 
 class Handler:
+    ONLINE_TTL = 3 * const.PING_INTERVAL * const.RPC_PING_STEP
+
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
@@ -34,7 +36,7 @@ class Handler:
             if (session is None or session.token != token) and options.env is not const.Environment.DEV:
                 raise ValueError("token error")
             old_online = shared.parser.set(online_key(uid), Online(address=address, conn_id=conn_id),
-                                           ex=const.CLIENT_TTL, get=True)
+                                           ex=self.ONLINE_TTL, get=True)
             shared.publisher.publish(Login(uid=uid))
             if old_online:
                 logging.info(f'kick conn {uid} {old_online}')
@@ -62,7 +64,7 @@ class Handler:
             online = shared.parser.get(key, Online)
             if online is None or online.conn_id != conn_id:
                 raise ValueError(f'{online} {conn_id}')
-            redis.expire(key, const.CLIENT_TTL)
+            redis.expire(key, self.ONLINE_TTL)
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:

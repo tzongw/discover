@@ -1,7 +1,7 @@
 from enum import Enum
 
 PING_INTERVAL = 20
-CLIENT_TTL = 3 * PING_INTERVAL
+RPC_PING_STEP = 10
 SLOW_WORKER = 30
 
 APP_USER = 'user'

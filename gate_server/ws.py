@@ -41,8 +41,9 @@ def serve():
 
 class Client:
     ping_message = object()
+    CLIENT_TTL = 3 * const.PING_INTERVAL
 
-    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing']
+    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -51,21 +52,23 @@ class Client:
         self.messages = queue.Queue()
         self.groups = set()
         self.writing = False
+        self.step = 0
 
     def __str__(self):
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
         self.messages.put_nowait(message)
-        if not self.writing:
-            self.writing = True
-            if message is self.ping_message:
-                shared.executor.submit(self._writer, 0)
-            else:
-                gevent.spawn(self._writer, const.PING_INTERVAL / 2)
+        if self.writing:
+            return
+        self.writing = True
+        if message is self.ping_message:
+            shared.executor.submit(self._writer, 0)
+        else:
+            gevent.spawn(self._writer, const.PING_INTERVAL / 2)
 
     def serve(self):
-        self.ws.handler.socket.settimeout(const.CLIENT_TTL)
+        self.ws.handler.socket.settimeout(self.CLIENT_TTL)
         pc = PeriodicCallback(shared.schedule, self._ping, const.PING_INTERVAL)
         try:
             while not self.ws.closed:
@@ -82,6 +85,10 @@ class Client:
 
     def _ping(self):
         self.send(self.ping_message)
+        self.step += 1
+        if self.step < const.RPC_PING_STEP:
+            return
+        self.step = 0
         addr = shared.user_service.address(hint=self.conn_id)
         with shared.user_service.client(addr) as client:
             client.ping(options.rpc_address, self.conn_id, self.context)
