@@ -22,7 +22,7 @@ def valid(addr: str):
     if addr.startswith('unix://'):
         return os.path.exists(addr[len('unix://'):])
     else:
-        return not options.same_host or Addr(addr).host in ['127.0.0.1', '::1', 'localhost', ip_address()]
+        return not options.same_host or Addr(addr).host == ip_address()
 
 
 def reload_nginx():
