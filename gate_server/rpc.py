@@ -12,26 +12,22 @@ from config import options
 
 class Handler:
     def set_context(self, conn_id, key, value):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client} {key} {value}')
             client.set_context(key, value)
 
     def unset_context(self, conn_id, key, value):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client} {key} {value}')
             client.unset_context(key, value)
 
     def remove_conn(self, conn_id):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client}')
             client.stop()
 
     def _send_message(self, conn_id, message):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client} {message}')
             client.send(message)
 
@@ -39,21 +35,19 @@ class Handler:
     send_binary = _send_message
 
     def join_group(self, conn_id, group):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client} {group}')
             client.groups.add(group)
             groups[group].add(client)
 
     def leave_group(self, conn_id, group):
-        client = clients.get(conn_id)
-        if client:
+        if client := clients.get(conn_id):
             logging.debug(f'{client} {group}')
             client.groups.discard(group)
             remove_from_group(client, group)
 
     def _broadcast_message(self, group, exclude, message):
-        logging.debug(f'{group} {exclude} {message} {groups}')
+        logging.debug(f'{group} {exclude} {message}')
         for client in groups.get(group) or set():  # type: Client
             if client.conn_id not in exclude:
                 client.send(message)
