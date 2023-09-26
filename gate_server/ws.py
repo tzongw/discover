@@ -65,6 +65,8 @@ class Client:
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
+        if self.ws.closed:
+            return
         self.messages.put_nowait(message)
         if self.writing:
             return
