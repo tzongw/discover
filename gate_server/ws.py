@@ -39,6 +39,15 @@ def serve():
     return g
 
 
+def handle_ping(self: WebSocket, header, payload):
+    self.send_frame(payload, self.OPCODE_PONG)
+    client: Client = self.environ['WS_CLIENT']
+    client.rpc_ping()
+
+
+WebSocket.handle_ping = handle_ping
+
+
 class Client:
     CLIENT_TTL = 3 * const.PING_INTERVAL
 
@@ -146,6 +155,7 @@ def client_serve(ws: WebSocket):
         for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
+        ws.environ['WS_CLIENT'] = client
         client.serve()
     except Exception:
         logging.exception(f'{client}')
