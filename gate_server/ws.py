@@ -147,20 +147,22 @@ def client_serve(ws: WebSocket):
     client = Client(ws, conn_id)
     clients[conn_id] = client
     logging.info(f'new client {client}')
+    environ = ws.environ
+    environ['WS_CLIENT'] = client
     try:
-        params = {normalize_header(k): v for k, v in ws.environ.items() if k.startswith('HTTP_X_')}
-        cookie = ws.environ.get('HTTP_COOKIE')
+        params = {normalize_header(k): v for k, v in environ.items() if k.startswith('HTTP_X_')}
+        cookie = environ.get('HTTP_COOKIE')
         if cookie:
             params['cookie'] = cookie
-        for k, v in parse.parse_qsl(ws.environ['QUERY_STRING']):
+        for k, v in parse.parse_qsl(environ['QUERY_STRING']):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
-        ws.environ['WS_CLIENT'] = client
         client.serve()
     except Exception:
         logging.exception(f'{client}')
     finally:
         logging.info(f'finish {client}')
+        environ.pop('WS_CLIENT')
         for group in client.groups:
             remove_from_group(client, group)
         clients.pop(conn_id)
