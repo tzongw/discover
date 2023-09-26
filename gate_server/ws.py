@@ -7,7 +7,6 @@ from typing import Set
 import gevent
 from gevent import pywsgi
 from gevent import queue
-from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base import utils
@@ -65,8 +64,6 @@ class Client:
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
-        if self.ws.closed:
-            return
         self.messages.put_nowait(message)
         if self.writing:
             return
@@ -75,13 +72,12 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(self.CLIENT_TTL)
-        while not self.ws.closed:
-            message = self.ws.receive()
+        while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
             if isinstance(message, bytes):
                 with shared.user_service.client(addr) as client:
                     client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
-            elif isinstance(message, str):
+            else:
                 with shared.user_service.client(addr) as client:
                     client.recv_text(options.rpc_address, self.conn_id, self.context, message)
 
@@ -96,26 +92,21 @@ class Client:
 
     def _writer(self):
         logging.debug(f'start {self}')
-        idle_timeout = False
         try:
             while message := self.messages.get(timeout=const.PING_INTERVAL / 2):
                 self.ws.send(message)
         except queue.Empty:
-            logging.debug(f'writer idle exit')
-            idle_timeout = True
-        except (WebSocketError, OSError) as e:
-            logging.debug(f'peer closed {self} {e}')
-        except Exception:
-            logging.exception(f'{self}')
-        else:
-            logging.debug(f'exit {self}')
-        finally:
-            self.writing = False
-            if not idle_timeout:
-                self.ws.close()
-            elif not self.messages.empty():  # race condition, do again
-                self.writing = True
+            logging.debug(f'idle {self}')
+            if self.messages.empty():
+                self.writing = False
+            else:  # race condition, do again
                 gevent.spawn(self._writer)
+        except Exception as e:
+            logging.debug(f'exit {self} {e}')
+            self.ws.close()
+        else:
+            logging.debug(f'stop {self}')
+            self.ws.close()
 
     def stop(self):
         self.messages.put_nowait(None)
