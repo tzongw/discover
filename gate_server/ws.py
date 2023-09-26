@@ -137,9 +137,9 @@ def client_serve(ws: WebSocket):
     conn_id = utils.base62(shared.id_generator.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
-    logging.info(f'new client {client}')
     environ = ws.environ
     environ['WS_CLIENT'] = client
+    logging.info(f'++ {len(clients)} {client}')
     try:
         params = {normalize_header(k): v for k, v in environ.items() if k.startswith('HTTP_X_')}
         cookie = environ.get('HTTP_COOKIE')
@@ -152,10 +152,10 @@ def client_serve(ws: WebSocket):
     except Exception:
         logging.exception(f'{client}')
     finally:
-        logging.info(f'finish {client}')
         environ.pop('WS_CLIENT')
         for group in client.groups:
             remove_from_group(client, group)
         clients.pop(conn_id)
         client.stop()
+        logging.info(f'-- {len(clients)} {client}')
         shared.user_service.disconnect(options.rpc_address, conn_id, client.context)
