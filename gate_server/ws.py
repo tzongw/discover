@@ -40,7 +40,6 @@ def serve():
 
 
 class Client:
-    ping_message = object()
     CLIENT_TTL = 3 * const.PING_INTERVAL
 
     __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
@@ -62,29 +61,21 @@ class Client:
         if self.writing:
             return
         self.writing = True
-        if message is self.ping_message:
-            shared.executor.submit(self._writer, 0)
-        else:
-            gevent.spawn(self._writer, const.PING_INTERVAL / 2)
+        gevent.spawn(self._writer)
 
     def serve(self):
         self.ws.handler.socket.settimeout(self.CLIENT_TTL)
-        pc = PeriodicCallback(shared.schedule, self._ping, const.PING_INTERVAL)
-        try:
-            while not self.ws.closed:
-                message = self.ws.receive()
-                addr = shared.user_service.address(hint=self.conn_id)
-                if isinstance(message, bytes):
-                    with shared.user_service.client(addr) as client:
-                        client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
-                elif isinstance(message, str):
-                    with shared.user_service.client(addr) as client:
-                        client.recv_text(options.rpc_address, self.conn_id, self.context, message)
-        finally:
-            pc.stop()
+        while not self.ws.closed:
+            message = self.ws.receive()
+            addr = shared.user_service.address(hint=self.conn_id)
+            if isinstance(message, bytes):
+                with shared.user_service.client(addr) as client:
+                    client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
+            elif isinstance(message, str):
+                with shared.user_service.client(addr) as client:
+                    client.recv_text(options.rpc_address, self.conn_id, self.context, message)
 
-    def _ping(self):
-        self.send(self.ping_message)
+    def rpc_ping(self):
         self.step += 1
         if self.step < const.RPC_PING_STEP:
             return
@@ -93,18 +84,12 @@ class Client:
         with shared.user_service.client(addr) as client:
             client.ping(options.rpc_address, self.conn_id, self.context)
 
-    def _writer(self, timeout):
+    def _writer(self):
         logging.debug(f'start {self}')
         idle_timeout = False
         try:
-            while True:
-                message = self.messages.get(block=timeout > 0, timeout=timeout)
-                if message is None:
-                    break
-                if message is self.ping_message:
-                    self.ws.send_frame('', WebSocket.OPCODE_PING)
-                else:
-                    self.ws.send(message)
+            while message := self.messages.get(timeout=const.PING_INTERVAL / 2):
+                self.ws.send(message)
         except queue.Empty:
             logging.debug(f'writer idle exit')
             idle_timeout = True
@@ -119,7 +104,8 @@ class Client:
             if not idle_timeout:
                 self.ws.close()
             elif not self.messages.empty():  # race condition, do again
-                self.send(self.ping_message)
+                self.writing = True
+                gevent.spawn(self._writer)
 
     def stop(self):
         self.messages.put_nowait(None)
