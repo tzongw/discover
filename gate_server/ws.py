@@ -74,12 +74,11 @@ class Client:
         self.ws.handler.socket.settimeout(self.CLIENT_TTL)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
-            if isinstance(message, bytes):
-                with shared.user_service.client(addr) as client:
-                    client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
-            else:
-                with shared.user_service.client(addr) as client:
+            with shared.user_service.client(addr) as client:
+                if isinstance(message, str):
                     client.recv_text(options.rpc_address, self.conn_id, self.context, message)
+                else:
+                    client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
 
     def rpc_ping(self):
         self.step += 1
