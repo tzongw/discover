@@ -11,7 +11,6 @@ from geventwebsocket.exceptions import WebSocketError
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base import utils
-from base.schedule import PeriodicCallback
 import shared
 import const
 from config import options
