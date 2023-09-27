@@ -108,7 +108,7 @@ class Client:
             self.ws.close()
 
     def stop(self):
-        self.messages.put_nowait(None)
+        self.send(None)
 
     def set_context(self, key, value):
         self.context[key] = value
