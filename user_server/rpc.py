@@ -25,8 +25,7 @@ class Handler:
         logging.info(f'{address} {conn_id} {params}')
         try:
             params = {k.lower(): v for k, v in params.items()}
-            cookie = params.pop('cookie', None)
-            if cookie:
+            if cookie := params.pop('cookie', None):
                 request = app.request_class({'HTTP_COOKIE': cookie})
                 session = app.open_session(request)
                 params.update(session)
