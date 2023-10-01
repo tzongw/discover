@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import random
 from typing import Dict
 from urllib import parse
 from collections import defaultdict
@@ -92,7 +93,8 @@ class Client:
     def _writer(self):
         logging.debug(f'start {self}')
         try:
-            while message := self.messages.get(timeout=const.PING_INTERVAL / 2):
+            timeout = 1 + random.random() * const.PING_INTERVAL
+            while message := self.messages.get(timeout=timeout):
                 self.ws.send(message)
         except queue.Empty:
             logging.debug(f'idle {self}')
