@@ -39,7 +39,6 @@ def serve():
 
 
 def handle_ping(self: WebSocket, header, payload):
-    self.send_frame(payload, self.OPCODE_PONG)
     client: Client = self.environ['WS_CLIENT']
     client.rpc_ping()
 
