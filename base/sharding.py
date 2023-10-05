@@ -146,9 +146,10 @@ class MigratingTimer(ShardingTimer):
     def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         if self.redis is not self.old_timer.redis and self.old_timer.kill(key):
             _, new_stream = self._sharding_key.sharded_keys(key, stream)
-            old_stream = stream
             if isinstance(self.old_timer, ShardingTimer):
                 _, old_stream = self.old_timer._sharding_key.sharded_keys(key, stream)
+            else:
+                old_stream = stream
             last_id = self.old_timer.redis.xinfo_stream(old_stream)['last-generated-id']
             last_tick = int(last_id[:-2])
             self.redis.xadd(new_stream, fields={'': ''}, id=last_tick + 1)
