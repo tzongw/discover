@@ -3,8 +3,7 @@ from redis import Redis, RedisCluster
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta
-from .utils import LogSuppress, Addr, ip_address, ListConverter, Proxy, stream_name, \
-    run_in_thread
+from .utils import LogSuppress, Addr, ip_address, ListConverter, stream_name, run_in_thread
 from .single_flight import SingleFlight, single_flight
 from .parser import SmartParser
 from .snowflake import extract_datetime, from_datetime, IdGenerator
