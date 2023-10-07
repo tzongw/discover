@@ -18,7 +18,7 @@ from base.utils import CaseDict
 from config import options
 import const
 from base import FullCache, Cache
-from common.shared import invalidator, id_generator
+from shared import invalidator, id_generator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
 engine = create_engine('sqlite:///db.sqlite3', echo=echo)
