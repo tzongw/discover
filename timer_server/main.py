@@ -84,14 +84,14 @@ class Handler:
         px = max(int(delay * 1000), 1)
         old_info = shared.parser.set(full_key, info, px=px, get=True)
         if old_info and old_info.addr != options.rpc_address:
-            self._rpc_remove(old_info)
+            self._rpc_delete(old_info)
 
         def callback():
-            self._delete_timer(full_key)
+            self._delete_timer(key, service_name)
             self._fire_timer(key, service_name, data)
 
         handle = shared.schedule.call_at(callback, deadline)
-        self._delete_timer(full_key)
+        self._delete_timer(full_key, service_name)
         self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
 
     def call_repeat(self, key, service_name, data, interval):
@@ -101,13 +101,13 @@ class Handler:
         info = Info(key=key, service=service_name, data=data, addr=options.rpc_address, interval=interval)
         old_info = shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
-            self._rpc_remove(old_info)
+            self._rpc_delete(old_info)
 
         def callback():
             self._fire_timer(key, service_name, data)
 
         pc = PeriodicCallback(shared.schedule, callback, interval)
-        self._delete_timer(full_key)
+        self._delete_timer(key, service_name)
         self._timers[full_key] = Timer(info=info, cancel=pc.stop)
 
     def remove_timer(self, key, service_name):
@@ -115,19 +115,21 @@ class Handler:
         full_key = self._full_key(key, service_name)
         old_info = shared.parser.getdel(full_key, Info)
         if old_info and old_info.addr != options.rpc_address:
-            self._rpc_remove(old_info)
-        self._delete_timer(full_key)
+            self._rpc_delete(old_info)
+        self._delete_timer(key, service_name)
 
-    def _delete_timer(self, full_key):
+    def _delete_timer(self, key, service_name):
+        full_key = self._full_key(key, service_name)
         if timer := self._timers.pop(full_key, None):
             logging.debug(f'delete {full_key}')
             timer.cancel()
 
     @staticmethod
-    def _rpc_remove(info: Info):
+    def _rpc_delete(info: Info):
         logging.debug(f'{info.key} {info.service} {info.addr}')
         with shared.timer_service.client(info.addr) as client:
-            client.remove_timer(info.key, info.service)
+            # noinspection PyProtectedMember
+            client._delete_timer(info.key, info.service)
 
 
 def rpc_serve(handler):

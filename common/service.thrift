@@ -2,6 +2,7 @@ service timer {
     void call_later(1: string key, 2: string service_name, 3: string data, 4: double delay)
     void call_repeat(1: string key, 2: string service_name, 3: string data, 4: double interval)
     void remove_timer(1: string key, 2: string service_name)
+    void _delete_timer(1: string key, 2: string service_name)
 }
 
 service timeout {
