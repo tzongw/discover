@@ -91,7 +91,7 @@ class Handler:
             self._fire_timer(key, service_name, data)
 
         handle = shared.schedule.call_at(callback, deadline)
-        self._delete_timer(full_key, service_name)
+        self._delete_timer(key, service_name)
         self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
 
     def call_repeat(self, key, service_name, data, interval):
