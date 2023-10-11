@@ -28,6 +28,7 @@ class Info(BaseModel):
     key: str
     service: str
     data: str
+    addr: str
     deadline = 0.0
     interval = 0.0
 
@@ -51,6 +52,8 @@ class Handler:
         for full_key in full_keys:
             with LogSuppress():
                 info = shared.parser.get(full_key, Info)
+                if info.addr != options.rpc_address:
+                    continue
                 if info.deadline:
                     self.call_later(info.key, info.service, info.data,
                                     info.deadline - time.time())
@@ -75,9 +78,11 @@ class Handler:
         logging.info(f'{key} {service_name} {delay}')
         full_key = self._full_key(key, service_name)
         deadline = time.time() + delay
-        info = Info(key=key, service=service_name, data=data, deadline=deadline)
+        info = Info(key=key, service=service_name, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
-        shared.parser.set(full_key, info, px=px)
+        old_info = shared.parser.set(full_key, info, px=px, get=True)
+        if old_info and old_info.addr != options.rpc_address:
+            self._rpc_remove(old_info)
 
         def callback():
             self._delete_timer(full_key)
@@ -91,8 +96,10 @@ class Handler:
         assert interval > 0
         logging.info(f'{key} {service_name} {interval}')
         full_key = self._full_key(key, service_name)
-        info = Info(key=key, service=service_name, data=data, interval=interval)
-        shared.parser.set(full_key, info)
+        info = Info(key=key, service=service_name, data=data, addr=options.rpc_address, interval=interval)
+        old_info = shared.parser.set(full_key, info, get=True)
+        if old_info and old_info.addr != options.rpc_address:
+            self._rpc_remove(old_info)
 
         def callback():
             self._fire_timer(key, service_name, data)
@@ -104,13 +111,20 @@ class Handler:
     def remove_timer(self, key, service_name):
         logging.info(f'{key} {service_name}')
         full_key = self._full_key(key, service_name)
-        shared.redis.delete(full_key)
+        old_info = shared.parser.getdel(full_key, Info)
+        if old_info and old_info.addr != options.rpc_address:
+            self._rpc_remove(old_info)
         self._delete_timer(full_key)
 
     def _delete_timer(self, full_key):
         if timer := self._timers.pop(full_key, None):
             logging.info(f'delete {full_key}')
             timer.cancel()
+
+    @staticmethod
+    def _rpc_remove(info: Info):
+        with shared.timer_service.client(info.addr) as client:
+            client.remove_timer(info.key, info.service)
 
 
 def rpc_serve(handler):
