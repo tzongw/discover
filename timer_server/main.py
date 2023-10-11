@@ -48,19 +48,21 @@ class Handler:
             lambda service_name: Service(shared.registry, service_name))  # type: Dict[str, Service]
 
     def load_timers(self):
-        full_keys = set(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
-        for full_key in full_keys:
-            with LogSuppress():
-                info = shared.parser.get(full_key, Info)
-                if info.addr != options.rpc_address:
-                    continue
-                if info.deadline:
-                    self.call_later(info.key, info.service, info.data,
-                                    info.deadline - time.time())
-                elif info.interval:
-                    self.call_repeat(info.key, info.service, info.data, info.interval)
-                else:
-                    logging.error(f'invalid timer: {info}')
+        cursor = '0'
+        while cursor != 0:
+            cursor, full_keys = shared.redis.scan(cursor=cursor, match=f'{self._PREFIX}:*', count=100)
+            if not full_keys:
+                continue
+            for info in shared.parser.mget_nonatomic(full_keys, Info):
+                with LogSuppress():
+                    if info.addr != options.rpc_address or self._full_key(info.key, info.service) in self._timers:
+                        continue
+                    if info.deadline:
+                        self.call_later(info.key, info.service, info.data, info.deadline - time.time())
+                    elif info.interval:
+                        self.call_repeat(info.key, info.service, info.data, info.interval)
+                    else:
+                        logging.error(f'invalid timer: {info}')
 
     @classmethod
     def _full_key(cls, key, service_name):
