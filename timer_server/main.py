@@ -77,7 +77,7 @@ class Handler:
             client.timeout(key, data)
 
     def call_later(self, key, service_name, data, delay):
-        logging.info(f'{key} {service_name} {delay}')
+        logging.debug(f'{key} {service_name} {delay}')
         full_key = self._full_key(key, service_name)
         deadline = time.time() + delay
         info = Info(key=key, service=service_name, data=data, addr=options.rpc_address, deadline=deadline)
@@ -96,7 +96,7 @@ class Handler:
 
     def call_repeat(self, key, service_name, data, interval):
         assert interval > 0
-        logging.info(f'{key} {service_name} {interval}')
+        logging.debug(f'{key} {service_name} {interval}')
         full_key = self._full_key(key, service_name)
         info = Info(key=key, service=service_name, data=data, addr=options.rpc_address, interval=interval)
         old_info = shared.parser.set(full_key, info, get=True)
@@ -111,7 +111,7 @@ class Handler:
         self._timers[full_key] = Timer(info=info, cancel=pc.stop)
 
     def remove_timer(self, key, service_name):
-        logging.info(f'{key} {service_name}')
+        logging.debug(f'{key} {service_name}')
         full_key = self._full_key(key, service_name)
         old_info = shared.parser.getdel(full_key, Info)
         if old_info and old_info.addr != options.rpc_address:
@@ -120,11 +120,12 @@ class Handler:
 
     def _delete_timer(self, full_key):
         if timer := self._timers.pop(full_key, None):
-            logging.info(f'delete {full_key}')
+            logging.debug(f'delete {full_key}')
             timer.cancel()
 
     @staticmethod
     def _rpc_remove(info: Info):
+        logging.debug(f'{info.key} {info.service} {info.addr}')
         with shared.timer_service.client(info.addr) as client:
             client.remove_timer(info.key, info.service)
 
