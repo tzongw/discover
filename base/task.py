@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from importlib import import_module
@@ -91,9 +90,6 @@ class AsyncTask(_BaseTask):
         return self.wraps(f, path)
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
-        if not task_id:
-            assert not loop, 'loop task CAN NOT be anonymous'
-            task_id = f'task:{uuid.uuid4()}'
         stream = self.stream_name(task)
         return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, stream=stream)
 

@@ -25,9 +25,6 @@ class Invalidator:
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
 
-    def invalidate(self, key, *args, **kwargs):
-        self.dispatcher.dispatch(key, *args, **kwargs)
-
     def _invalidate_all(self):
         for group in self.groups:
             self.dispatcher.dispatch(group, '')
