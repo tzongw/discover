@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from typing import Union
 import uuid
+from weakref import WeakValueDictionary
+from concurrent.futures import Future
 from redis import Redis, RedisCluster
 import gevent
 import logging
@@ -13,6 +15,7 @@ class Invalidator:
         self.redis = redis
         self.sep = sep
         self.dispatcher = Dispatcher(executor=Executor(name='invalidator'))
+        self.futures = WeakValueDictionary()
 
     @property
     def handler(self):
@@ -28,6 +31,14 @@ class Invalidator:
     def _invalidate_all(self):
         for group in self.groups:
             self.dispatcher.dispatch(group, '')
+
+    def future(self, group, key):
+        assert self.sep not in group
+        full_key = f'{group}{self.sep}{key}'
+        fut = self.futures.get(full_key)
+        if not fut:
+            fut = self.futures[full_key] = Future()
+        return fut
 
     def publish(self, group, key):
         assert self.sep not in group
@@ -63,6 +74,8 @@ class Invalidator:
                 if isinstance(data, (bytes, str)):
                     data = [data]
                 for full_key in data:
+                    if fut := self.futures.pop(full_key, None):
+                        fut.set_result(None)
                     group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
             except Exception:
