@@ -35,7 +35,7 @@ def chunks(iterable, batch):
         yield Chunk(first, iterator, batch)
 
 
-class LazyList:
+class LazySequence:
     def __init__(self, get_more):
         self._values = []
         self._get_more = get_more
@@ -60,11 +60,13 @@ class LazyList:
             self._fut = None
 
     def __iter__(self):
-        i = 0
+        return self.slice(0)
+
+    def slice(self, start):
         while True:
-            while i < len(self._values):
-                yield self._values[i]
-                i += 1
+            while start < len(self._values):
+                yield self._values[start]
+                start += 1
             if self._done:
                 return
             self._load()
