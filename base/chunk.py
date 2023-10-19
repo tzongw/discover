@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from typing import Optional
+from concurrent.futures import Future
+
 sentinel = object()
 
 
@@ -30,3 +33,38 @@ def chunks(iterable, batch):
         if first is sentinel:
             return
         yield Chunk(first, iterator, batch)
+
+
+class LazyList:
+    def __init__(self, get_more):
+        self._values = []
+        self._get_more = get_more
+        self._cursor = None
+        self._done = False
+        self._fut = None  # type: Optional[Future]
+
+    def _load(self):
+        assert not self._done
+        if self._fut:
+            return self._fut.result()
+        self._fut = Future()
+        try:
+            values, self._cursor = self._get_more(self._cursor)
+            self._values += values
+            if self._cursor is None:
+                self._done = True
+            self._fut.set_result(None)
+        except Exception as e:
+            self._fut.set_exception(e)
+        finally:
+            self._fut = None
+
+    def __iter__(self):
+        i = 0
+        while True:
+            while i < len(self._values):
+                yield self._values[i]
+                i += 1
+            if self._done:
+                return
+            self._load()
