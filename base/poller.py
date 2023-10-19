@@ -71,7 +71,8 @@ class Poller:
     def notify(self, group: str, queue: str):
         config = self.configs[group]
         task = self.poll_task(group, queue)
-        if self.async_task.post(self.task_id(group, queue), task, config.interval, loop=True):
+        task_id = self.task_id(group, queue)
+        if not self.async_task.exists(task_id) and self.async_task.post(task_id, task, config.interval, loop=True):
             self.async_task.publish(task)
 
     def handler(self, group, interval=timedelta(seconds=1), spawn=None):
