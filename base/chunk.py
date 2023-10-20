@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from typing import Optional
+import bisect
+from itertools import islice
 from concurrent.futures import Future
 
 sentinel = object()
@@ -60,9 +62,9 @@ class LazySequence:
             self._fut = None
 
     def __iter__(self):
-        return self.slice(0)
+        return self._slice(0)
 
-    def slice(self, start):
+    def _slice(self, start):
         while True:
             while start < len(self._values):
                 yield self._values[start]
@@ -70,3 +72,11 @@ class LazySequence:
             if self._done:
                 return
             self._load()
+
+    def gt_slice(self, x, size=None, key=None):
+        start = 0
+        while start >= len(self._values) and not self._done:
+            self._load()
+            start = bisect.bisect_right(self._values, x, lo=start, key=key)
+        s = self._slice(start)
+        return islice(s, size) if size else s
