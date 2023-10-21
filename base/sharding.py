@@ -11,7 +11,7 @@ from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, Stocks
 from .timer import Timer
-from .chunk import chunks
+from .chunk import batched
 
 
 class ShardingKey:
@@ -221,7 +221,7 @@ class ShardingStocks(Stocks):
             for key in keys:
                 for sharded_key in self.sharding_key.all_sharded_keys(key):
                     pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            return [sum(values[0] for values in chunk) for chunk in chunks(pipe.execute(), self.sharding_key.shards)]
+            return [sum(values[0] for values in chunk) for chunk in batched(pipe.execute(), self.sharding_key.shards)]
 
     def incrby(self, key, total):
         assert total >= 0

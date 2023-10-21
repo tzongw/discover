@@ -7,7 +7,7 @@ from .utils import LogSuppress, Addr, ip_address, ListConverter, stream_name, ru
 from .single_flight import SingleFlight, single_flight
 from .parser import SmartParser
 from .snowflake import extract_datetime, from_datetime, IdGenerator
-from .chunk import chunks
+from .chunk import batched
 from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool
