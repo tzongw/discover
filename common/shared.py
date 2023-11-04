@@ -113,7 +113,7 @@ def at_exit(fun):
 
 def init_main():
     status.inited = True
-    executor.gather(*_mains)
+    executor.gather(_mains)
     _mains.clear()
 
 
@@ -128,7 +128,7 @@ def _cleanup():
             for fn in _exits:
                 fn()
         else:
-            executor.gather(*_exits)
+            executor.wait(_exits)
     _exits.clear()
 
 

@@ -29,8 +29,6 @@ class _WorkItem:
             self.future.set_exception(exc)
         else:
             self.future.set_result(result)
-        finally:
-            self.future = None
 
     def __str__(self):
         return f'fn: {func_desc(self.fn)} args: {self.args} kwargs: {self.kwargs}'
@@ -60,13 +58,19 @@ class Executor:
             logging.warning(f'+ overload {self} {item}')
         return fut
 
-    def gather(self, *fns, block=True):
+    def gather(self, fns):
         futures = [self.submit(fn) for fn in fns]
-        results = (fut.result() for fut in futures)
-        return list(results) if block else results
+        return [fut.result() for fut in futures]
 
-    def map(self, fn: Callable, *args, block=True):
-        return self.gather(*[partial(fn, arg) for arg in args], block=block)
+    def wait(self, fns):
+        futures = [self.submit(fn) for fn in fns]
+        return [fut.exception() for fut in futures]
+
+    def map_gather(self, fn: Callable, *args):
+        return self.gather([partial(fn, arg) for arg in args])
+
+    def map_wait(self, fn: Callable, *args):
+        return self.wait([partial(fn, arg) for arg in args])
 
     def _adjust_workers(self):
         if self._workers < self._unfinished <= self._max_workers:
