@@ -36,9 +36,9 @@ class LazySequence:
             self._fut = None
 
     def __iter__(self):
-        return self._slice(0)
+        return self.slice(0)
 
-    def _slice(self, start):
+    def slice(self, start):
         while True:
             while start < len(self._values):
                 yield self._values[start]
@@ -47,10 +47,9 @@ class LazySequence:
                 return
             self._load()
 
-    def gt_slice(self, x, size=None, key=None):
+    def gt_slice(self, x, key=None):
         start = 0
         while start >= len(self._values) and not self._done:
             self._load()
             start = bisect.bisect_right(self._values, x, lo=start, key=key)
-        s = self._slice(start)
-        return islice(s, size) if size else s
+        return self.slice(start)
