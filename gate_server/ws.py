@@ -131,7 +131,11 @@ def remove_from_group(client: Client, group):
 
 
 def normalize_header(name: str):
-    return name[len('HTTP_X_'):].replace('_', '-')
+    if name.startswith('HTTP_X_'):
+        name = name[len('HTTP_X_'):]
+    elif name.startswith('HTTP_'):
+        name = name[len('HTTP_'):]
+    return name.replace('_', '-')
 
 
 def client_serve(ws: WebSocket):
@@ -142,7 +146,7 @@ def client_serve(ws: WebSocket):
     environ['WS_CLIENT'] = client
     logging.info(f'++ {len(clients)} {client}')
     try:
-        params = {normalize_header(k): v for k, v in environ.items() if k.startswith('HTTP_X_')}
+        params = {normalize_header(k): v for k, v in environ.items() if k.startswith('HTTP_')}
         cookie = environ.get('HTTP_COOKIE')
         if cookie:
             params['cookie'] = cookie
