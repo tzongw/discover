@@ -45,9 +45,9 @@ class Service:
                     self._cooldown[address] = time.time() + Registry.COOLDOWN
                     if len(self._cooldown) > count:
                         logging.warning(f'+ cool down {self._name} {address}')
-                        self._update_addresses()
+                        expire = self._update_addresses()
                         if not count:
-                            gevent.spawn(self._reap_cooldown)
+                            gevent.spawn_later(expire, self._reap_cooldown)
                 raise
 
     def _clean_pools(self):
