@@ -24,7 +24,7 @@ class Handler:
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
-            params = {k.lower(): v for k, v in params.items()}
+            params = {k[2:].lower() if k.startswith('X-') else k.lower(): v for k, v in params.items()}
             if cookie := params.pop('cookie', None):
                 request = app.request_class({'HTTP_COOKIE': cookie})
                 session = app.open_session(request)

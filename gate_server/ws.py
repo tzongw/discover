@@ -130,14 +130,6 @@ def remove_from_group(client: Client, group):
         groups.pop(group)
 
 
-def normalize_header(name: str):
-    if name.startswith('HTTP_X_'):
-        name = name[len('HTTP_X_'):]
-    elif name.startswith('HTTP_'):
-        name = name[len('HTTP_'):]
-    return name.replace('_', '-')
-
-
 def client_serve(ws: WebSocket):
     conn_id = utils.base62(shared.id_generator.gen())
     client = Client(ws, conn_id)
@@ -146,7 +138,7 @@ def client_serve(ws: WebSocket):
     environ['WS_CLIENT'] = client
     logging.info(f'++ {len(clients)} {client}')
     try:
-        params = {normalize_header(k): v for k, v in environ.items() if k.startswith('HTTP_')}
+        params = {k[5:].replace('_', '-'): v for k, v in environ.items() if k.startswith('HTTP_')}
         for k, v in parse.parse_qsl(environ['QUERY_STRING']):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
