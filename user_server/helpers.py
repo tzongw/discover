@@ -24,7 +24,7 @@ def kick(uid, message=None):
     with gate_service.client(online.address) as client:
         if isinstance(message, str):
             client.send_text(online.conn_id, message)
-        else:
+        elif isinstance(message, bytes):
             client.send_binary(online.conn_id, message)
         client.remove_conn(online.conn_id)
 
