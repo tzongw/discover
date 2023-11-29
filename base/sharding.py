@@ -152,7 +152,7 @@ class MigratingTimer(ShardingTimer):
                 old_stream = stream
             last_id = self.old_timer.redis.xinfo_stream(old_stream)['last-generated-id']
             last_tick = int(last_id[:-2])
-            self.redis.xadd(new_stream, fields={'': ''}, id=last_tick + 1)
+            self.redis.xadd(new_stream, fields={'': ''}, id=str(last_tick + 1))
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
 
@@ -162,8 +162,7 @@ class MigratingReceiver(ShardingReceiver):
         self.old_receiver = old_receiver
 
     def start(self):
-        self.old_receiver.start()
-        return super().start()
+        return self.old_receiver.start() + super().start()
 
     def stop(self):
         self.old_receiver.stop()
