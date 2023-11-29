@@ -214,3 +214,19 @@ class FullTTLCache(FullMixin[T], TTLCache[T]):
     def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)
+
+
+def ttl_cache(expire, *, maxsize=128):
+    def decorator(f):
+        def get(_, *args, **kwargs):
+            return f(*args, **kwargs), expire
+
+        cache = TTLCache(get=get, maxsize=maxsize)
+
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            return cache.get(None, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
