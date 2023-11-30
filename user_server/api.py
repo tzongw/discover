@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 import flask
 from flask import Blueprint, g, request, stream_with_context
 from flask.app import DefaultJSONProvider, Flask
-from mongoengine import NotUniqueError
+from mongoengine import NotUniqueError, EmbeddedDocument
 from pydantic import BaseModel
 from webargs import fields
 from webargs.flaskparser import use_kwargs
@@ -45,6 +45,8 @@ class JSONEncoder(json.JSONEncoder):
             return o.strftime('%Y-%m-%d')
         elif isinstance(o, timedelta):
             return o.total_seconds()
+        elif isinstance(o, EmbeddedDocument):
+            return o.to_mongo().to_dict()
         return super().default(o)
 
 

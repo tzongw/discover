@@ -7,7 +7,7 @@ from enum import StrEnum, auto
 from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
 from pymongo import monitoring
 from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField, \
-    EmbeddedDocument, ListField, EmbeddedDocumentListField
+    EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from sqlalchemy import Column
 from sqlalchemy import create_engine
 from sqlalchemy import BigInteger
@@ -139,6 +139,7 @@ class CRUD(StrEnum):
 
 class Privilege(EmbeddedDocument):
     meta = {'strict': False}
+
     coll = StringField(required=True)
     ops = ListField(EnumField(CRUD), required=True)
 
@@ -149,11 +150,13 @@ class Privilege(EmbeddedDocument):
 @collection
 class Role(Document, CacheMixin['Role']):
     meta = {'strict': False}
+
     id = StringField(primary_key=True)
+    admin = BooleanField(default=False)
     privileges = EmbeddedDocumentListField(Privilege, required=True)
 
     def can_access(self, coll, op: CRUD):
-        return any(privilege.can_access(coll, op) for privilege in self.privileges)
+        return self.admin or any(privilege.can_access(coll, op) for privilege in self.privileges)
 
 
 cache: Cache[Role] = Cache(mget=Role.mget, make_key=Role.make_key, maxsize=None)
