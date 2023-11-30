@@ -138,6 +138,7 @@ class CRUD(StrEnum):
 
 
 class Privilege(EmbeddedDocument):
+    meta = {'strict': False}
     coll = StringField(required=True)
     ops = ListField(EnumField(CRUD), required=True)
 
@@ -147,6 +148,7 @@ class Privilege(EmbeddedDocument):
 
 @collection
 class Role(Document, CacheMixin['Role']):
+    meta = {'strict': False}
     id = StringField(primary_key=True)
     privileges = EmbeddedDocumentListField(Privilege, required=True)
 

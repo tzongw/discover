@@ -227,6 +227,7 @@ def ttl_cache(expire, *, maxsize=128):
         def wrapper(*args, **kwargs):
             return cache.get(None, *args, **kwargs)
 
+        wrapper.cache = cache
         return wrapper
 
     return decorator
