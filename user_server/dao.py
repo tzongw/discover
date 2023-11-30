@@ -130,6 +130,14 @@ class TimeDeltaField(FloatField):
         return timedelta(seconds=value) if isinstance(value, float) else value
 
 
+class BooleanFieldEx(BooleanField):
+    def prepare_query_value(self, op, value):
+        return super().prepare_query_value(op, self.to_mongo(value))
+
+    def to_mongo(self, value):
+        return False if value in ['false', '0'] else bool(value)
+
+
 class CRUD(StrEnum):
     CREATE = auto()
     READ = auto()
@@ -152,7 +160,7 @@ class Role(Document, CacheMixin['Role']):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
-    admin = BooleanField(default=False)
+    admin = BooleanFieldEx(default=False)
     privileges = EmbeddedDocumentListField(Privilege, required=True)
 
     def can_access(self, coll, op: CRUD):
