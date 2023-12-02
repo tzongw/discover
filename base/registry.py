@@ -14,17 +14,13 @@ class Registry:
     COOLDOWN = _TTL + _INTERVAL
 
     @classmethod
-    def _key_prefix(cls, name):
-        return f'{cls._PREFIX}:{name}'
-
-    @classmethod
     def _full_key(cls, name, address):
-        return f'{cls._key_prefix(name)}:{address}'
+        return f'{cls._PREFIX}:{name}:{address}'
 
     @classmethod
     def _unpack(cls, key: str):
-        assert key.startswith(cls._PREFIX)
-        _, name, address = key.split(sep=':', maxsplit=2)
+        prefix, name, address = key.split(sep=':', maxsplit=2)
+        assert prefix == cls._PREFIX
         return name, address
 
     def __init__(self, redis: Redis):
