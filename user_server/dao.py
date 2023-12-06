@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, Any, TypeVar, Generic, Optional, Union, Type
+from typing import Callable, Any, Optional, Union, Type, Self
 from pymongo import monitoring
 from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
@@ -38,10 +38,8 @@ class Account(Base):
 
 Base.metadata.create_all(engine)
 
-T = TypeVar('T')
 
-
-class GetterMixin(Generic[T]):
+class GetterMixin:
     id: Any
     objects: Callable
     _fields: dict
@@ -49,7 +47,7 @@ class GetterMixin(Generic[T]):
     __include__ = None
 
     @classmethod
-    def mget(cls, keys, *, only=()) -> list[Optional[T]]:
+    def mget(cls, keys, *, only=()) -> list[Optional[Self]]:
         if not keys:
             return []
         query = {f'{cls.id.name}__in': keys}
@@ -57,7 +55,7 @@ class GetterMixin(Generic[T]):
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
-    def get(cls, key, *, ensure=True, only=()) -> Optional[T]:
+    def get(cls, key, *, ensure=True, only=()) -> Optional[Self]:
         value = cls.mget([key], only=only)[0]
         if value is None and ensure:
             raise DoesNotExist(f'document `{key}` does not exist')
@@ -73,13 +71,13 @@ class GetterMixin(Generic[T]):
         return {k: v for k, v in self._data.items() if k in include}
 
 
-class CacheMixin(GetterMixin[T]):
+class CacheMixin(GetterMixin):
     @classmethod
     def make_key(cls, key, *_, **__):
         return cls.id.to_python(key)  # ignore only
 
     @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[T]]:
+    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
         return super().mget(keys)  # ignore only
 
     def invalidate(self):
@@ -95,9 +93,9 @@ class CacheMixin(GetterMixin[T]):
         return get_expire
 
 
-class FlashCacheMixin(CacheMixin[T]):
+class FlashCacheMixin(CacheMixin):
     @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[T]]:
+    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
         return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
 
 
@@ -156,7 +154,7 @@ class Privilege(EmbeddedDocument):
 
 
 @collection
-class Role(Document, CacheMixin['Role']):
+class Role(Document, CacheMixin):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
@@ -173,7 +171,7 @@ Role.mget = cache.mget
 
 
 @collection
-class Profile(Document, CacheMixin['Profile']):
+class Profile(Document, CacheMixin):
     __include__ = ['name', 'addr']
     meta = {'strict': False}
 
@@ -201,10 +199,15 @@ def valid_profiles():
 
 
 @collection
-class Setting(Document, CacheMixin['Setting']):
+class Setting(Document, CacheMixin):
     meta = {'strict': False, 'allow_inheritance': True}
 
     id = StringField(primary_key=True)
+
+    @classmethod
+    def get(cls, key=None, *, ensure=False, only=()) -> Self:
+        assert key is None or key == cls.__name__, 'key is NOT support'
+        return super().get(cls.__name__, ensure=ensure, only=only) or cls(id=cls.__name__)
 
 
 cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
@@ -221,11 +224,6 @@ class Status(Enum):
 class TokenSetting(Setting):
     expire = TimeDeltaField(default=timedelta(hours=1), max_value=timedelta(days=1))
     status = EnumField(Status, default=Status.OK)
-
-    @classmethod
-    def get(cls, key=None, *, ensure=False, only=()) -> TokenSetting:
-        assert key is None or key == cls.__name__, 'key is NOT support'
-        return super().get(cls.__name__, ensure=ensure, only=only) or cls(id=cls.__name__)
 
 
 cache.listen(invalidator, TokenSetting.__name__)
