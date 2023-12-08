@@ -162,7 +162,7 @@ def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
 def create_document(collection: str, **kwargs):
     coll = collections[collection]
     key = kwargs.get(coll.id.name)
-    if key is not None and coll.get(key, ensure=False):
+    if key is not None and coll.get(key):
         raise NotUniqueError(f'document `{key}` already exists')
     doc = coll(**kwargs).save()
     doc.invalidate()  # notify full cache new document created

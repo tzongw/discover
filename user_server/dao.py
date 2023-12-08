@@ -55,10 +55,13 @@ class GetterMixin:
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
-    def get(cls, key, *, ensure=True, only=()) -> Optional[Self]:
+    def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
         value = cls.mget([key], only=only)[0]
-        if value is None and ensure:
-            raise DoesNotExist(f'document `{key}` does not exist')
+        if value is None:
+            if ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
+            if default:
+                value = cls(**{cls.id.name: cls.id.to_python(key)})
         return value
 
     def to_dict(self, include=None, exclude=None):
@@ -205,9 +208,9 @@ class Setting(Document, CacheMixin):
     id = StringField(primary_key=True)
 
     @classmethod
-    def get(cls, key=None, *, ensure=False, only=()) -> Self:
+    def get(cls, key=None, *, ensure=False, default=True, only=()) -> Self:
         assert key is None or key == cls.__name__, 'key is NOT support'
-        return super().get(cls.__name__, ensure=ensure, only=only) or cls(id=cls.__name__)
+        return super().get(cls.__name__, ensure=ensure, default=default, only=only)
 
 
 cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
