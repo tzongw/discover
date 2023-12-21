@@ -146,7 +146,7 @@ def streaming_response():
             location='query', unknown='include')
 def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
     coll = collections[collection]
-    order_by = order_by or [f'-{coll.id.name}']
+    order_by = order_by.split(',') or [f'-{coll.id.name}']
     for key, value in kwargs.items():
         if key.endswith('__in'):
             kwargs[key] = value.split(',')
@@ -166,6 +166,7 @@ def create_document(collection: str, **kwargs):
         raise NotUniqueError(f'document `{key}` already exists')
     doc = coll(**kwargs).save()
     doc.invalidate()  # notify full cache new document created
+    return doc.to_dict(exclude=[])
 
 
 @app.route('/collections/<collection>/documents/<doc_id>')
@@ -180,11 +181,9 @@ def get_document(collection: str, doc_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id)
-    if not doc.modify(**kwargs):
-        kwargs[coll.id.name] = doc_id
-        logging.info(f'create doc {kwargs}')
-        doc = coll(**kwargs).save()
+    doc.modify(**kwargs)
     doc.invalidate()
+    return doc.to_dict(exclude=[])
 
 
 @app.route('/collections/<collection>/documents/<doc_id>', methods=['DELETE'])
@@ -194,6 +193,7 @@ def delete_documents(collection: str, doc_id):
     doc = coll.get(doc_id)
     doc.delete()
     doc.invalidate()
+    return doc.to_dict(exclude=[])
 
 
 @app.route('/collections/<collection>/documents/<doc_id>/fields/<field>', methods=['PATCH'])
