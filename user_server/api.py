@@ -172,7 +172,7 @@ def create_document(collection: str, **kwargs):
 @app.route('/collections/<collection>/documents/<doc_id>')
 def get_document(collection: str, doc_id):
     coll = collections[collection]
-    doc = coll.get(doc_id)
+    doc = coll.get(doc_id, ensure=True)
     return doc.to_dict(exclude=[])
 
 
@@ -180,7 +180,7 @@ def get_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
-    doc = coll.get(doc_id)
+    doc = coll.get(doc_id, ensure=True)
     doc.modify(**kwargs)
     doc.invalidate()
     return doc.to_dict(exclude=[])
@@ -190,7 +190,7 @@ def update_document(collection: str, doc_id, **kwargs):
 @use_kwargs({}, location='json_or_form')
 def delete_documents(collection: str, doc_id):
     coll = collections[collection]
-    doc = coll.get(doc_id)
+    doc = coll.get(doc_id, ensure=True)
     doc.delete()
     doc.invalidate()
     return doc.to_dict(exclude=[])
@@ -200,7 +200,7 @@ def delete_documents(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    target = coll.get(doc_id)
+    target = coll.get(doc_id, ensure=True)
     value = target[field]
     kwargs[f'{field}__gte'] = value
     kwargs[f'{coll.id.name}__ne'] = doc_id
