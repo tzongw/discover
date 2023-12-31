@@ -6,6 +6,11 @@ key=$1
 timeout=$2
 len=${#key}
 shift 2
+value=$(redis-cli "$@" PING)
+if [ "$value" != PONG ]; then
+  echo "expect PONG, got $value"
+  exit 1
+fi
 while true; do
   value=$(redis-cli "$@" BLPOP "$key" "$timeout")
   if [ -z "$value" ]; then
