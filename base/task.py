@@ -124,8 +124,8 @@ class HeavyTask(_BaseTask):
         return self.wraps(f, path)
 
     def push(self, task: Task):
-        logging.info(f'+task {task}')
-        self.redis.rpush(self.key, task.json(exclude_defaults=True))
+        total = self.redis.rpush(self.key, task.json(exclude_defaults=True))
+        logging.info(f'+task {task} total {total}')
 
     def pop(self, *, timeout=0, block=True) -> Optional[Task]:
         r = self.redis.blpop([self.key], timeout) if block else self.redis.lpop(self.key)
