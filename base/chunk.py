@@ -22,7 +22,7 @@ class LazySequence:
     def _load(self):
         assert not self._done
         if self._fut:
-            return self._fut.result()
+            self._fut.result()
         self._fut = Future()
         try:
             values, self._cursor = self._get_more(self._cursor)
