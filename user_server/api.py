@@ -22,7 +22,7 @@ import gevent
 from gevent import pywsgi
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN
-from shared import session_key, async_task, async_heavy
+from shared import session_key, async_task, run_in_process
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 from base.utils import ListConverter, base62
 from flasgger import Swagger
@@ -90,7 +90,8 @@ def init_trace():
     ctx.trace = base62(id_generator.gen())
 
 
-@async_heavy
+@async_task
+@run_in_process
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')

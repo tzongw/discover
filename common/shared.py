@@ -55,13 +55,12 @@ async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
 
 
-def async_heavy(f):
+def run_in_process(f):
     @heavy_task
     @functools.wraps(f)
     def task(*args, **kwargs):
         return f(*args, **kwargs)
 
-    @async_task
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         heavy_task.push(task(*args, **kwargs))

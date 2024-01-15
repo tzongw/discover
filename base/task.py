@@ -144,7 +144,9 @@ class HeavyTask(_BaseTask):
         logging.info(f'doing task {task}')
         index = task.path.rindex('.')
         module = import_module(task.path[:index])
-        func = getattr(module, task.path[index + 1:]).wrapped
+        func = getattr(module, task.path[index + 1:])
+        while hasattr(func, 'wrapped'):
+            func = func.wrapped
         args = loads(task.args)  # type: list
         kwargs = loads(task.kwargs)  # type: dict
         start = time.time()
