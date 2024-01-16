@@ -54,20 +54,7 @@ else:
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
 
-
-def run_in_process(f):
-    @heavy_task
-    @functools.wraps(f)
-    def task(*args, **kwargs):
-        return f(*args, **kwargs)
-
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        heavy_task.push(task(*args, **kwargs))
-
-    wrapper.wrapped = f
-    return wrapper
-
+run_in_process = heavy_task  # alias
 
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
