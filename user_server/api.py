@@ -147,7 +147,7 @@ def streaming_response():
             location='query', unknown='include')
 def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
     coll = collections[collection]
-    order_by = order_by.split(',') or [f'-{coll.id.name}']
+    order_by = order_by or [f'-{coll.id.name}']
     for key, value in kwargs.items():
         if key.endswith('__in'):
             kwargs[key] = value.split(',')
