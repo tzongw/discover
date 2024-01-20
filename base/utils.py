@@ -158,7 +158,7 @@ class Semaphore:
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
         name, token = self.local.name, self.local.token
-        if name and token and self.lua_reacquire(keys=[name], args=[token, timeout]):
+        if self.lua_reacquire(keys=[name], args=[token, timeout]):
             return
         raise LockError('Lock not owned')
 
