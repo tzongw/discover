@@ -48,7 +48,7 @@ class Timer:
 
     def new(self, key: str, function: str, interval: timedelta, loop: bool, num_keys: int, keys_and_args):
         interval = int(interval.total_seconds() * 1000)
-        assert interval >= 1
+        assert interval >= 1 or not loop, 'loop timer with 0 interval'
         params = [key, function, interval]
         if loop:
             params.append('LOOP')
