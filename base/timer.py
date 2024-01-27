@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-from redis import Redis
+from typing import Union
 from datetime import timedelta
 from pydantic import BaseModel
-from .utils import stream_name
+from redis import Redis, RedisCluster
+from .utils import stream_name, redis_name
 
 _SCRIPT = """#!lua name=timer
 local function timer_xadd(keys, args)
@@ -41,8 +42,13 @@ redis.register_function('timer_tick', timer_tick)
 
 
 class Timer:
-    def __init__(self, redis: Redis, hint=None):
-        redis.function_load(_SCRIPT, replace=True)
+    loaded = set()
+
+    def __init__(self, redis: Union[Redis, RedisCluster], hint=None):
+        name = redis_name(redis)
+        if name not in self.loaded:
+            redis.function_load(_SCRIPT, replace=True)
+            self.loaded.add(name)
         self.redis = redis
         self.hint = hint
 

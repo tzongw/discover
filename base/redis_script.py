@@ -2,6 +2,7 @@
 from typing import Union
 from datetime import timedelta
 from redis import Redis, RedisCluster
+from .utils import redis_name
 
 _SCRIPT = """#!lua name=utils
 local function limited_incrby(keys, args)
@@ -36,8 +37,13 @@ redis.register_function('limited_incrby', limited_incrby)
 
 
 class Script:
+    loaded = set()
+
     def __init__(self, redis: Union[Redis, RedisCluster]):
-        redis.function_load(_SCRIPT, replace=True)
+        name = redis_name(redis)
+        if name not in self.loaded:
+            redis.function_load(_SCRIPT, replace=True)
+            self.loaded.add(name)
         self.redis = redis
 
     def limited_incrby(self, key: str, amount: int, limit: int, expire: timedelta = None):

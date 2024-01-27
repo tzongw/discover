@@ -207,3 +207,14 @@ class Stocks:
     def try_lock(self, key, hint=None) -> bool:
         bitfield = self.redis.bitfield(key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+
+
+def redis_name(redis: Union[Redis, RedisCluster]):
+    if isinstance(redis, RedisCluster):
+        return redis.nodes_manager.default_node.name
+    else:
+        kwargs = redis.get_connection_kwargs()
+        host = kwargs.get('host', 'localhost')
+        port = kwargs.get('port', 6379)
+        db = kwargs.get('db', 0)
+        return f'{host}:{port}/{db}'
