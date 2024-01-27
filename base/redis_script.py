@@ -32,7 +32,17 @@ local function limited_incrby(keys, args)
     return amount
 end
 
+local function compare_set(keys, args)
+    if redis.call('GET', keys[1]) == args[1] then
+        redis.call('SET', keys[1], args[2], unpack(args, 3))
+        return 1
+    else
+        return 0
+    end
+end
+
 redis.register_function('limited_incrby', limited_incrby)
+redis.register_function('compare_set', compare_set)
 """
 
 
@@ -51,3 +61,11 @@ class Script:
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)
+
+    def compare_set(self, key: str, expected, value, expire: timedelta = None, keepttl: bool = False):
+        keys_and_args = [key, expected, value]
+        if expire is not None:
+            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
+        if keepttl:
+            keys_and_args.append('KEEPTTL')
+        return self.redis.fcall('compare_set', 1, *keys_and_args)
