@@ -41,8 +41,18 @@ local function compare_set(keys, args)
     end
 end
 
+local function compare_del(keys, args)
+    if redis.call('GET', keys[1]) == args[1] then
+        redis.call('DEL', keys[1])
+        return 1
+    else
+        return 0
+    end
+end
+
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
+redis.register_function('compare_del', compare_del)
 """
 
 
@@ -69,3 +79,6 @@ class Script:
         if keepttl:
             keys_and_args.append('KEEPTTL')
         return self.redis.fcall('compare_set', 1, *keys_and_args)
+
+    def compare_del(self, key: str, expected):
+        return self.redis.fcall('compare_del', 1, key, expected)
