@@ -14,7 +14,7 @@ from redis.client import Pipeline
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key
 from config import options
-from base import SmartParser
+from base import create_parser
 import helpers
 
 
@@ -78,7 +78,7 @@ class Handler:
         key = online_key(uid)
 
         def unset_online(pipe: Pipeline):
-            online = SmartParser(pipe).get(key, Online)
+            online = create_parser(pipe).get(key, Online)
             if online and online.conn_id == conn_id:
                 logging.info(f'clear {uid} {online}')
                 pipe.multi()

@@ -15,14 +15,13 @@ def session_key(uid: int):
     return f'session:{uid}'
 
 
-def session(uid: int):
+def get_session(uid: int):
     key = session_key(uid)
     with redis.pipeline(transaction=False) as pipe:
-        parser = SmartParser(pipe)
-        parser.get(key, Session)
+        create_parser(pipe).get(key, Session)
         pipe.ttl(key)
         return pipe.execute()
 
 
-sessions: TTLCache[Session] = TTLCache(get=session)
+sessions: TTLCache[Session] = TTLCache(get=get_session)
 sessions.listen(invalidator, 'session')

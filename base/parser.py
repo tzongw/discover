@@ -136,5 +136,5 @@ class ParserCluster(Parser):
         return True
 
 
-def SmartParser(redis):
+def create_parser(redis):
     return ParserCluster(redis) if isinstance(redis, RedisCluster) else Parser(redis)

@@ -13,7 +13,7 @@ from base import Registry, LogSuppress
 from base import Executor, Schedule
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
-from base import SmartInvalidator, SmartParser
+from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
@@ -37,8 +37,8 @@ unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
-parser = SmartParser(redis)
-invalidator = SmartInvalidator(redis)
+parser = create_parser(redis)
+invalidator = create_invalidator(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')
 script = Script(redis)
 

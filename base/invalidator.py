@@ -101,5 +101,5 @@ class InvalidatorCluster(Invalidator):
             gevent.sleep(1)
 
 
-def SmartInvalidator(redis, sep=':'):
+def create_invalidator(redis, sep=':'):
     return InvalidatorCluster(redis, sep) if isinstance(redis, RedisCluster) else Invalidator(redis, sep)
