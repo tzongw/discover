@@ -3,6 +3,7 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
+from random import choice
 import const
 import shared
 import logging
@@ -131,6 +132,31 @@ class Handler:
             # noinspection PyProtectedMember
             client._delete_timer(info.key, info.service)
 
+    def retreat_timers(self):
+        if not self._timers:
+            return
+        addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
+        if not addresses:
+            logging.error(f'can not retreat timers: {len(self._timers)}')
+            return
+        logging.info(f'retreat timers start: {len(self._timers)}')
+        while self._timers:
+            full_key, timer = self._timers.popitem()
+            logging.debug(f'retreating timer: {full_key}')
+            timer.cancel()
+            info = timer.info
+            with LogSuppress():
+                shared.redis.delete(full_key)
+                addr = choice(addresses)
+                with shared.timer_service.client(addr) as client:
+                    if info.deadline:
+                        client.call_later(info.key, info.service, info.data, info.deadline - time.time())
+                    elif info.interval:
+                        client.call_repeat(info.key, info.service, info.data, info.interval)
+                    else:
+                        logging.error(f'invalid timer: {info}')
+        logging.info(f'retreating timers done')
+
 
 def rpc_serve(handler):
     processor = Processor(handler)
@@ -155,6 +181,7 @@ def main():
     shared.init_main()
     shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
     handler.load_timers()
+    shared.at_exit(handler.retreat_timers)
     gevent.joinall(workers, raise_error=True)
 
 
