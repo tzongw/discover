@@ -3,7 +3,6 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
-from random import choice
 import const
 import shared
 import logging
@@ -23,6 +22,7 @@ from base.utils import DefaultDict
 import time
 from pydantic import BaseModel
 from dataclasses import dataclass
+from common.shared import spawn_worker
 
 
 class Info(BaseModel):
@@ -132,14 +132,8 @@ class Handler:
             # noinspection PyProtectedMember
             client._delete_timer(info.key, info.service)
 
-    def retreat_timers(self):
-        if not self._timers:
-            return
-        addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
-        if not addresses:
-            logging.error(f'can not retreat timers: {len(self._timers)}')
-            return
-        logging.info(f'retreat timers start: {len(self._timers)}')
+    def _do_retreat(self, addr):
+        logging.info(f'retreat worker {addr} start')
         while self._timers:
             full_key, timer = self._timers.popitem()
             logging.debug(f'retreating timer: {full_key}')
@@ -147,7 +141,6 @@ class Handler:
             info = timer.info
             with LogSuppress():
                 shared.redis.delete(full_key)
-                addr = choice(addresses)
                 with shared.timer_service.client(addr) as client:
                     if info.deadline:
                         client.call_later(info.key, info.service, info.data, info.deadline - time.time())
@@ -155,7 +148,18 @@ class Handler:
                         client.call_repeat(info.key, info.service, info.data, info.interval)
                     else:
                         logging.error(f'invalid timer: {info}')
-        logging.info(f'retreating timers done')
+        logging.info(f'retreat worker {addr} done')
+
+    def retreat_timers(self):
+        if not self._timers:
+            return
+        addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
+        if not addresses:
+            logging.error(f'can not retreat timers: {len(self._timers)}')
+            return
+        logging.info(f'retreat timers: {len(self._timers)}')
+        for addr in addresses:
+            spawn_worker(self._do_retreat, addr)
 
 
 def rpc_serve(handler):

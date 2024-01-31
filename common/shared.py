@@ -143,7 +143,7 @@ def run_in_worker(f):
 
 def _sig_handler(sig, frame):
     def graceful_exit():
-        logging.info(f'exit {sig} {frame}')
+        logging.info(f'exit {sig}')
         _cleanup()
         if sig != signal.SIGUSR1:
             seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
