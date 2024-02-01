@@ -60,7 +60,6 @@ def on_quarter(dt: datetime):
     logging.info(f'quarter {dt}')
 
 
-@at_main
 def init():
     if registry.addresses(const.RPC_TIMER):
         timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)

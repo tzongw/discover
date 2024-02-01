@@ -90,6 +90,12 @@ def init_trace():
     ctx.trace = base62(id_generator.gen())
 
 
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'max-age=10'
+    return response
+
+
 @async_task
 @run_in_process
 def log(message):
@@ -122,12 +128,10 @@ def hello(names):
       200:
         description: hello
     """
-    if len(names) > 1:
-        if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
-            poller.notify('hello', 'queue:hello')
-    else:
-        async_task.post(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=5))
-    return f'say hello {names}'
+    gevent.sleep(0.2)
+    tick = redis.incr('tick')
+    logging.warning(f'tick {tick}')
+    return f'say hello {names} {tick}'
 
 
 @app.route('/stream')
