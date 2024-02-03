@@ -4,17 +4,18 @@ import socket
 import string
 import uuid
 from datetime import timedelta
-from typing import Callable
+from typing import Callable, Type, Union
 from inspect import signature, Parameter
+from binascii import crc32
+from collections import defaultdict
+from random import shuffle
 from functools import lru_cache, wraps
-from typing import Type, Union
+from pydantic import BaseModel
+from yaml import safe_dump
 from redis import Redis, RedisCluster
 from redis.lock import Lock, LockError
 from werkzeug.routing import BaseConverter
-from random import shuffle
-from collections import defaultdict
 import gevent
-from pydantic import BaseModel
 from gevent.local import local
 
 
@@ -218,3 +219,8 @@ def redis_name(redis: Union[Redis, RedisCluster]):
         port = kwargs.get('port', 6379)
         db = kwargs.get('db', 0)
         return f'{host}:{port}/{db}'
+
+
+def stable_hash(o):
+    s = safe_dump(o)
+    return crc32(s.encode())
