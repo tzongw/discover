@@ -133,13 +133,14 @@ def hello(names):
 @app.route('/echo/<message>')
 def echo(message):
     gevent.sleep(0.1)
-    if request.headers.get('If-None-Match') == redis.get('tick'):
+    tick = redis.get('tick')
+    if request.headers.get('If-None-Match') == f'W/"{tick}"':
         return current_app.make_response(('', 304))
     tick = redis.incr('tick')
     logging.warning(f'tick {tick}')
     response = current_app.make_response(f'say hello {message} {tick}')
     response.headers['Cache-Control'] = 'max-age=10'
-    response.headers['ETag'] = str(tick)
+    response.headers['ETag'] = f'W/"{tick}"'
     return response
 
 
