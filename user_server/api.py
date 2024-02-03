@@ -16,7 +16,7 @@ from webargs import fields
 from webargs.flaskparser import use_kwargs
 from marshmallow.validate import Range
 from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker
+from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
 from base.poller import PollStatus
 import gevent
 from gevent import pywsgi
@@ -180,7 +180,7 @@ def create_document(collection: str, **kwargs):
     if key is not None and coll.get(key):
         raise NotUniqueError(f'document `{key}` already exists')
     doc = coll(**kwargs).save()
-    doc.invalidate()  # notify full cache new document created
+    doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
 
 
@@ -197,7 +197,7 @@ def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.modify(**kwargs)
-    doc.invalidate()
+    doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
 
@@ -207,7 +207,7 @@ def delete_documents(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.delete()
-    doc.invalidate()
+    doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
 
@@ -229,7 +229,7 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
         doc_ids = [doc.id for doc in docs]
         coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
         for doc in docs:
-            doc.invalidate()
+            doc.invalidate(invalidator)
 
 
 @app.route('/eval', methods=['POST'])

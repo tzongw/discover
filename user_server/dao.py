@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from base.utils import CaseDict
 from config import options
 import const
-from base import FullCache, Cache
+from base import FullCache, Cache, Invalidator
 from shared import invalidator, id_generator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
@@ -83,7 +83,7 @@ class CacheMixin(GetterMixin):
     def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
         return super().mget(keys)  # ignore only
 
-    def invalidate(self):
+    def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)
 
     @staticmethod

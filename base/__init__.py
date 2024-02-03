@@ -5,7 +5,7 @@ from yaml.constructor import SafeConstructor
 from datetime import timedelta
 from .utils import LogSuppress, Addr, ip_address, ListConverter, stream_name, run_in_thread
 from .single_flight import SingleFlight, single_flight
-from .parser import create_parser
+from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, IdGenerator
 from .chunk import batched
 from .defer import deferrable, defer_if, defer
@@ -14,7 +14,7 @@ from .thrift_pool import ThriftPool
 from .executor import Executor
 from .dispatcher import Dispatcher, TimeDispatcher
 from .schedule import Schedule
-from .invalidator import create_invalidator
+from .invalidator import create_invalidator, Invalidator
 from .mq import Receiver, Publisher
 from .registry import Registry
 from .service import Service
