@@ -4,20 +4,21 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, Any, Optional, Union, Type, Self
-from pymongo import monitoring
-from mongoengine import Document, IntField, StringField, connect, DoesNotExist, DateTimeField, FloatField, EnumField, \
+from typing import Union, Type, Self
+from mongoengine import Document, IntField, StringField, connect, DateTimeField, FloatField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
-from sqlalchemy import Column
-from sqlalchemy import create_engine
+from pymongo import monitoring
 from sqlalchemy import BigInteger
+from sqlalchemy import Column
 from sqlalchemy import String
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from base.utils import CaseDict
-from config import options
 import const
-from base import FullCache, Cache, Invalidator
+from base import FullCache, Cache
+from base.utils import CaseDict
+from base.misc import CacheMixin
+from config import options
 from shared import invalidator, id_generator
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
@@ -37,70 +38,6 @@ class Account(Base):
 
 
 Base.metadata.create_all(engine)
-
-
-class GetterMixin:
-    id: Any
-    objects: Callable
-    _fields: dict
-    _data: dict
-    __include__ = None
-
-    @classmethod
-    def mget(cls, keys, *, only=()) -> list[Optional[Self]]:
-        if not keys:
-            return []
-        query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query).only(*only).limit(len(keys))}
-        return [mapping.get(cls.id.to_python(k)) for k in keys]
-
-    @classmethod
-    def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
-        value = cls.mget([key], only=only)[0]
-        if value is None:
-            if ensure:
-                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
-            if default:
-                value = cls(**{cls.id.name: cls.id.to_python(key)})
-        return value
-
-    def to_dict(self, include=None, exclude=None):
-        if exclude is not None:
-            assert not include, '`include`, `exclude` are mutually exclusive'
-            include = [field for field in self._fields if field not in exclude and not field.startswith('_')]
-        if include is None:
-            include = self.__include__
-        assert include, 'NO specified fields'
-        return {k: v for k, v in self._data.items() if k in include}
-
-
-class CacheMixin(GetterMixin):
-    @classmethod
-    def make_key(cls, key, *_, **__):
-        return cls.id.to_python(key)  # ignore only
-
-    @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
-        return super().mget(keys)  # ignore only
-
-    def invalidate(self, invalidator: Invalidator):
-        invalidator.publish(self.__class__.__name__, self.id)
-
-    @staticmethod
-    def fields_expire(*fields):
-        def get_expire(values):
-            now = datetime.now()
-            expires = [doc[field] for doc in values for field in fields if doc[field] >= now]
-            return min(expires) if expires else None
-
-        return get_expire
-
-
-class FlashCacheMixin(CacheMixin):
-    @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
-        return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
-
 
 collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = CaseDict()
 

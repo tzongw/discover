@@ -3,20 +3,20 @@ import logging
 import socket
 import string
 import uuid
-from datetime import timedelta
-from typing import Callable, Type, Union
-from inspect import signature, Parameter
 from binascii import crc32
 from collections import defaultdict
-from random import shuffle
+from datetime import timedelta
 from functools import lru_cache, wraps
-from pydantic import BaseModel
-from yaml import safe_dump
-from redis import Redis, RedisCluster
-from redis.lock import Lock, LockError
-from werkzeug.routing import BaseConverter
+from inspect import signature, Parameter
+from random import shuffle
+from typing import Callable, Type, Union
+
 import gevent
 from gevent.local import local
+from pydantic import BaseModel
+from redis import Redis, RedisCluster
+from redis.lock import Lock, LockError
+from yaml import safe_dump
 
 
 class LogSuppress(contextlib.suppress):
@@ -71,19 +71,6 @@ def var_args(f: Callable):
         return f(*args, **kwargs)
 
     return wrapper
-
-
-class ListConverter(BaseConverter):
-    def __init__(self, map, type=str, sep=','):
-        super().__init__(map)
-        self.type = type
-        self.sep = sep
-
-    def to_python(self, value):
-        return [self.type(v) for v in value.split(self.sep)]
-
-    def to_url(self, value):
-        return self.sep.join([str(v) for v in value])
 
 
 _kw_mark = object()
@@ -224,3 +211,7 @@ def redis_name(redis: Union[Redis, RedisCluster]):
 def stable_hash(o):
     s = safe_dump(o)
     return crc32(s.encode())
+
+
+def etag(o):
+    return base62(stable_hash(o))

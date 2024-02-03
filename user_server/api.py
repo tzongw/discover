@@ -1,78 +1,34 @@
 # -*- coding: utf-8 -*-
-import dataclasses
 import functools
+import json
+import logging
 import time
 import uuid
 from collections import OrderedDict
-import logging
-import json
-from datetime import datetime, date, timedelta
+from datetime import timedelta
+from hashlib import sha1
+
 import flask
+import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
-from flask.app import DefaultJSONProvider, Flask
-from mongoengine import NotUniqueError, EmbeddedDocument
-from pydantic import BaseModel
+from gevent import pywsgi
+from marshmallow.validate import Range
+from mongoengine import NotUniqueError
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from marshmallow.validate import Range
-from dao import Account, Session, GetterMixin, collections
-from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
+
+import models
 from base.poller import PollStatus
-import gevent
-from gevent import pywsgi
+from base.utils import base62
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN
+from dao import Account, Session, collections
+from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
 from shared import session_key, async_task, run_in_process
-from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
-from base.utils import ListConverter, base62
-from flasgger import Swagger
-from hashlib import sha1
-import models
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
-
-
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, GetterMixin):
-            return o.to_dict()
-        elif isinstance(o, BaseModel):
-            return o.dict()
-        elif isinstance(o, datetime):
-            return o.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(o, date):
-            return o.strftime('%Y-%m-%d')
-        elif isinstance(o, timedelta):
-            return o.total_seconds()
-        elif isinstance(o, EmbeddedDocument):
-            return o.to_mongo().to_dict()
-        return super().default(o)
-
-
-class JSONProvider(DefaultJSONProvider):
-    def dumps(self, obj, **kwargs) -> str:
-        return json.dumps(obj, cls=JSONEncoder, **kwargs)
-
-
-app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
-app.url_map.converters['list'] = ListConverter
-app.json = JSONProvider(app)
-
-
-def make_response(rv):
-    if rv is None:
-        rv = {}
-    elif isinstance(rv, GetterMixin):
-        rv = rv.to_dict()
-    elif isinstance(rv, BaseModel):
-        rv = rv.dict()
-    elif dataclasses.is_dataclass(rv):
-        rv = dataclasses.asdict(rv)
-    return Flask.make_response(app, rv)
-
-
-app.make_response = make_response
 
 
 def serve():
@@ -373,4 +329,3 @@ def whoami():
 
 
 app.register_blueprint(bp)
-swagger = Swagger(app)
