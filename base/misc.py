@@ -44,8 +44,8 @@ class JSONEncoder(json.JSONEncoder):
 
 
 class JSONProvider(DefaultJSONProvider):
-    def dumps(self, obj, **kwargs) -> str:
-        return json.dumps(obj, cls=JSONEncoder, **kwargs)
+    def dumps(self, obj, cls=JSONEncoder, default=None, **kwargs) -> str:
+        return super().dumps(obj, cls=cls, default=default, **kwargs)
 
 
 def make_response(app, rv):

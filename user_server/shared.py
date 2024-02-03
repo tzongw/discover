@@ -6,12 +6,15 @@ from flask import Flask
 from base import ListConverter
 from base.misc import JSONProvider, make_response
 from base.cache import TTLCache
+import const
 from models import Session
 
 app = Flask(__name__)
 app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
+app.json.ensure_ascii = False
+app.debug = options.env is const.Environment.DEV
 app.make_response = functools.partial(make_response, app)
 swagger = Swagger(app)
 
