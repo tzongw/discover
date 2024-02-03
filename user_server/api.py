@@ -8,7 +8,7 @@ import logging
 import json
 from datetime import datetime, date, timedelta
 import flask
-from flask import Blueprint, g, request, stream_with_context
+from flask import Blueprint, g, request, stream_with_context, current_app
 from flask.app import DefaultJSONProvider, Flask
 from mongoengine import NotUniqueError, EmbeddedDocument
 from pydantic import BaseModel
@@ -128,6 +128,19 @@ def hello(names):
     else:
         async_task.post(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=5))
     return f'say hello {names}'
+
+
+@app.route('/echo/<message>')
+def echo(message):
+    gevent.sleep(0.1)
+    if request.headers.get('If-None-Match') == redis.get('tick'):
+        return current_app.make_response(('', 304))
+    tick = redis.incr('tick')
+    logging.warning(f'tick {tick}')
+    response = current_app.make_response(f'say hello {message} {tick}')
+    response.headers['Cache-Control'] = 'max-age=10'
+    response.headers['ETag'] = str(tick)
+    return response
 
 
 @app.route('/stream')
