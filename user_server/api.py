@@ -135,7 +135,7 @@ def echo(message):
     gevent.sleep(0.1)
     tick = redis.get('tick')
     if request.headers.get('If-None-Match') == f'W/"{tick}"':
-        return current_app.make_response(('', 304))
+        return '', 304
     tick = redis.incr('tick')
     logging.warning(f'tick {tick}')
     response = current_app.make_response(f'say hello {message} {tick}')
