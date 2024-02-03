@@ -5,11 +5,12 @@ import json
 from datetime import datetime, date, timedelta
 from typing import Any, Callable, Optional, Self
 
+from flask.app import DefaultJSONProvider, Flask
 from mongoengine import EmbeddedDocument, DoesNotExist
 from pydantic import BaseModel
 from werkzeug.routing import BaseConverter
 
-from base import Invalidator
+from .invalidator import Invalidator
 
 
 class ListConverter(BaseConverter):
@@ -42,6 +43,11 @@ class JSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+class JSONProvider(DefaultJSONProvider):
+    def dumps(self, obj, **kwargs) -> str:
+        return json.dumps(obj, cls=JSONEncoder, **kwargs)
+
+
 def make_response(app, rv):
     if rv is None:
         rv = {}
@@ -51,7 +57,7 @@ def make_response(app, rv):
         rv = rv.dict()
     elif dataclasses.is_dataclass(rv):
         rv = dataclasses.asdict(rv)
-    return app.make_response(rv)
+    return Flask.make_response(app, rv)
 
 
 class GetterMixin:

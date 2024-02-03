@@ -15,7 +15,7 @@ from service import user
 from shared import dispatcher, app, online_key, redis, session_key
 from config import options
 from base import create_parser
-import helpers
+import push
 
 
 class Handler:
@@ -103,12 +103,12 @@ class Handler:
             with shared.gate_service.client(address) as client:
                 client.join_group(conn_id, const.ROOM)
                 client.set_context(conn_id, const.CTX_GROUP, const.ROOM)
-            helpers.broadcast(const.ROOM, f'sys: {uid} join')
+            push.broadcast(const.ROOM, f'sys: {uid} join')
         elif message == 'leave':
             with shared.gate_service.client(address) as client:
                 client.leave_group(conn_id, const.ROOM)
                 client.unset_context(conn_id, const.CTX_GROUP, const.ROOM)
-            helpers.broadcast(const.ROOM, f'sys: {uid} leave')
+            push.broadcast(const.ROOM, f'sys: {uid} leave')
         else:
             if not group:
                 with shared.gate_service.client(address) as client:
