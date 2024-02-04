@@ -6,7 +6,8 @@ from typing import Callable, Optional
 from dataclasses import dataclass
 from contextlib import suppress
 from redis import Redis
-from redis.lock import Lock, LockError
+from redis.lock import Lock
+from redis.exceptions import LockError
 from .task import AsyncTask
 from .defer import deferrable, defer_if, Result
 

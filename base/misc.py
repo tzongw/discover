@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import uuid
 from datetime import datetime, date, timedelta
-from typing import Any, Callable, Optional, Self
+from random import shuffle
+from typing import Any, Callable, Optional, Self, Union
 
 from flask.app import DefaultJSONProvider, Flask
+from gevent.local import local
 from mongoengine import EmbeddedDocument, DoesNotExist
 from pydantic import BaseModel
+from redis import Redis, RedisCluster
+from redis.lock import Lock
+from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 
 from .invalidator import Invalidator
@@ -121,3 +127,71 @@ class FlashCacheMixin(CacheMixin):
     @classmethod
     def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
         return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
+
+
+class Semaphore:
+    def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
+        self.redis = redis
+        self.names = [f'{name}_{i}' for i in range(value)]
+        self.timeout = timeout
+        self.local = local()
+        self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
+        self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
+
+    def __enter__(self):
+        assert not self.local.__dict__, 'recursive lock'
+        token = str(uuid.uuid4())
+        shuffle(self.names)
+        for name in self.names:
+            if self.redis.set(name, token, nx=True, px=self.timeout):
+                self.local.name = name
+                self.local.token = token
+                return self
+        raise LockError('Unable to acquire lock')
+
+    def __exit__(self, exctype, excinst, exctb):
+        keys = [self.local.name]
+        args = [self.local.token]
+        del self.local.name
+        del self.local.token
+        self.lua_release(keys=keys, args=args)
+
+    def reacquire(self):
+        timeout = int(self.timeout.total_seconds() * 1000)
+        name, token = self.local.name, self.local.token
+        if self.lua_reacquire(keys=[name], args=[token, timeout]):
+            return
+        raise LockError('Lock not owned')
+
+    def acquired(self):
+        return sum(self.redis.exists(*self.names))
+
+
+class Stocks:
+    def __init__(self, redis: Union[Redis, RedisCluster]):
+        self.redis = redis
+
+    def reset(self, key, total=0, expire=None):
+        assert total >= 0
+        with self.redis.pipeline(transaction=False) as pipe:
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            if expire is not None:
+                pipe.expire(key, expire)
+            pipe.execute()
+
+    def get(self, key):
+        return self.mget([key])
+
+    def mget(self, keys):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                pipe.bitfield(key).get(fmt='u32', offset=0).execute()
+            return [values[0] for values in pipe.execute()]
+
+    def incrby(self, key, total):
+        assert total >= 0
+        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()[0]
+
+    def try_lock(self, key, hint=None) -> bool:
+        bitfield = self.redis.bitfield(key, default_overflow='FAIL')
+        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None

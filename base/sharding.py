@@ -9,7 +9,8 @@ import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
-from .utils import stream_name, Stocks
+from .utils import stream_name
+from .misc import Stocks
 from .timer import Timer
 from .chunk import batched
 
