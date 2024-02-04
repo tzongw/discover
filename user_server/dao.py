@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Union, Type, Self
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, FloatField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
@@ -76,7 +76,7 @@ class BooleanFieldEx(BooleanField):
         return False if value in ['false', '0'] else bool(value)
 
 
-class CRUD(Enum):
+class CRUD(StrEnum):
     CREATE = 'create'
     READ = 'read'
     UPDATE = 'update'
@@ -155,7 +155,7 @@ cache.listen(invalidator, Setting.__name__)
 Setting.mget = cache.mget
 
 
-class Status(Enum):
+class Status(StrEnum):
     OK = 'ok'
     ERROR = 'error'
 
