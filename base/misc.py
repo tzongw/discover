@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional, Self, Union
 
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
-from mongoengine import EmbeddedDocument, DoesNotExist
+from mongoengine import EmbeddedDocument, DoesNotExist, FloatField
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -195,3 +195,23 @@ class Stocks:
     def try_lock(self, key, hint=None) -> bool:
         bitfield = self.redis.bitfield(key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+
+
+class TimeDeltaField(FloatField):
+    def __init__(self, min_value=None, max_value=None, **kwargs):
+        if isinstance(min_value, timedelta):
+            min_value = min_value.total_seconds()
+        if isinstance(max_value, timedelta):
+            max_value = max_value.total_seconds()
+        super().__init__(min_value, max_value, **kwargs)
+
+    def prepare_query_value(self, op, value):
+        value = self.to_mongo(value)
+        return super().prepare_query_value(op, value)
+
+    def to_mongo(self, value):
+        return value.total_seconds() if isinstance(value, timedelta) else super().to_python(value)  # yes, to_python
+
+    def to_python(self, value):
+        value = super().to_python(value)
+        return timedelta(seconds=value) if isinstance(value, float) else value

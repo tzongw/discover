@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Union, Type, Self
-from mongoengine import Document, IntField, StringField, connect, DateTimeField, FloatField, EnumField, \
+from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from pymongo import monitoring
 from sqlalchemy import BigInteger
@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.utils import CaseDict
-from base.misc import CacheMixin
+from base.misc import CacheMixin, TimeDeltaField
 from config import options
 from shared import invalidator, id_generator
 
@@ -48,34 +48,6 @@ def collection(coll):
     return coll
 
 
-class TimeDeltaField(FloatField):
-    def __init__(self, min_value=None, max_value=None, **kwargs):
-        if isinstance(min_value, timedelta):
-            min_value = min_value.total_seconds()
-        if isinstance(max_value, timedelta):
-            max_value = max_value.total_seconds()
-        super().__init__(min_value, max_value, **kwargs)
-
-    def prepare_query_value(self, op, value):
-        value = self.to_mongo(value)
-        return super().prepare_query_value(op, value)
-
-    def to_mongo(self, value):
-        return value.total_seconds() if isinstance(value, timedelta) else super().to_python(value)  # yes, to_python
-
-    def to_python(self, value):
-        value = super().to_python(value)
-        return timedelta(seconds=value) if isinstance(value, float) else value
-
-
-class BooleanFieldEx(BooleanField):
-    def prepare_query_value(self, op, value):
-        return super().prepare_query_value(op, self.to_mongo(value))
-
-    def to_mongo(self, value):
-        return False if value in ['false', '0'] else bool(value)
-
-
 class CRUD(StrEnum):
     CREATE = 'create'
     READ = 'read'
@@ -98,7 +70,7 @@ class Role(Document, CacheMixin):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
-    admin = BooleanFieldEx(default=False)
+    admin = BooleanField(default=False)
     privileges = EmbeddedDocumentListField(Privilege, required=True)
 
     def can_access(self, coll, op: CRUD):
