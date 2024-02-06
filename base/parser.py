@@ -20,11 +20,6 @@ def mget_callback(response, convert=None):
     return [convert(value) for value in response] if convert else response
 
 
-def hgetall_callback(response, convert=None):
-    response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
-    return convert(response) if convert else response
-
-
 def patch_callbacks(callbacks):
     if 'SET_ORIG' in callbacks:  # already done
         return
@@ -35,8 +30,6 @@ def patch_callbacks(callbacks):
     callbacks['GETEX'] = callback
     callbacks['HMGET'] = callback
     callbacks['MGET'] = mget_callback
-    callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
-    callbacks['HGETALL'] = hgetall_callback
 
 
 patch_callbacks(Redis.RESPONSE_CALLBACKS)
@@ -88,21 +81,15 @@ class Parser:
         mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
         return self._redis.mset(mapping)
 
-    def hget(self, name, cls: Type[M], *, include=None, exclude=None) -> Optional[M]:
-        if exclude is not None:
-            assert not include, '`include`, `exclude` are mutually exclusive'
+    def hget(self, name, cls: Type[M], *, include=(), exclude=()) -> Optional[M]:
+        if not include:
             include = [field for field in cls.__fields__ if field not in exclude]
-        if include:
-            def convert(values):
-                mapping = {k: v for k, v in zip(include, values) if v is not None}
-                return cls.parse_obj(mapping)
 
-            return self._redis.execute_command('HMGET', name, *include, convert=convert)
-        else:
-            def convert(mapping):
-                return cls.parse_obj(mapping) if mapping else None
+        def convert(values):
+            mapping = {k: v for k, v in zip(include, values) if v is not None}
+            return cls.parse_obj(mapping)
 
-            return self._redis.execute_command('HGETALL', name, convert=convert)
+        return self._redis.execute_command('HMGET', name, *include, convert=convert)
 
     def hset(self, name: str, model: M) -> int:
         mapping = model.dict(exclude_unset=True)
