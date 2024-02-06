@@ -9,3 +9,10 @@ class Online(BaseModel):
 
 class Session(BaseModel):
     token: str
+
+
+class Runtime(BaseModel):
+    address: str
+    pid: int
+    app_id: int
+    log_level: str

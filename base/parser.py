@@ -87,7 +87,7 @@ class Parser:
 
         def convert(values):
             mapping = {k: v for k, v in zip(include, values) if v is not None}
-            return cls.parse_obj(mapping)
+            return cls.parse_obj(mapping) if mapping else None
 
         return self._redis.execute_command('HMGET', name, *include, convert=convert)
 
