@@ -202,6 +202,12 @@ def args_error(e: UnprocessableEntity):
     return e.data['messages']
 
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.exception(f'{request.path}, {request.args}, {request.data}')
+    return '', 500
+
+
 def hash_password(uid: int, password: str) -> str:
     # uid as salt
     return sha1(f'{uid}{password}'.encode()).hexdigest()
