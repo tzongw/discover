@@ -91,13 +91,12 @@ class GetterMixin:
                 value = cls(**{cls.id.name: cls.id.to_python(key)})
         return value
 
-    def to_dict(self, include=(), exclude=()):
-        if exclude:
+    def to_dict(self, include=(), exclude=None):
+        if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
             include = [field for field in self._fields if field not in exclude and not field.startswith('_')]
-        if not include:
+        elif not include:
             include = self.__include__
-        assert include, 'NO specified fields'
         return {k: v for k, v in self._data.items() if k in include}
 
 

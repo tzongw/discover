@@ -84,6 +84,8 @@ class Parser:
     def hget(self, name, cls: Type[M], *, include=(), exclude=()) -> Optional[M]:
         if not include:
             include = [field for field in cls.__fields__ if field not in exclude]
+        else:
+            assert not exclude, '`include`, `exclude` are mutually exclusive'
 
         def convert(values):
             mapping = {k: v for k, v in zip(include, values) if v is not None}
