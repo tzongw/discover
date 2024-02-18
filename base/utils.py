@@ -8,7 +8,6 @@ from functools import lru_cache, wraps
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 
-import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from yaml import safe_dump
@@ -87,12 +86,6 @@ def func_desc(func):
         return f'{func.__module__}.{func.__name__}'
     except AttributeError:
         return str(func)
-
-
-def run_in_thread(fn, *args, **kwargs):
-    pool = gevent.get_hub().threadpool
-    result = pool.spawn(fn, *args, **kwargs).get()
-    return result
 
 
 class DefaultDict(defaultdict):

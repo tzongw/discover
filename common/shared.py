@@ -67,12 +67,11 @@ if options.env is const.Environment.DEV:
     # in dev, run in worker to debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
-if options.env is not const.Environment.STAGING:
-    # staging should not impact prod
-    @receiver.group(const.TICK_STREAM)
-    def _on_tick(_, sid):
-        ts = int(sid[:-2])
-        tick.dispatch(ts)
+
+@receiver.group(const.TICK_STREAM)
+def _on_tick(_, sid):
+    ts = int(sid[:-2])
+    tick.dispatch(ts)
 
 
 @dataclass
