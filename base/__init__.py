@@ -3,7 +3,7 @@ from redis import Redis, RedisCluster
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from datetime import timedelta
-from .utils import LogSuppress, Addr, ip_address, stream_name, run_in_thread
+from .utils import LogSuppress, Addr, ip_address, stream_name
 from .misc import ListConverter
 from .single_flight import SingleFlight, single_flight
 from .parser import create_parser, Parser
