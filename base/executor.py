@@ -62,15 +62,8 @@ class Executor:
         futures = [self.submit(fn) for fn in fns]
         return [fut.result() for fut in futures]
 
-    def wait(self, fns):
-        futures = [self.submit(fn) for fn in fns]
-        return [fut.exception() for fut in futures]
-
-    def map_gather(self, fn: Callable, args):
-        return self.gather(partial(fn, arg) for arg in args)
-
-    def map_wait(self, fn: Callable, args):
-        return self.wait(partial(fn, arg) for arg in args)
+    def map(self, fn: Callable, args):
+        return self.gather([partial(fn, arg) for arg in args])
 
     def _adjust_workers(self):
         if self._workers < self._unfinished <= self._max_workers:

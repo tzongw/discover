@@ -97,6 +97,7 @@ def at_exit(fun):
 
 
 def init_main():
+    assert not status.inited
     status.inited = True
     executor.gather(_mains)
     _mains.clear()
@@ -107,13 +108,15 @@ atexit.register(unique_id.stop)  # after cleanup
 
 @atexit.register
 def _cleanup():
+    if status.exiting:
+        return
     status.exiting = True
     with LogSuppress():
         if options.env is const.Environment.DEV:  # ptpython compatible
             for fn in _exits:
                 fn()
         else:
-            executor.wait(_exits)
+            executor.gather(_exits)
     _exits.clear()
 
 
