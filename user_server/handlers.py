@@ -6,7 +6,7 @@ from datetime import timedelta, datetime
 from base import ip_address
 from common.messages import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, registry, timer, invalidator, \
-    async_task, at_main, tick, run_in_worker, app_id, parser, redis
+    async_task, at_main, tick, run_in_worker, app_name, app_id, parser, redis
 from models import Runtime
 from dao import Account
 
@@ -48,7 +48,7 @@ def session_invalidate(key):
 
 @invalidator.handler(f'runtime')
 def runtime_invalidate(key):
-    if key != str(app_id):
+    if key != f'{app_name}:{app_id}':
         return
     runtime = parser.hget(f'runtime:{key}', Runtime)
     if not runtime:
@@ -95,6 +95,7 @@ def init():
     timer.tick(const.TICK_TIMER, const.TICK_STREAM)
     at_exit(lambda: timer.kill(const.TICK_TIMER))
     log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
-    runtime = Runtime(address=ip_address(), pid=os.getpid(), app_id=app_id, log_level=log_level)
-    parser.hset(f'runtime:{app_id}', runtime)
-    at_exit(lambda: redis.delete(f'runtime:{app_id}'))
+    runtime = Runtime(address=ip_address(), pid=os.getpid(), log_level=log_level)
+    key = f'runtime:{app_name}:{app_id}'
+    parser.hset(key, runtime)
+    at_exit(lambda: redis.delete(key))

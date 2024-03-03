@@ -14,5 +14,4 @@ class Session(BaseModel):
 class Runtime(BaseModel):
     address: str
     pid: int
-    app_id: int
     log_level: str
