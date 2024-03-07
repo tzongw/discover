@@ -100,6 +100,17 @@ def echo(message):
     return response
 
 
+@invalidator.getter('future')
+def getter(key):
+    return redis.get(f'future:{key}')
+
+
+@app.route('/future/<key>')
+def get_future(key):
+    fut = invalidator.future('future', key)
+    return fut.result(30)
+
+
 @app.route('/stream')
 def streaming_response():
     def generate():

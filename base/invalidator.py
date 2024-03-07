@@ -16,14 +16,23 @@ class Invalidator:
         self.sep = sep
         self.dispatcher = Dispatcher(executor=Executor(name='invalidator'))
         self.futures = WeakValueDictionary()
+        self.getters = {}
 
     @property
     def handler(self):
         return self.dispatcher.handler
 
+    def getter(self, group):
+        def decorator(f):
+            assert group not in self.getters
+            self.getters[group] = f
+            return f
+
+        return decorator
+
     @property
     def groups(self):
-        return self.dispatcher.handlers.keys()
+        return self.dispatcher.handlers.keys() | self.getters.keys()
 
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
@@ -74,10 +83,11 @@ class Invalidator:
                 if isinstance(data, (bytes, str)):
                     data = [data]
                 for full_key in data:
-                    if fut := self.futures.pop(full_key, None):
-                        fut.set_result(None)
                     group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
+                    if fut := self.futures.pop(full_key, None):
+                        value = self.getters[group](key)
+                        fut.set_result(value)
             except Exception:
                 logging.exception(f'')
                 sub = None
