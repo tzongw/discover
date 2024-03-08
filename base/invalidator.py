@@ -14,7 +14,8 @@ class Invalidator:
     def __init__(self, redis: Union[Redis, RedisCluster], sep=':'):
         self.redis = redis
         self.sep = sep
-        self.dispatcher = Dispatcher(executor=Executor(name='invalidator'))
+        self.executor = Executor(name='invalidator')
+        self.dispatcher = Dispatcher(self.executor)
         self.futures = WeakValueDictionary()
         self.getters = {}
 
@@ -54,6 +55,13 @@ class Invalidator:
         full_key = f'{group}{self.sep}{key}'
         self.redis.publish('__redis__:invalidate', full_key)
 
+    def _get_result(self, fut: Future, group, key):
+        try:
+            value = self.getters[group](key)
+            fut.set_result(value)
+        except Exception as e:
+            fut.set_exception(e)
+
     def _run(self, redis, subscribe=True):
         sub = None
         while True:
@@ -86,11 +94,7 @@ class Invalidator:
                     group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
                     if fut := self.futures.pop(full_key, None):
-                        try:
-                            value = self.getters[group](key)
-                            fut.set_result(value)
-                        except Exception as e:
-                            fut.set_exception(e)
+                        self.executor.submit(self._get_result, fut, group, key)
             except Exception:
                 logging.exception(f'')
                 sub = None
