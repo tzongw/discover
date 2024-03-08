@@ -13,3 +13,9 @@
 # Related projects
 1. [redis-timer](https://github.com/tzongw/redis-timer), a distributed timer via redis module
 2. [registry](https://github.com/tzongw/registry), a gateway server implemented in golang
+
+## Thanks
+Thanks JetBrains support provided by [OpenSourceSupport](https://www.jetbrains.com/community/opensource/#support) : )
+<div align="center">
+<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg" width="200" height="200"/>
+</div>
