@@ -24,7 +24,7 @@ class Invalidator:
 
     def getter(self, group):
         def decorator(f):
-            assert group not in self.getters
+            assert self.sep not in group and group not in self.getters
             self.getters[group] = f
             return f
 
@@ -42,7 +42,7 @@ class Invalidator:
             self.dispatcher.dispatch(group, '')
 
     def future(self, group, key):
-        assert self.sep not in group
+        assert group in self.getters
         full_key = f'{group}{self.sep}{key}'
         fut = self.futures.get(full_key)
         if not fut:
@@ -86,8 +86,11 @@ class Invalidator:
                     group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
                     if fut := self.futures.pop(full_key, None):
-                        value = self.getters[group](key)
-                        fut.set_result(value)
+                        try:
+                            value = self.getters[group](key)
+                            fut.set_result(value)
+                        except Exception as e:
+                            fut.set_exception(e)
             except Exception:
                 logging.exception(f'')
                 sub = None
