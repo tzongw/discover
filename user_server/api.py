@@ -25,7 +25,7 @@ from config import options, ctx
 from const import CTX_UID, CTX_TOKEN
 from dao import Account, Session, collections
 from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
-from shared import session_key, async_task, run_in_process
+from shared import session_key, async_task, run_in_process, script
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
@@ -107,8 +107,18 @@ def getter(key):
 
 @app.route('/future/<key>')
 def get_future(key):
-    fut = invalidator.future('future', key)
-    return fut.result(30)
+    full_key = f'future:{key}'
+    placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
+    value = redis.set(full_key, placeholder, nx=True, ex=10, get=True)
+    if value is None:  # first request
+        gevent.sleep(5)
+        value = options.http_address
+        script.compare_set(full_key, placeholder, value, expire=timedelta(seconds=20))
+        return value
+    if value.startswith('PLACEHOLDER-'):  # wait for others
+        fut = invalidator.future('future', key)
+        return fut.result(10)
+    return value  # cached
 
 
 @app.route('/stream')
