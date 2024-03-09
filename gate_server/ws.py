@@ -92,8 +92,7 @@ class Client:
     def _writer(self):
         logging.debug(f'start {self}')
         try:
-            timeout = 1 + random.random() * const.PING_INTERVAL
-            while message := self.messages.get(timeout=timeout):
+            while message := self.messages.get_nowait():
                 self.ws.send(message)
         except queue.Empty:
             logging.debug(f'idle {self}')

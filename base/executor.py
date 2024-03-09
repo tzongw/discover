@@ -66,7 +66,7 @@ class Executor:
         return self.gather([partial(fn, arg) for arg in args])
 
     def _adjust_workers(self):
-        if self._workers < self._unfinished <= self._max_workers:
+        if self._workers < self._unfinished and self._workers < self._max_workers:
             self._workers += 1
             gevent.spawn(self._worker)
             logging.debug(f'+ worker {self}')
@@ -78,7 +78,7 @@ class Executor:
     def _worker(self):
         try:
             while True:
-                item = self._items.get(block=self._idle > 0, timeout=self._idle)  # type: _WorkItem
+                item = self._items.get(timeout=self._idle)  # type: _WorkItem
                 if self._overload and len(self._items) <= self._max_workers:
                     self._overload = False
                     logging.warning(f'- overload {self} {item}')
