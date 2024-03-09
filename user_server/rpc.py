@@ -60,10 +60,9 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            online = shared.parser.get(key, Online)
+            online = shared.parser.getex(key, Online, ex=self.ONLINE_TTL)
             if online is None or online.conn_id != conn_id:
                 raise ValueError(f'{online} {conn_id}')
-            redis.expire(key, self.ONLINE_TTL)
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
