@@ -63,7 +63,7 @@ class ShardingReceiver(Receiver):
 
     def start(self):
         with self.redis.pipeline(transaction=False) as pipe:
-            streams = set(self._group_dispatcher.handlers) | set(self._fanout_dispatcher.handlers)
+            streams = self._group_dispatcher.keys() | self._fanout_dispatcher.keys()
             for stream in streams:
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):
                     # create group & stream
@@ -71,10 +71,10 @@ class ShardingReceiver(Receiver):
             pipe.execute(raise_on_error=False)  # group already exists
         workers = []
         for streams in zip(
-                *[self._sharding_key.all_sharded_keys(stream) for stream in self._group_dispatcher.handlers]):
+                *[self._sharding_key.all_sharded_keys(stream) for stream in self._group_dispatcher.keys()]):
             workers.append(gevent.spawn(self._group_run, streams))
         for streams in zip(
-                *[self._sharding_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.handlers]):
+                *[self._sharding_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.keys()]):
             workers.append(gevent.spawn(self._fanout_run, streams))
         return workers
 
@@ -85,7 +85,7 @@ class ShardingReceiver(Receiver):
             for waker in self._sharding_key.all_sharded_keys(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
-            for stream in self._group_dispatcher.handlers:
+            for stream in self._group_dispatcher.keys():
                 if stream == self._waker:  # already deleted
                     continue
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):

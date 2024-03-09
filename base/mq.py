@@ -79,20 +79,20 @@ class Receiver:
 
     def start(self):
         with self.redis.pipeline(transaction=False) as pipe:
-            streams = set(self._group_dispatcher.handlers) | set(self._fanout_dispatcher.handlers)
+            streams = self._group_dispatcher.keys() | self._fanout_dispatcher.keys()
             for stream in streams:
                 # create group & stream
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        return [gevent.spawn(self._group_run, self._group_dispatcher.handlers),
-                gevent.spawn(self._fanout_run, self._fanout_dispatcher.handlers)]
+        return [gevent.spawn(self._group_run, self._group_dispatcher.keys()),
+                gevent.spawn(self._fanout_run, self._fanout_dispatcher.keys())]
 
     def stop(self):
         logging.info(f'stop')
         self._stopped = True
         with self.redis.pipeline(transaction=False) as pipe:
             pipe.xadd(self._waker, {'wake': 'up'})
-            for stream in self._group_dispatcher.handlers:
+            for stream in self._group_dispatcher.keys():
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
             pipe.execute(raise_on_error=False)  # stop but no start

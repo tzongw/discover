@@ -10,11 +10,14 @@ from .utils import var_args
 
 class Dispatcher:
     def __init__(self, executor=None):
-        self.handlers = defaultdict(list)
+        self._handlers = defaultdict(list)
         self._executor = executor or Executor(name='dispatch')
 
+    def keys(self):
+        return self._handlers.keys()
+
     def dispatch(self, key, *args, **kwargs):
-        handlers = self.handlers.get(key) or []
+        handlers = self._handlers.get(key) or []
         for handle in handlers:
             self._executor.submit(handle, *args, **kwargs)
 
@@ -24,7 +27,7 @@ class Dispatcher:
 
     def handler(self, key):
         def decorator(f):
-            self.handlers[key].append(var_args(f))
+            self._handlers[key].append(var_args(f))
             return f
 
         return decorator

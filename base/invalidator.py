@@ -33,7 +33,7 @@ class Invalidator:
 
     @property
     def groups(self):
-        return self.dispatcher.handlers.keys() | self.getters.keys()
+        return self.dispatcher.keys() | self.getters.keys()
 
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
