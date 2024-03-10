@@ -45,10 +45,13 @@ class Cache(Generic[T]):
         return value
 
     def _set_value(self, key, value):
-        assert key not in self.lru
+        replace = key in self.lru
         self.lru[key] = value
-        if self.maxsize is not None and len(self.lru) > self.maxsize:
-            self.lru.popitem(last=False)
+        if self.maxsize is not None:
+            if replace:
+                self.lru.move_to_end(key)
+            elif len(self.lru) > self.maxsize:
+                self.lru.popitem(last=False)
 
     def mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = [self.placeholder] * len(keys)
