@@ -23,12 +23,12 @@ def expire_at(expire):
 
 
 class Cache(Generic[T]):
-    # placeholder to avoid race conditions, see https://redis.io/docs/manual/client-side-caching/
     placeholder = object()
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
         self.single_flight = SingleFlight(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
+        self.locks = {}  # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
         self.make_key = make_key
         self.maxsize = maxsize
         self.full_cached = False
@@ -44,20 +44,18 @@ class Cache(Generic[T]):
         value, = self.mget([key], *args, **kwargs)
         return value
 
-    def _hold(self, key):
-        replace = key in self.lru
-        self.lru[key] = self.placeholder
-        if self.maxsize is not None:
-            if replace:
-                self.lru.move_to_end(key)
-            elif len(self.lru) > self.maxsize:
-                self.lru.popitem(last=False)
+    def _set_value(self, key, value):
+        assert key not in self.lru
+        self.lru[key] = value
+        if self.maxsize is not None and len(self.lru) > self.maxsize:
+            self.lru.popitem(last=False)
 
     def mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
+        locked_keys = set()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
@@ -71,13 +69,18 @@ class Cache(Generic[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._hold(made_key)
+                if made_key not in self.locks:
+                    self.locks[made_key] = True
+                    locked_keys.add(made_key)
         if missing_keys:
-            values = self.single_flight.mget(missing_keys, *args, **kwargs)
+            try:
+                values = self.single_flight.mget(missing_keys, *args, **kwargs)
+            finally:
+                locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, value in zip(indexes, made_keys, values):
                 results[index] = value
-                if made_key in self.lru:
-                    self.lru[made_key] = value
+                if made_key in locked_keys:
+                    self._set_value(made_key, value)
         return results
 
     def listen(self, invalidator: Invalidator, group: str, handler: Optional[Callable] = None):
@@ -87,15 +90,21 @@ class Cache(Generic[T]):
             self.invalids += 1
             if not key:
                 self.lru.clear()
+                for key in self.locks:
+                    self.locks[key] = False
                 return
             if handler:
                 key_or_keys = handler(key, *args, **kwargs)
                 keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
                 for key in keys:
                     self.lru.pop(key, None)
+                    if key in self.locks:
+                        self.locks[key] = False
             else:
-                made_key = self.make_key(key, *args, **kwargs)
-                self.lru.pop(made_key, None)
+                key = self.make_key(key, *args, **kwargs)
+                self.lru.pop(key, None)
+                if key in self.locks:
+                    self.locks[key] = False
 
 
 class TTLCache(Cache[T]):
@@ -106,6 +115,7 @@ class TTLCache(Cache[T]):
         missing_keys = []
         made_keys = []
         indexes = []
+        locked_keys = set()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
@@ -119,14 +129,19 @@ class TTLCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._hold(made_key)
+                if made_key not in self.locks:
+                    self.locks[made_key] = True
+                    locked_keys.add(made_key)
         if missing_keys:
-            tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
+            try:
+                tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
+            finally:
+                locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 results[index] = value
-                if made_key in self.lru:
+                if made_key in locked_keys:
                     pair = TTLCache.Pair(value, expire_at(expire))
-                    self.lru[made_key] = pair
+                    self._set_value(made_key, pair)
         return results
 
 
