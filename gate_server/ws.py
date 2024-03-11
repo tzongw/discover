@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
-import random
 from typing import Dict
 from urllib import parse
 from collections import defaultdict
 from typing import Set
 import gevent
 from gevent import pywsgi
-from gevent import queue
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base import utils
@@ -55,7 +53,7 @@ class Client:
         self.conn_id = conn_id
         self.context = {}
         self.ws = ws
-        self.messages = queue.Queue()
+        self.messages = []
         self.groups = set()
         self.writing = False
         self.step = 0
@@ -64,7 +62,7 @@ class Client:
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
-        self.messages.put_nowait(message)
+        self.messages.append(message)
         if self.writing:
             return
         self.writing = True
@@ -90,22 +88,18 @@ class Client:
             client.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
-        logging.debug(f'start {self}')
         try:
-            while message := self.messages.get_nowait():
-                self.ws.send(message)
-        except queue.Empty:
-            logging.debug(f'idle {self}')
-            if self.messages.empty():
+            while self.messages:
+                messages = self.messages
+                self.messages = []
+                for message in messages:
+                    if message is None:
+                        raise StopIteration
+                    self.ws.send(message)
+            else:
                 self.writing = False
-            else:  # race condition, do again
-                gevent.spawn(self._writer)
-        except Exception as e:
-            logging.debug(f'exit {self} {e}')
-            self.ws.close()
-        else:
-            logging.debug(f'stop {self}')
-            self.ws.close()
+        except Exception:
+            self.ws.close()  # keep writing status true
 
     def stop(self):
         self.send(None)
