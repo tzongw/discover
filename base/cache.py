@@ -119,10 +119,11 @@ class TTLCache(Cache[T]):
         made_keys = []
         indexes = []
         locked_keys = set()
+        now = datetime.now()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
-            if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > datetime.now()):
+            if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > now):
                 self.hits += 1
                 results[index] = pair.value
                 if self.maxsize is not None:
