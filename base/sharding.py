@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-import uuid
+import random
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
@@ -24,7 +24,12 @@ class ShardingKey:
         assert not key.startswith('{')
         return [f'{{{i}}}:{key}' for i in range(self.shards)]
 
-    def sharded_key(self, key):
+    def random_sharded_key(self, key: str):
+        assert not key.startswith('{')
+        shard = random.randrange(len(self.shards))
+        return f'{{{shard}}}:{key}'
+
+    def sharded_key(self, key: str):
         return self.sharded_keys(key)[0]
 
     def sharded_keys(self, *keys):
@@ -46,7 +51,7 @@ class ShardingPublisher(Publisher):
 
     def publish(self, message: BaseModel, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
-        stream = self._sharding_key.sharded_key(stream)
+        stream = self._sharding_key.random_sharded_key(stream)
         return super().publish(message, maxlen, stream)
 
 
@@ -232,7 +237,8 @@ class ShardingStocks(Stocks):
 
     def try_lock(self, key, hint=None) -> bool:
         if hint is None:
-            hint = uuid.uuid4()
-        _, sharded_key = self.sharding_key.sharded_keys(str(hint), key)
+            sharded_key = self.sharding_key.random_sharded_key(key)
+        else:
+            _, sharded_key = self.sharding_key.sharded_keys(hint, key)
         bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
