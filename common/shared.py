@@ -36,7 +36,7 @@ redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if o
 unique_id = UniqueId(schedule, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
-hint = f'{options.env.value}:{ip_address()}:{app_id}'
+hint = f'{ip_address()}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
 heavy_task = HeavyTask(redis, 'heavy_tasks')

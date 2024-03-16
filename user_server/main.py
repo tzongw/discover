@@ -19,7 +19,7 @@ from base import LogSuppress
 def main():
     logging.info(f'{app_name} app id: {app_id}')
     workers = [rpc.serve(), api.serve()]
-    if options.env is const.Environment.DEV and options.back_port:
+    if options.back_port:
         from gevent.backdoor import BackdoorServer
         logging.info(f'Starting backdoor: {options.back_port}')
         server = BackdoorServer(('127.0.0.1', options.back_port), locals={'shared': shared})
