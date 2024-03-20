@@ -59,7 +59,7 @@ class Registry:
         return self._addresses.get(name) or set()
 
     def _refresh(self):
-        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=100))
+        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=1000))
         addresses = defaultdict(set)
         for key in keys:
             with LogSuppress():
@@ -93,7 +93,7 @@ class Registry:
                 self._refresh()
                 timeout = self._INTERVAL
                 while msg := sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
-                    logging.info(f'got {msg}')
+                    logging.debug(f'got {msg}')
                     timeout = 0  # exhaust all msgs
             except Exception:
                 logging.exception(f'')
