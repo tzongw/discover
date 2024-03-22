@@ -81,6 +81,7 @@ class Cache(Generic[T]):
             finally:
                 locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, value in zip(indexes, made_keys, values):
+                assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
                 if made_key in locked_keys:
                     self._set_value(made_key, value)
@@ -142,6 +143,7 @@ class TTLCache(Cache[T]):
             finally:
                 locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
+                assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
                 if made_key in locked_keys:
                     pair = TTLCache.Pair(value, expire_at(expire))

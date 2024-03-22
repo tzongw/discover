@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, date, timedelta
 from random import shuffle
 from typing import Any, Callable, Optional, Self, Union
+from types import MappingProxyType
 
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
@@ -46,6 +47,10 @@ class JSONEncoder(json.JSONEncoder):
             return o.total_seconds()
         elif isinstance(o, EmbeddedDocument):
             return o.to_mongo().to_dict()
+        elif isinstance(o, (set, frozenset)):
+            return list(o)
+        elif isinstance(o, MappingProxyType):
+            return o.copy()
         return super().default(o)
 
 
