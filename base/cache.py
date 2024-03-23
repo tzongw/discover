@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable, Sequence
@@ -13,12 +14,14 @@ T = TypeVar('T')
 
 
 def expire_at(expire):
-    if expire is None or isinstance(expire, datetime):
-        return expire
-    if isinstance(expire, (int, float)):
-        return None if expire < 0 else datetime.now() + timedelta(seconds=expire)
+    if expire is None:
+        return float('inf')
+    if isinstance(expire, datetime):
+        return expire.timestamp()
     if isinstance(expire, timedelta):
-        return datetime.now() + expire
+        return time.time() + expire.total_seconds()
+    if isinstance(expire, (int, float)):
+        return float('inf') if expire < 0 else time.time() + expire
     raise ValueError(f'{expire} not valid')
 
 
@@ -120,11 +123,11 @@ class TTLCache(Cache[T]):
         made_keys = []
         indexes = []
         locked_keys = set()
-        now = datetime.now()
+        now = time.time()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
-            if pair is not self.placeholder and (pair.expire_at is None or pair.expire_at > now):
+            if pair is not self.placeholder and pair.expire_at > now:
                 self.hits += 1
                 results[index] = pair.value
                 if self.maxsize is not None:
@@ -198,19 +201,19 @@ class FullMixin(Generic[T]):
                 return f(*args, **kwargs)
 
             cache_version = self._version
-            cache_expire: Optional[datetime] = None
+            cache_expire_at = float('inf')
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
                 nonlocal cache_version
-                nonlocal cache_expire
+                nonlocal cache_expire_at
                 values = self.values  # update version if needed
-                if cache_version != self._version or (cache_expire and cache_expire < datetime.now()):
+                if cache_version != self._version or cache_expire_at < time.time():
                     inner.cache_clear()
                     cache_version = self._version
                     if get_expire:
                         expire = get_expire(values)
-                        cache_expire = expire_at(expire)
+                        cache_expire_at = expire_at(expire)
                 return inner(*args, **kwargs)
 
             wrapper.cache_info = inner.cache_info
