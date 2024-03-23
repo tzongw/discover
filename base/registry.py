@@ -46,7 +46,7 @@ class Registry:
     def register(self, services):
         logging.info(f'register {services}')
         self._services.update(services)
-        self._unregister()  # remove first in case process restarting
+        self._unregister()  # remove first & wake up
 
     def _unregister(self):
         if not self._services:
@@ -90,9 +90,11 @@ class Registry:
                 if not sub:
                     sub = self._redis.pubsub()
                     sub.subscribe(self._PREFIX)
+                    res = sub.parse_response()
+                    logging.info(res)
                 self._refresh()
                 timeout = self._INTERVAL
-                while msg := sub.get_message(ignore_subscribe_messages=True, timeout=timeout):
+                while msg := sub.get_message(timeout=timeout):
                     logging.debug(f'got {msg}')
                     timeout = 0  # exhaust all msgs
             except Exception:

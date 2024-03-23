@@ -79,7 +79,7 @@ class Invalidator:
                     res = sub.parse_response()
                     logging.info(res)
                     self._invalidate_all()
-                msg = sub.get_message(ignore_subscribe_messages=True, timeout=None)
+                msg = sub.get_message(timeout=None)
                 if msg is None:
                     continue
                 logging.debug(f'got {msg}')
