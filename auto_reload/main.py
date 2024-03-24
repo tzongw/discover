@@ -27,7 +27,7 @@ def is_valid(addr: str):
 
 def reload_nginx():
     for name in changed:
-        addrs = addr_map[name]
+        addrs = sorted(addr_map[name])
         logging.info(f'updating: {name} {addrs}')
         with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
             f.write('\n'.join([f'server {addr};' for addr in addrs]))
@@ -41,8 +41,10 @@ def update_upstreams():
     empty = not changed
     # noinspection PyProtectedMember
     for name, addrs in shared.registry._addresses.items():
+        if not is_api(name):
+            continue
         addrs = {addr for addr in addrs if is_valid(addr)}
-        if is_api(name) and addrs and addrs != addr_map.get(name):
+        if addrs and addrs != addr_map.get(name):
             logging.info(f'changed: {name} {addr_map.get(name)} -> {addrs}')
             addr_map[name] = addrs
             changed.add(name)
