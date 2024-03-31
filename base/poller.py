@@ -8,7 +8,7 @@ from contextlib import suppress
 from redis import Redis
 from redis.lock import Lock
 from redis.exceptions import LockError
-from .task import AsyncTask
+from .task import AsyncTask, Task
 from .defer import deferrable, defer_if, Result
 
 
@@ -35,7 +35,7 @@ class Poller:
         self.async_task = async_task
 
         @async_task
-        def poll_task(group: str, queue: str):
+        def poll_task(group: str, queue: str) -> Task | None:
             config = self.configs.get(group)
             if not config:
                 logging.info(f'no config, quit {queue}')  # deploying? other apps will poll again
