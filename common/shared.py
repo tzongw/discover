@@ -17,11 +17,11 @@ from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
+from base import AsyncTask, HeavyTask, Poller, Script
+import service
 from . import const
 from .config import options
-import service
 from .rpc_service import UserService, GateService, TimerService
-from base import AsyncTask, HeavyTask, Poller, Script
 
 executor = Executor(name='shared')
 schedule = Schedule()
