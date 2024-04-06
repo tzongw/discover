@@ -114,9 +114,9 @@ class Handler:
     def remove_timer(self, key, service_name):
         logging.debug(f'{key} {service_name}')
         full_key = self._full_key(key, service_name)
-        old_info = shared.parser.getdel(full_key, Info)
-        if old_info and old_info.addr != options.rpc_address:
-            self._rpc_delete(old_info)
+        info = shared.parser.getdel(full_key, Info)
+        if info and info.addr != options.rpc_address:
+            self._rpc_delete(info)
         self._delete_timer(key, service_name)
 
     def _delete_timer(self, key, service_name):
