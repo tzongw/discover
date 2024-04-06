@@ -134,7 +134,7 @@ class Handler:
 
     def _do_retreat(self, addr):
         logging.info(f'retreat worker {addr} start')
-        while self._timers:
+        while self._timers and addr in shared.timer_service.addresses():
             full_key, timer = self._timers.popitem()
             logging.debug(f'retreating timer: {full_key}')
             timer.cancel()
