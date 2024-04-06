@@ -97,10 +97,10 @@ def at_exit(fun):
 
 
 def init_main():
-    assert not status.inited
+    if status.inited:
+        return
     status.inited = True
     executor.gather(_mains)
-    _mains.clear()
 
 
 atexit.register(unique_id.stop)  # after cleanup
@@ -117,7 +117,6 @@ def _cleanup():
                 fn()
         else:
             executor.gather(_exits)
-    _exits.clear()
 
 
 def spawn_worker(f, *args, **kwargs):
