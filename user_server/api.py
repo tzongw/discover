@@ -19,6 +19,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 
 import models
+from base import single_flight
 from base.poller import PollStatus
 from base.utils import base62
 from config import options, ctx
@@ -106,6 +107,7 @@ def getter(key):
 
 
 @app.route('/future/<key>')
+@single_flight
 def get_future(key):
     full_key = f'future:{key}'
     placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
