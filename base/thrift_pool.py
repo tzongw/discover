@@ -12,8 +12,9 @@ class ThriftPool(Pool):
         self.addr = addr
 
     def create_connection(self):
-        transport = TSocket.TSocket(self.addr.host, self.addr.port)
-        transport = TTransport.TBufferedTransport(transport)
+        sock = TSocket.TSocket(self.addr.host, self.addr.port)
+        sock.setTimeout(self._timeout * 1000)  # ms
+        transport = TTransport.TBufferedTransport(sock)
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         transport.open()
         return protocol
