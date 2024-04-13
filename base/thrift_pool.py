@@ -1,9 +1,12 @@
+from thrift.Thrift import TException, TApplicationException
 from thrift.protocol import TBinaryProtocol
+from thrift.protocol.TProtocol import TProtocolException
 from thrift.transport import TSocket
 from thrift.transport import TTransport
-from thrift.Thrift import TException
-from .utils import Addr
+from thrift.transport.TTransport import TTransportException
+
 from .pool import Pool
+from .utils import Addr
 
 
 class ThriftPool(Pool):
@@ -24,4 +27,5 @@ class ThriftPool(Pool):
 
     @staticmethod
     def biz_exception(e: Exception):
-        return isinstance(e, TException) and not isinstance(e, TTransport.TTransportException)
+        return (isinstance(e, TException) and
+                not isinstance(e, (TTransportException, TProtocolException, TApplicationException)))
