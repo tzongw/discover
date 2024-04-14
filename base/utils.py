@@ -4,12 +4,15 @@ import socket
 import string
 from binascii import crc32
 from collections import defaultdict
+from datetime import timedelta
 from functools import lru_cache, wraps
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
+from redis.exceptions import LockError
+from redis.lock import Lock
 from yaml import safe_dump
 
 
@@ -133,5 +136,18 @@ def stable_hash(o):
     return crc32(s.encode())
 
 
-def etag(o):
-    return base62(stable_hash(o))
+class Exclusion:
+    def __init__(self, redis: Union[Redis, RedisCluster]):
+        self.redis = redis
+
+    def __call__(self, timeout: timedelta):
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                key = f'exclusion:{func_desc(f)}'
+                with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
+                    f(*args, **kwargs)
+
+            return wrapper
+
+        return decorator

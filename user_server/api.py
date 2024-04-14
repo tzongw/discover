@@ -22,6 +22,7 @@ import models
 from base import single_flight
 from base.poller import PollStatus
 from base.utils import base62
+from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN
 from dao import Account, Session, collections
@@ -49,6 +50,7 @@ def init_trace():
 
 @async_task
 @run_in_process
+@run_exclusively(timedelta(seconds=30))
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')

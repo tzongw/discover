@@ -17,7 +17,7 @@ from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
 from base.utils import func_desc, ip_address
-from base import AsyncTask, HeavyTask, Poller, Script
+from base import AsyncTask, HeavyTask, Poller, Script, Exclusion
 import service
 from . import const
 from .config import options
@@ -39,8 +39,9 @@ id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
-heavy_task = HeavyTask(redis, 'heavy_tasks')
+run_in_process = heavy_task = HeavyTask(redis, 'heavy_tasks')
 script = Script(redis)
+run_exclusively = Exclusion(redis)
 
 if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
@@ -53,8 +54,6 @@ else:
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
-
-run_in_process = heavy_task  # alias
 
 user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
