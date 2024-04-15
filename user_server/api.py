@@ -57,7 +57,7 @@ def log(message):
         gevent.sleep(1)
 
 
-@poller.handler('hello', spawn=spawn_worker)
+@poller('hello', spawn=spawn_worker)
 def poll(queue):
     name = redis.lpop(queue)
     if name is None:

@@ -11,17 +11,17 @@ from models import Runtime
 from dao import Account
 
 
-@dispatcher.handler('welcome')
+@dispatcher('welcome')
 def on_welcome(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-@dispatcher.handler('notice')
+@dispatcher('notice')
 def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-@dispatcher.handler(Account)
+@dispatcher(Account)
 def on_register(account: Account):
     logging.info(f'{account}')
 
@@ -41,12 +41,12 @@ def on_alarm(data: Alarm):
     logging.info(f'{data}')
 
 
-@invalidator.handler('session')
+@invalidator('session')
 def session_invalidate(key):
     logging.info(key)
 
 
-@invalidator.handler(f'runtime')
+@invalidator('runtime')
 def runtime_invalidate(key):
     if key != f'{app_name}:{app_id}':
         return

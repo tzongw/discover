@@ -24,14 +24,14 @@ class Publisher:
 
 
 class ProtoDispatcher(Dispatcher):
-    def handler(self, key_or_cls, stream=None):
+    def __call__(self, key_or_cls, stream=None):
         if not isinstance(key_or_cls, type) or not issubclass(key_or_cls, BaseModel):
             assert stream is None
-            return super().handler(key_or_cls)
+            return super().__call__(key_or_cls)
 
         message_cls = key_or_cls
         key = stream or stream_name(message_cls)
-        super_handler = super().handler
+        super_handler = super().__call__
 
         def decorator(f):
             vf = var_args(f)
@@ -61,21 +61,21 @@ class Receiver:
         self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='fanout_dispatch'))
         self._batch = batch
 
-        @self._group_dispatcher.handler(self._waker)
+        @self._group_dispatcher(self._waker)
         def group_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
-        @self._fanout_dispatcher.handler(self._waker)
+        @self._fanout_dispatcher(self._waker)
         def fanout_wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
     @property
     def group(self):
-        return self._group_dispatcher.handler
+        return self._group_dispatcher
 
     @property
     def fanout(self):
-        return self._fanout_dispatcher.handler
+        return self._fanout_dispatcher
 
     def start(self):
         with self.redis.pipeline(transaction=False) as pipe:

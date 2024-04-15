@@ -91,7 +91,7 @@ class Cache(Generic[T]):
         return results
 
     def listen(self, invalidator: Invalidator, group: str, handler: Optional[Callable] = None):
-        @invalidator.handler(group)
+        @invalidator(group)
         def invalidate(key: str, *args, **kwargs):
             self.full_cached = False
             self.invalids += 1

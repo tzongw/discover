@@ -78,7 +78,7 @@ class Poller:
         if self.async_task.post(task_id, task, config.interval, loop=True):
             self.async_task.publish(task)
 
-    def handler(self, group, interval=timedelta(seconds=1), spawn=None):
+    def __call__(self, group, interval=timedelta(seconds=1), spawn=None):
         def decorator(poll):
             assert group not in self.configs
             self.configs[group] = Config(poll, interval, spawn)

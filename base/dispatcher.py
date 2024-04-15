@@ -25,7 +25,7 @@ class Dispatcher:
         cls = event.__class__
         self.dispatch(cls, event)
 
-    def handler(self, key):
+    def __call__(self, key):
         def decorator(f):
             self._handlers[key].append(var_args(f))
             return f
