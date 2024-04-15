@@ -144,7 +144,10 @@ class Exclusion:
         def decorator(f):
             @wraps(f)
             def wrapper(*args, **kwargs):
-                key = f'exclusion:{func_desc(f)}'
+                path = func_desc(f)
+                assert '<' not in path, 'CAN NOT be lambda or local function'
+                assert not path.startswith('__main__'), '__main__ is different in another process'
+                key = f'exclusion:{path}'
                 with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
                     f(*args, **kwargs)
 
