@@ -57,48 +57,37 @@ class Receiver:
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._group_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='group_dispatch'))
-        self._fanout_dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='fanout_dispatch'))
         self._batch = batch
+        self._dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='receiver'))
 
-        @self._group_dispatcher(self._waker)
-        def group_wakeup(data, sid):
+        @self._dispatcher(self._waker)
+        def _wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
-        @self._fanout_dispatcher(self._waker)
-        def fanout_wakeup(data, sid):
-            logging.info(f'{sid} {data}')
-
-    @property
-    def group(self):
-        return self._group_dispatcher
-
-    @property
-    def fanout(self):
-        return self._fanout_dispatcher
+    def __call__(self, key_or_cls, stream=None):
+        return self._dispatcher(key_or_cls, stream)
 
     def start(self):
+        streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
-            streams = self._group_dispatcher.keys() | self._fanout_dispatcher.keys()
             for stream in streams:
                 # create group & stream
                 pipe.xgroup_create(stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        return [gevent.spawn(self._group_run, self._group_dispatcher.keys()),
-                gevent.spawn(self._fanout_run, self._fanout_dispatcher.keys())]
+        return [gevent.spawn(self._run, streams)]
 
     def stop(self):
-        logging.info(f'stop')
+        logging.info(f'stop {self._waker}')
         self._stopped = True
+        streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             pipe.xadd(self._waker, {'wake': 'up'})
-            for stream in self._group_dispatcher.keys():
+            for stream in streams:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
             pipe.execute(raise_on_error=False)  # stop but no start
-        logging.info(f'delete waker {self._waker}')
 
-    def _group_run(self, streams):
+    def _run(self, streams):
         streams = {stream: '>' for stream in streams}
         while not self._stopped:
             try:
@@ -107,31 +96,8 @@ class Receiver:
                                                noack=True)
                 for stream, messages in result:
                     for message in messages:
-                        self._group_dispatcher.dispatch(stream, *message[::-1])
+                        self._dispatcher.dispatch(stream, *message[::-1])
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        logging.info(f'group exit {streams.keys()}')
-
-    def _fanout_run(self, streams):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for stream in streams:
-                pipe.xinfo_stream(stream)
-            last_ids = [xinfo['last-generated-id'] for xinfo in pipe.execute()]
-        # race happen if use $ as last id
-        # 1. xread stream1 stream2 $ $
-        # 2. xadd stream1 message1
-        # 3. while handling message1, xadd stream2 message2
-        # 4. xread stream1 stream2 $ $, message2 is missing
-        streams = dict(zip(streams, last_ids))
-        while not self._stopped:
-            try:
-                result = self.redis.xread(streams, count=self._batch, block=0)
-                for stream, messages in result:
-                    for message in messages:
-                        self._fanout_dispatcher.dispatch(stream, *message[::-1])
-                        streams[stream] = message[0]  # update last id
-            except Exception:
-                logging.exception(f'')
-                gevent.sleep(1)
-        logging.info(f'fanout exit {streams.keys()}')
+        logging.info(f'receiver exit {streams.keys()}')

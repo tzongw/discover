@@ -26,17 +26,17 @@ def on_register(account: Account):
     logging.info(f'{account}')
 
 
-@receiver.group(Login)
+@receiver(Login)
 def on_login(data: Login):
     logging.info(f'{data}')
 
 
-@receiver.fanout(Logout)
+@receiver(Logout)
 def on_logout(data: Logout):
     logging.info(f'{data}')
 
 
-@receiver.group(Alarm)
+@receiver(Alarm)
 def on_alarm(data: Alarm):
     logging.info(f'{data}')
 

@@ -67,36 +67,30 @@ class ShardingReceiver(Receiver):
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
     def start(self):
+        streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
-            streams = self._group_dispatcher.keys() | self._fanout_dispatcher.keys()
             for stream in streams:
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):
                     # create group & stream
                     pipe.xgroup_create(sharded_stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
-        workers = []
-        for streams in zip(
-                *[self._sharding_key.all_sharded_keys(stream) for stream in self._group_dispatcher.keys()]):
-            workers.append(gevent.spawn(self._group_run, streams))
-        for streams in zip(
-                *[self._sharding_key.all_sharded_keys(stream) for stream in self._fanout_dispatcher.keys()]):
-            workers.append(gevent.spawn(self._fanout_run, streams))
-        return workers
+        return [gevent.spawn(self._run, sharded_streams) for sharded_streams in
+                zip(*[self._sharding_key.all_sharded_keys(stream) for stream in streams])]
 
     def stop(self):
-        logging.info(f'stop')
+        logging.info(f'stop {self._waker}')
         self._stopped = True
+        streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             for waker in self._sharding_key.all_sharded_keys(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
-            for stream in self._group_dispatcher.keys():
+            for stream in streams:
                 if stream == self._waker:  # already deleted
                     continue
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):
                     pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
             pipe.execute(raise_on_error=False)  # stop but no start
-        logging.info(f'delete waker {self._waker}')
 
 
 class ShardingTimer(Timer):
@@ -174,29 +168,13 @@ class MigratingReceiver(ShardingReceiver):
         self.old_receiver.stop()
         super().stop()
 
-    def _group_handler(self, *args, **kwargs):
+    def __call__(self, key_or_cls, stream=None):
         def decorator(f):
-            self.old_receiver.group(*args, **kwargs)(f)
-            self._group_dispatcher(*args, **kwargs)(f)
+            self.old_receiver(key_or_cls, stream)(f)
+            self._dispatcher(key_or_cls, stream)(f)
             return f
 
         return decorator
-
-    def _fanout_handler(self, *args, **kwargs):
-        def decorator(f):
-            self.old_receiver.fanout(*args, **kwargs)(f)
-            self._fanout_dispatcher(*args, **kwargs)(f)
-            return f
-
-        return decorator
-
-    @property
-    def group(self):
-        return self._group_handler
-
-    @property
-    def fanout(self):
-        return self._fanout_handler
 
 
 class ShardingStocks(Stocks):

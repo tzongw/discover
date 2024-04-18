@@ -67,7 +67,7 @@ if options.env is const.Environment.DEV:
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
 
-@receiver.group(const.TICK_STREAM)
+@receiver(const.TICK_STREAM)
 def _on_tick(_, sid):
     ts = int(sid[:-2])
     tick.dispatch(ts)
