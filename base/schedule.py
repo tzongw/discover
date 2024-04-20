@@ -71,6 +71,14 @@ class Schedule:
                 timeout = self._handles[0].when - now if self._handles else None
                 self._cond.wait(timeout)
 
+    def __call__(self, period: Union[int, float, timedelta]):
+        def decorator(f):
+            pc = PeriodicCallback(self, f, period)
+            f.stop = pc.stop
+            return f
+
+        return decorator
+
 
 class PeriodicCallback:
     __slots__ = ['_schedule', '_callback', '_period', '_handle']
