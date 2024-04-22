@@ -37,10 +37,10 @@ class Handle:
         return f'handle: {func_desc(self.callback)} at: {datetime.fromtimestamp(self.when)}'
 
 
-class Schedule:
+class Scheduler:
     def __init__(self, executor=None):
         self._cond = threading.Condition()
-        self._executor = executor or Executor(name='schedule')
+        self._executor = executor or Executor(name='scheduler')
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
@@ -81,13 +81,13 @@ class Schedule:
 
 
 class PeriodicCallback:
-    __slots__ = ['_schedule', '_callback', '_period', '_handle']
+    __slots__ = ['_scheduler', '_callback', '_period', '_handle']
 
-    def __init__(self, schedule: Schedule, callback: Callable, period: Union[int, float, timedelta]):
+    def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[int, float, timedelta]):
         if isinstance(period, timedelta):
             period = period.total_seconds()
         assert callable(callback) and period > 0
-        self._schedule = schedule
+        self._scheduler = scheduler
         self._callback = callback
         self._period = period
         self._handle = None  # type: Optional[Handle]
@@ -101,7 +101,7 @@ class PeriodicCallback:
             self._schedule_next()
 
     def _schedule_next(self):
-        self._handle = self._schedule.call_later(self._run, self._period)
+        self._handle = self._scheduler.call_later(self._run, self._period)
 
     def stop(self):
         self._callback = None

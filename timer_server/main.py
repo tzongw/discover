@@ -14,7 +14,7 @@ import gevent
 from service.timer import Processor
 from service.timeout import Client
 from typing import Dict, Callable
-from base.schedule import PeriodicCallback
+from base.scheduler import PeriodicCallback
 from base.service import Service
 from setproctitle import setproctitle
 from base import LogSuppress
@@ -91,7 +91,7 @@ class Handler:
             self._delete_timer(key, service_name)
             self._fire_timer(key, service_name, data)
 
-        handle = shared.schedule.call_at(callback, deadline)
+        handle = shared.scheduler.call_at(callback, deadline)
         self._delete_timer(key, service_name)
         self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
 
@@ -107,7 +107,7 @@ class Handler:
         def callback():
             self._fire_timer(key, service_name, data)
 
-        pc = PeriodicCallback(shared.schedule, callback, interval)
+        pc = PeriodicCallback(shared.scheduler, callback, interval)
         self._delete_timer(key, service_name)
         self._timers[full_key] = Timer(info=info, cancel=pc.stop)
 

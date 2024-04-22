@@ -4,7 +4,7 @@ from itertools import chain
 from redis import Redis
 import logging
 from typing import Optional
-from .schedule import Schedule, PeriodicCallback
+from .scheduler import Scheduler, PeriodicCallback
 
 
 class UniqueId:
@@ -12,8 +12,8 @@ class UniqueId:
     _INTERVAL = 10
     _TTL = 3600
 
-    def __init__(self, schedule: Schedule, redis: Redis):
-        self._schedule = schedule
+    def __init__(self, scheduler: Scheduler, redis: Redis):
+        self._scheduler = scheduler
         self._redis = redis
         self._keys = set()
         self._pc = None  # type: Optional[PeriodicCallback]
@@ -33,7 +33,7 @@ class UniqueId:
             self._keys.add(key)
             if not self._pc:
                 logging.info(f'start')
-                self._pc = PeriodicCallback(self._schedule, self._refresh, self._INTERVAL)
+                self._pc = PeriodicCallback(self._scheduler, self._refresh, self._INTERVAL)
             return id
         raise ValueError('no id')
 

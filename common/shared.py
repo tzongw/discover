@@ -10,7 +10,7 @@ import sys
 import gevent
 from redis import Redis, RedisCluster
 from base import Registry, LogSuppress
-from base import Executor, Schedule
+from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
@@ -24,7 +24,7 @@ from .config import options
 from .rpc_service import UserService, GateService, TimerService
 
 executor = Executor(name='shared')
-schedule = Schedule()
+scheduler = Scheduler()
 dispatcher = Dispatcher()
 tick = TimeDispatcher()
 
@@ -33,7 +33,7 @@ registry = Registry(Redis.from_url(options.registry, decode_responses=True))
 
 redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
     Redis.from_url(options.redis, decode_responses=True)
-unique_id = UniqueId(schedule, redis)
+unique_id = UniqueId(scheduler, redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{options.env.value}:{ip_address()}:{app_id}'
