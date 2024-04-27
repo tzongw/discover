@@ -4,12 +4,11 @@ from datetime import timedelta
 from enum import Enum, auto
 from typing import Callable, Optional
 from dataclasses import dataclass
-from contextlib import suppress
+from contextlib import suppress, ExitStack
 from redis import Redis
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
-from .defer import deferrable, defer_if, Result
 
 
 @dataclass
@@ -45,15 +44,14 @@ class Poller:
             else:
                 do_poll(config, group, queue)
 
-        @deferrable
         def do_poll(config: Config, group: str, queue: str):
             task = poll_task(group, queue)
-            defer_if(Result.TRUE, lambda: async_task.publish(task))  # without lock, notify next if true
-            with suppress(LockError), Lock(redis, f'lock:{group}:{queue}', timeout=timeout.total_seconds(),
-                                           blocking=False):
+            lock = Lock(redis, f'lock:{group}:{queue}', timeout=timeout.total_seconds(), blocking=False)
+            with ExitStack() as stack, suppress(LockError), lock:
                 status = PollStatus(config.poll(queue))
+                stack.callback(lambda: status is PollStatus.ASAP and async_task.publish(task))  # without lock
                 if status is not PollStatus.DONE:
-                    return status is PollStatus.ASAP
+                    return
                 logging.debug(f'no jobs, stop {queue}')
                 task_id = self.task_id(group, queue)
                 async_task.cancel(task_id)
@@ -61,7 +59,6 @@ class Poller:
                 if status is not PollStatus.DONE:  # race
                     logging.info(f'new jobs, restart {queue}')
                     async_task.post(task_id, task, config.interval, loop=True)
-                    return status is PollStatus.ASAP
 
         self.poll_task = poll_task
 

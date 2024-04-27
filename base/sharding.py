@@ -26,7 +26,7 @@ class ShardingKey:
 
     def random_sharded_key(self, key: str):
         assert not key.startswith('{')
-        shard = random.randrange(len(self.shards))
+        shard = random.randrange(self.shards)
         return f'{{{shard}}}:{key}'
 
     def sharded_key(self, key: str):
