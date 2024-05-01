@@ -44,12 +44,12 @@ class Scheduler:
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
-    def call_later(self, callback: Callable, delay: Union[int, float, timedelta]) -> Handle:
+    def call_later(self, callback: Callable, delay: Union[float, timedelta]) -> Handle:
         if isinstance(delay, timedelta):
             delay = delay.total_seconds()
         return self.call_at(callback, time.time() + delay)
 
-    def call_at(self, callback: Callable, when: Union[int, float, datetime]) -> Handle:
+    def call_at(self, callback: Callable, when: Union[float, datetime]) -> Handle:
         assert callable(callback)
         if isinstance(when, datetime):
             when = when.timestamp()
@@ -71,7 +71,7 @@ class Scheduler:
                 timeout = self._handles[0].when - now if self._handles else None
                 self._cond.wait(timeout)
 
-    def __call__(self, period: Union[int, float, timedelta]):
+    def __call__(self, period: Union[float, timedelta]):
         def decorator(f):
             pc = PeriodicCallback(self, f, period)
             f.stop = pc.stop
@@ -83,7 +83,7 @@ class Scheduler:
 class PeriodicCallback:
     __slots__ = ['_scheduler', '_callback', '_period', '_handle']
 
-    def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[int, float, timedelta]):
+    def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
         if isinstance(period, timedelta):
             period = period.total_seconds()
         assert callable(callback) and period > 0
