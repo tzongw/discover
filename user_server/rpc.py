@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import time
 import gevent
 from typing import Dict
 from thrift.transport import TSocket
@@ -12,7 +13,7 @@ from common.messages import Login, Logout
 from models import Online, Session
 from redis.client import Pipeline
 from service import user
-from shared import dispatcher, app, online_key, redis, session_key
+from shared import dispatcher, app, online_key, redis, session_key, script, tick
 from config import options
 from base import create_parser
 import push
@@ -116,8 +117,15 @@ class Handler:
                 shared.gate_service.broadcast_text(const.ROOM, [conn_id], f'{uid}: {message}')
 
     def timeout(self, full_key, data):
-        group, key = full_key.split(':', maxsplit=1)
-        dispatcher.dispatch(group, key, data)
+        if full_key == const.TICK_TIMER:
+            now = int(time.time())
+            increment = script.limited_incrby('timestamp:tick', amount=now, limit=now)
+            offset = min(increment, 10)
+            for ts in range(now - offset + 1, now + 1):
+                tick.dispatch(ts)
+        else:
+            group, key = full_key.split(':', maxsplit=1)
+            dispatcher.dispatch(group, key, data)
 
 
 def serve():

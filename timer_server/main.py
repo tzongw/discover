@@ -72,7 +72,7 @@ class Handler:
     def _fire_timer(self, key, service_name, data):
         logging.debug(f'{key} {service_name}')
         service = self._services[service_name]
-        addr = service.address(hint=key)
+        addr = None if key == const.TICK_TIMER else service.address(hint=key)
         with service.connection(addr) as conn:
             client = Client(conn)
             client.timeout(key, data)
