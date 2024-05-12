@@ -4,7 +4,7 @@ from concurrent.futures import Future
 from . import utils
 
 
-class SingleFlight:
+class Singleflight:
     def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
         assert get or mget
         if mget is None:
@@ -50,11 +50,11 @@ class SingleFlight:
         return [fut.result() for fut in futures]
 
 
-def single_flight(f):
+def singleflight(f):
     def get(_, *args, **kwargs):
         return f(*args, **kwargs)
 
-    sf = SingleFlight(get=get)
+    sf = Singleflight(get=get)
 
     @functools.wraps(f)
     def wrapper(*args, **kwargs):

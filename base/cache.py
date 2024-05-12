@@ -7,7 +7,7 @@ from concurrent.futures import Future
 import functools
 
 from . import utils
-from .single_flight import SingleFlight
+from .singleflight import Singleflight
 from .invalidator import Invalidator
 
 T = TypeVar('T')
@@ -29,7 +29,7 @@ class Cache(Generic[T]):
     placeholder = object()
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
-        self.single_flight = SingleFlight(get=get, mget=mget, make_key=make_key)
+        self.singleflight = Singleflight(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.locks = {}  # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
         self.make_key = make_key
@@ -80,7 +80,7 @@ class Cache(Generic[T]):
                     locked_keys.add(made_key)
         if missing_keys:
             try:
-                values = self.single_flight.mget(missing_keys, *args, **kwargs)
+                values = self.singleflight.mget(missing_keys, *args, **kwargs)
             finally:
                 locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, value in zip(indexes, made_keys, values):
@@ -114,7 +114,7 @@ class Cache(Generic[T]):
                     self.locks[made_key] = False
 
 
-class TTLCache(Cache[T]):
+class TtlCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
     def mget(self, keys, *args, **kwargs) -> Sequence[T]:
@@ -142,14 +142,14 @@ class TTLCache(Cache[T]):
                     locked_keys.add(made_key)
         if missing_keys:
             try:
-                tuples = self.single_flight.mget(missing_keys, *args, **kwargs)
+                tuples = self.singleflight.mget(missing_keys, *args, **kwargs)
             finally:
                 locked_keys = {k for k in locked_keys if self.locks.pop(k)}
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
                 if made_key in locked_keys:
-                    pair = TTLCache.Pair(value, expire_at(expire))
+                    pair = TtlCache.Pair(value, expire_at(expire))
                     self._set_value(made_key, pair)
         return results
 
@@ -234,7 +234,7 @@ class FullCache(FullMixin[T], Cache[T]):
         super().__init__(get_keys=get_keys, get_expire=get_expire)
 
 
-class FullTTLCache(FullMixin[T], TTLCache[T]):
+class FullTtlCache(FullMixin[T], TtlCache[T]):
     def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_keys=get_keys, get_expire=get_expire)
@@ -245,7 +245,7 @@ def ttl_cache(expire, *, maxsize=128):
         def get(_, *args, **kwargs):
             return f(*args, **kwargs), expire
 
-        cache = TTLCache(get=get, maxsize=maxsize)
+        cache = TtlCache(get=get, maxsize=maxsize)
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs):

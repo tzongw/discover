@@ -1,7 +1,7 @@
 import itertools
 from datetime import datetime
 from typing import Callable
-from .single_flight import single_flight
+from .singleflight import singleflight
 
 
 class SlaveProxy:
@@ -27,7 +27,7 @@ class MigratingProxy:
 class LazyProxy:
     def __init__(self, create: Callable):
         self._target = None
-        self._create = single_flight(create)
+        self._create = singleflight(create)
 
     def __getattr__(self, name):
         if self._target is None:

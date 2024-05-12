@@ -5,7 +5,7 @@ from flasgger import Swagger
 from flask import Flask
 from base import ListConverter
 from base.misc import JSONProvider, make_response
-from base.cache import TTLCache
+from base.cache import TtlCache
 import const
 from models import Session
 
@@ -35,5 +35,5 @@ def get_session(uid: int):
         return pipe.execute()
 
 
-sessions: TTLCache[Session] = TTLCache(get=get_session)
+sessions: TtlCache[Session] = TtlCache(get=get_session)
 sessions.listen(invalidator, 'session')

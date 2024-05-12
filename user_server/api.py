@@ -19,7 +19,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
 
 import models
-from base import single_flight
+from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
 from common.shared import run_exclusively
@@ -110,7 +110,7 @@ def getter(key):
 
 
 @app.route('/future/<key>')
-@single_flight
+@singleflight
 def get_future(key):
     full_key = f'future:{key}'
     placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
@@ -185,7 +185,7 @@ def update_document(collection: str, doc_id, **kwargs):
 
 @app.route('/collections/<collection>/documents/<doc_id>', methods=['DELETE'])
 @use_kwargs({}, location='json_or_form')
-def delete_documents(collection: str, doc_id):
+def delete_document(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.delete()

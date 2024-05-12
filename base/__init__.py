@@ -5,7 +5,7 @@ from yaml.constructor import SafeConstructor
 from datetime import timedelta
 from .utils import LogSuppress, Addr, ip_address, stream_name, Exclusion
 from .misc import ListConverter
-from .single_flight import SingleFlight, single_flight
+from .singleflight import Singleflight, singleflight
 from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, IdGenerator
 from .chunk import batched
@@ -21,7 +21,7 @@ from .registry import Registry
 from .service import Service
 from .timer import Timer
 from .unique import UniqueId
-from .cache import Cache, TTLCache, FullCache, FullTTLCache
+from .cache import Cache, TtlCache, FullCache, FullTtlCache
 from .task import AsyncTask, HeavyTask
 from .poller import Poller
 from .redis_script import Script
