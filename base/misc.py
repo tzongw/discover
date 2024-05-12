@@ -90,10 +90,10 @@ class GetterMixin:
     def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
         value = cls.mget([key], only=only)[0]
         if value is None:
-            if ensure:
-                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
             if default:
                 value = cls(**{cls.id.name: cls.id.to_python(key)})
+            elif ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
         return value
 
     def to_dict(self, include=(), exclude=None):
@@ -219,3 +219,7 @@ class TimeDeltaField(FloatField):
     def to_python(self, value):
         value = super().to_python(value)
         return timedelta(seconds=value) if isinstance(value, float) else value
+
+    def validate(self, value):
+        value = self.to_mongo(value)
+        return super().validate(value)

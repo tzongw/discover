@@ -13,10 +13,9 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
-from mongoengine import NotUniqueError
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden, Conflict
 
 import models
 from base import singleflight
@@ -158,9 +157,9 @@ def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def create_document(collection: str, **kwargs):
     coll = collections[collection]
-    key = kwargs.get(coll.id.name)
-    if key is not None and coll.get(key):
-        raise NotUniqueError(f'document `{key}` already exists')
+    doc_id = kwargs.get(coll.id.name)
+    if doc_id is not None and coll.get(doc_id):
+        raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
     doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
@@ -178,7 +177,9 @@ def get_document(collection: str, doc_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
-    doc.modify(**kwargs)
+    if not doc.modify(**kwargs):  # if doc is default
+        kwargs[coll.id.name] = doc_id
+        doc = coll(**kwargs).save()
     doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
