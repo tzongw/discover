@@ -98,8 +98,14 @@ class Profile(Document, CacheMixin):
         return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
+def get_all_profiles():
+    ids = Profile.objects.distinct('id')
+    values = full_cache.mget(ids)
+    return values, timedelta(seconds=30)
+
+
 full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
-                                           get_keys=lambda: Profile.objects.distinct('id'))
+                                           get_values=get_all_profiles)
 full_cache.listen(invalidator, Profile.__name__)
 Profile.mget = full_cache.mget
 

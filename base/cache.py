@@ -2,13 +2,14 @@
 import time
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
-from typing import TypeVar, Optional, Generic, Callable, Sequence
+from typing import TypeVar, Optional, Generic, Callable, Sequence, Union
 from concurrent.futures import Future
 import functools
 
 from . import utils
 from .singleflight import Singleflight
 from .invalidator import Invalidator
+from .chunk import LazySequence
 
 T = TypeVar('T')
 
@@ -158,9 +159,8 @@ class FullMixin(Generic[T]):
     full_cached: bool
     mget: Callable
 
-    def __init__(self, *, get_keys, get_expire=None):
-        self.get_keys = get_keys
-        self.get_expire = get_expire
+    def __init__(self, *, get_values):
+        self._get_values = get_values
         self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
@@ -172,7 +172,7 @@ class FullMixin(Generic[T]):
         return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
 
     @property
-    def values(self) -> Sequence[T]:
+    def values(self) -> Union[Sequence[T], LazySequence]:
         if self._fut:
             self.full_misses += 1
             return self._fut.result()
@@ -183,11 +183,8 @@ class FullMixin(Generic[T]):
         self._fut = Future()
         self.full_cached = True  # BEFORE `get_keys` and `mget`, invalidate events may happen simultaneously
         try:
-            keys = self.get_keys()
-            self._values = self.mget(keys)
-            if self.get_expire:
-                expire = self.get_expire(self._values)
-                self._expire_at = expire_at(expire)
+            self._values, expire = self._get_values()
+            self._expire_at = expire_at(expire)
             self._version += 1
             self._fut.set_result(self._values)
             return self._values
@@ -229,15 +226,15 @@ class FullMixin(Generic[T]):
 
 
 class FullCache(FullMixin[T], Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_values):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys=get_keys, get_expire=get_expire)
+        super().__init__(get_values=get_values)
 
 
 class FullTtlCache(FullMixin[T], TtlCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_keys, get_expire=None):
+    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_values):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
-        super().__init__(get_keys=get_keys, get_expire=get_expire)
+        super().__init__(get_values=get_values)
 
 
 def ttl_cache(expire, *, maxsize=128):

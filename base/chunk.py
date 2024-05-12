@@ -23,6 +23,7 @@ class LazySequence:
         assert not self._done
         if self._fut:
             self._fut.result()
+            return
         self._fut = Future()
         try:
             values, self._cursor = self._get_more(self._cursor)
@@ -32,6 +33,7 @@ class LazySequence:
             self._fut.set_result(None)
         except Exception as e:
             self._fut.set_exception(e)
+            raise
         finally:
             self._fut = None
 

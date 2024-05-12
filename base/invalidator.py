@@ -61,6 +61,7 @@ class Invalidator:
             fut.set_result(value)
         except Exception as e:
             fut.set_exception(e)
+            raise
 
     def _run(self, redis, subscribe=True):
         sub = None
