@@ -90,28 +90,28 @@ class Cache(Generic[T]):
                     self._set_value(made_key, value)
         return results
 
-    def listen(self, invalidator: Invalidator, group: str, handler: Optional[Callable] = None):
+    def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
         @invalidator(group)
-        def invalidate(key: str, *args, **kwargs):
+        def invalidate(key: str):
             self.full_cached = False
             self.invalids += 1
             if not key:
                 self.lru.clear()
-                for key in self.locks:
-                    self.locks[key] = False
+                for made_key in self.locks:
+                    self.locks[made_key] = False
                 return
-            if handler:
-                key_or_keys = handler(key, *args, **kwargs)
-                keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
-                for key in keys:
-                    self.lru.pop(key, None)
-                    if key in self.locks:
-                        self.locks[key] = False
+            if convert:
+                key_or_keys = convert(key)
+                made_keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
+                for made_key in made_keys:
+                    self.lru.pop(made_key, None)
+                    if made_key in self.locks:
+                        self.locks[made_key] = False
             else:
-                key = self.make_key(key, *args, **kwargs)
-                self.lru.pop(key, None)
-                if key in self.locks:
-                    self.locks[key] = False
+                made_key = self.make_key(key)
+                self.lru.pop(made_key, None)
+                if made_key in self.locks:
+                    self.locks[made_key] = False
 
 
 class TTLCache(Cache[T]):
