@@ -3,11 +3,10 @@ import time
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable, Sequence
-from concurrent.futures import Future
 import functools
 
 from . import utils
-from .singleflight import Singleflight
+from .singleflight import Singleflight, singleflight
 from .invalidator import Invalidator
 from .chunk import LazySequence
 
@@ -35,7 +34,6 @@ class Cache(Generic[T]):
         self.locks = {}  # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
         self.make_key = make_key
         self.maxsize = maxsize
-        self.full_cached = False
         self.hits = 0
         self.misses = 0
         self.invalids = 0
@@ -94,7 +92,6 @@ class Cache(Generic[T]):
     def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
         @invalidator(group)
         def invalidate(key: str):
-            self.full_cached = False
             self.invalids += 1
             if not key:
                 self.lru.clear()
@@ -156,66 +153,47 @@ class TtlCache(Cache[T]):
 
 
 class FullMixin(Generic[T]):
-    full_cached: bool
+    invalids: int
     mget: Callable
 
     def __init__(self, *, get_values):
         self._get_values = get_values
-        self._fut = None  # type: Optional[Future]
         self._version = 0
         self._values = []
-        self._expire_at = float('inf')
-        self.full_hits = 0
-        self.full_misses = 0
-
-    def __str__(self):
-        return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
+        self._expire_at = float('-inf')
 
     @property
+    @singleflight
     def values(self) -> Sequence[T] | LazySequence[T]:
-        if self._fut:
-            self.full_misses += 1
-            return self._fut.result()
-        if self.full_cached and self._expire_at > time.time():
-            self.full_hits += 1
+        if self._version == self.invalids and self._expire_at > time.time():
             return self._values
-        self.full_misses += 1
-        self._fut = Future()
-        self.full_cached = True  # BEFORE `get_keys` and `mget`, invalidate events may happen simultaneously
-        try:
-            self._values, expire = self._get_values()
-            self._expire_at = expire_at(expire)
-            self._version += 1
-            self._fut.set_result(self._values)
-            return self._values
-        except Exception as e:
-            self._fut.set_exception(e)
-            self.full_cached = False
-            raise
-        finally:
-            self._fut = None
+        invalids = self.invalids
+        values, expire = self._get_values()  # invalidate events may happen simultaneously
+        self._values = values
+        self._expire_at = expire_at(expire)
+        self._version = invalids
+        return values
 
     def cached(self, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
             @functools.lru_cache(maxsize, typed)
             def inner(*args, **kwargs):
-                self.full_hits -= 1  # full_hits will +1 in f redundantly because values was accessed in wrapper
                 return f(*args, **kwargs)
 
-            cache_version = self._version
-            cache_expire_at = float('inf')
+            cache_version = 0
+            cache_expire_at = float('-inf')
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
                 nonlocal cache_version
                 nonlocal cache_expire_at
-                values = self.values  # update version if needed
+                values = self.values
                 if cache_version != self._version or cache_expire_at < time.time():
                     inner.cache_clear()
                     cache_version = self._version
-                    if get_expire:
-                        expire = get_expire(values)
-                        cache_expire_at = expire_at(expire)
+                    assert not get_expire or not isinstance(values, LazySequence), 'DO NOT get expire of lazy sequence'
+                    expire = get_expire(values) if get_expire else None
+                    cache_expire_at = expire_at(expire)
                 return inner(*args, **kwargs)
 
             wrapper.cache_info = inner.cache_info
