@@ -103,7 +103,7 @@ def get_all_profiles():
     def get_more():
         nonlocal last_id
         ids = []
-        for p in Profile.objects(rank__gt=last_id).only('id').order_by('id').limit(100):
+        for p in Profile.objects(id__gt=last_id).only('id').order_by('id').limit(100):
             ids.append(p.id)
             last_id = p.id
         return full_cache.mget(ids)

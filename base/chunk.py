@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import bisect
 from itertools import islice
+from typing import TypeVar, Generic, Iterator
 from .singleflight import singleflight
+
+T = TypeVar('T')
 
 
 def batched(iterable, n):
@@ -10,7 +13,7 @@ def batched(iterable, n):
         yield batch
 
 
-class LazySequence:
+class LazySequence(Generic[T]):
     def __init__(self, get_more):
         self._values = []
         self._get_more = get_more
@@ -28,7 +31,7 @@ class LazySequence:
     def __iter__(self):
         return self.slice(0)
 
-    def slice(self, start):
+    def slice(self, start) -> Iterator[T]:
         while True:
             while start < len(self._values):
                 yield self._values[start]

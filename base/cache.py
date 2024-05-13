@@ -2,7 +2,7 @@
 import time
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
-from typing import TypeVar, Optional, Generic, Callable, Sequence, Union
+from typing import TypeVar, Optional, Generic, Callable, Sequence
 from concurrent.futures import Future
 import functools
 
@@ -172,7 +172,7 @@ class FullMixin(Generic[T]):
         return f'full_hits: {self.full_hits} full_misses: {self.full_misses} {super().__str__()}'
 
     @property
-    def values(self) -> Union[Sequence[T], LazySequence]:
+    def values(self) -> Sequence[T] | LazySequence[T]:
         if self._fut:
             self.full_misses += 1
             return self._fut.result()
