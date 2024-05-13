@@ -15,7 +15,6 @@ class LazySequence:
     def __init__(self, get_more):
         self._values = []
         self._get_more = get_more
-        self._cursor = None
         self._done = False
         self._fut = None  # type: Optional[Future]
 
@@ -26,10 +25,11 @@ class LazySequence:
             return
         self._fut = Future()
         try:
-            values, self._cursor = self._get_more(self._cursor)
-            self._values += values
-            if self._cursor is None:
+            values = self._get_more()
+            if not values:
                 self._done = True
+                return
+            self._values += values
             self._fut.set_result(None)
         except Exception as e:
             self._fut.set_exception(e)

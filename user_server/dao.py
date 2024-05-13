@@ -16,6 +16,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
+from base.chunk import LazySequence
 from base.utils import CaseDict
 from base.misc import CacheMixin, TimeDeltaField
 from config import options
@@ -99,9 +100,17 @@ class Profile(Document, CacheMixin):
 
 
 def get_all_profiles():
-    ids = Profile.objects.distinct('id')
-    values = full_cache.mget(ids)
-    return values, timedelta(seconds=30)
+    def get_more():
+        nonlocal last_id
+        ids = []
+        for p in Profile.objects(rank__gt=last_id).only('id').order_by('id').limit(100):
+            ids.append(p.id)
+            last_id = p.id
+        return full_cache.mget(ids)
+
+    last_id = 0
+    lazy = LazySequence(get_more)
+    return lazy, None
 
 
 full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
