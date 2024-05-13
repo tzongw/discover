@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from typing import Optional
 import bisect
 from itertools import islice
-from concurrent.futures import Future
+from .singleflight import singleflight
 
 
 def batched(iterable, n):
@@ -16,26 +15,15 @@ class LazySequence:
         self._values = []
         self._get_more = get_more
         self._done = False
-        self._fut = None  # type: Optional[Future]
 
+    @singleflight
     def _load(self):
         assert not self._done
-        if self._fut:
-            self._fut.result()
+        values = self._get_more()
+        if not values:
+            self._done = True
             return
-        self._fut = Future()
-        try:
-            values = self._get_more()
-            if not values:
-                self._done = True
-                return
-            self._values += values
-            self._fut.set_result(None)
-        except Exception as e:
-            self._fut.set_exception(e)
-            raise
-        finally:
-            self._fut = None
+        self._values += values
 
     def __iter__(self):
         return self.slice(0)
