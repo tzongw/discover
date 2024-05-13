@@ -20,15 +20,17 @@ class _WorkItem:
         self.kwargs = kwargs
 
     def run(self):
-        if self.future.done():
+        if self.future.done():  # cancelled
             return
+        fut = self.future
+        self.future = None
         try:
             result = self.fn(*self.args, **self.kwargs)
         except BaseException as exc:
             logging.exception(f'{self}')
-            self.future.set_exception(exc)
+            fut.set_exception(exc)
         else:
-            self.future.set_result(result)
+            fut.set_result(result)
 
     def __str__(self):
         return f'fn: {func_desc(self.fn)} args: {self.args} kwargs: {self.kwargs}'
