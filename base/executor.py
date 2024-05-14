@@ -26,9 +26,9 @@ class _WorkItem:
         self.future = None
         try:
             result = self.fn(*self.args, **self.kwargs)
-        except BaseException as exc:
-            logging.exception(f'{self}')
-            fut.set_exception(exc)
+        except Exception as e:
+            fut.set_exception(e)
+            raise
         else:
             fut.set_result(result)
 
@@ -85,7 +85,10 @@ class Executor:
                     self._overload = False
                     logging.warning(f'- overload {self} {item}')
                 start = time.time()
-                item.run()
+                try:
+                    item.run()
+                except Exception:
+                    logging.exception(f'run error {self} {item}')
                 t = time.time() - start
                 if t > self._slow_time:
                     logging.warning(f'+ slow task {t} {self} {item}')
