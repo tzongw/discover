@@ -31,18 +31,18 @@ class LazySequence(Generic[T]):
     def __iter__(self):
         return self.slice(0)
 
-    def slice(self, start) -> Iterator[T]:
+    def slice(self, pos) -> Iterator[T]:
         while True:
-            while start < len(self._values):
-                yield self._values[start]
-                start += 1
+            while pos < len(self._values):
+                yield self._values[pos]
+                pos += 1
             if self._done:
                 return
             self._load()
 
     def gt_slice(self, x, key=None):
-        start = 0
-        while start >= len(self._values) and not self._done:
+        pos = 0
+        while pos >= len(self._values) and not self._done:
             self._load()
-            start = bisect.bisect_right(self._values, x, lo=start, key=key)
-        return self.slice(start)
+            pos = bisect.bisect_right(self._values, x, lo=pos, key=key)
+        return self.slice(pos)
