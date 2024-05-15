@@ -76,9 +76,9 @@ def on_quarter(dt: datetime):
 @at_main
 def init():
     if registry.addresses(const.RPC_TIMER):
-        timer_service.call_later('notice:1', const.RPC_USER, 'one shot', delay=3)
-        timer_service.call_repeat('welcome:2', const.RPC_USER, 'repeat', interval=5)
-        at_exit(lambda: timer_service.remove_timer('welcome:2', const.RPC_USER))
+        timer_service.call_later(const.RPC_USER, 'notice:1', 'one shot', delay=3)
+        timer_service.call_repeat(const.RPC_USER, 'welcome:2', 'repeat', interval=5)
+        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, 'welcome:2'))
 
     oneshot_id = 'timer:oneshot'
     timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))

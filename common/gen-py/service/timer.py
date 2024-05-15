@@ -19,42 +19,42 @@ all_structs = []
 
 
 class Iface(object):
-    def call_later(self, key, service_name, data, delay):
+    def call_later(self, service, key, data, delay):
         """
         Parameters:
+         - service
          - key
-         - service_name
          - data
          - delay
 
         """
         pass
 
-    def call_repeat(self, key, service_name, data, interval):
+    def call_repeat(self, service, key, data, interval):
         """
         Parameters:
+         - service
          - key
-         - service_name
          - data
          - interval
 
         """
         pass
 
-    def remove_timer(self, key, service_name):
+    def remove_timer(self, service, key):
         """
         Parameters:
+         - service
          - key
-         - service_name
 
         """
         pass
 
-    def _delete_timer(self, key, service_name):
+    def _delete_timer(self, service, key):
         """
         Parameters:
+         - service
          - key
-         - service_name
 
         """
         pass
@@ -67,23 +67,23 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def call_later(self, key, service_name, data, delay):
+    def call_later(self, service, key, data, delay):
         """
         Parameters:
+         - service
          - key
-         - service_name
          - data
          - delay
 
         """
-        self.send_call_later(key, service_name, data, delay)
+        self.send_call_later(service, key, data, delay)
         self.recv_call_later()
 
-    def send_call_later(self, key, service_name, data, delay):
+    def send_call_later(self, service, key, data, delay):
         self._oprot.writeMessageBegin('call_later', TMessageType.CALL, self._seqid)
         args = call_later_args()
+        args.service = service
         args.key = key
-        args.service_name = service_name
         args.data = data
         args.delay = delay
         args.write(self._oprot)
@@ -103,23 +103,23 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def call_repeat(self, key, service_name, data, interval):
+    def call_repeat(self, service, key, data, interval):
         """
         Parameters:
+         - service
          - key
-         - service_name
          - data
          - interval
 
         """
-        self.send_call_repeat(key, service_name, data, interval)
+        self.send_call_repeat(service, key, data, interval)
         self.recv_call_repeat()
 
-    def send_call_repeat(self, key, service_name, data, interval):
+    def send_call_repeat(self, service, key, data, interval):
         self._oprot.writeMessageBegin('call_repeat', TMessageType.CALL, self._seqid)
         args = call_repeat_args()
+        args.service = service
         args.key = key
-        args.service_name = service_name
         args.data = data
         args.interval = interval
         args.write(self._oprot)
@@ -139,21 +139,21 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def remove_timer(self, key, service_name):
+    def remove_timer(self, service, key):
         """
         Parameters:
+         - service
          - key
-         - service_name
 
         """
-        self.send_remove_timer(key, service_name)
+        self.send_remove_timer(service, key)
         self.recv_remove_timer()
 
-    def send_remove_timer(self, key, service_name):
+    def send_remove_timer(self, service, key):
         self._oprot.writeMessageBegin('remove_timer', TMessageType.CALL, self._seqid)
         args = remove_timer_args()
+        args.service = service
         args.key = key
-        args.service_name = service_name
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -171,21 +171,21 @@ class Client(Iface):
         iprot.readMessageEnd()
         return
 
-    def _delete_timer(self, key, service_name):
+    def _delete_timer(self, service, key):
         """
         Parameters:
+         - service
          - key
-         - service_name
 
         """
-        self.send__delete_timer(key, service_name)
+        self.send__delete_timer(service, key)
         self.recv__delete_timer()
 
-    def send__delete_timer(self, key, service_name):
+    def send__delete_timer(self, service, key):
         self._oprot.writeMessageBegin('_delete_timer', TMessageType.CALL, self._seqid)
         args = _delete_timer_args()
+        args.service = service
         args.key = key
-        args.service_name = service_name
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -240,7 +240,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = call_later_result()
         try:
-            self._handler.call_later(args.key, args.service_name, args.data, args.delay)
+            self._handler.call_later(args.service, args.key, args.data, args.delay)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -263,7 +263,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = call_repeat_result()
         try:
-            self._handler.call_repeat(args.key, args.service_name, args.data, args.interval)
+            self._handler.call_repeat(args.service, args.key, args.data, args.interval)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -286,7 +286,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = remove_timer_result()
         try:
-            self._handler.remove_timer(args.key, args.service_name)
+            self._handler.remove_timer(args.service, args.key)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -309,7 +309,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = _delete_timer_result()
         try:
-            self._handler._delete_timer(args.key, args.service_name)
+            self._handler._delete_timer(args.service, args.key)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -332,17 +332,17 @@ class Processor(Iface, TProcessor):
 class call_later_args(object):
     """
     Attributes:
+     - service
      - key
-     - service_name
      - data
      - delay
 
     """
 
 
-    def __init__(self, key=None, service_name=None, data=None, delay=None,):
+    def __init__(self, service=None, key=None, data=None, delay=None,):
+        self.service = service
         self.key = key
-        self.service_name = service_name
         self.data = data
         self.delay = delay
 
@@ -357,12 +357,12 @@ class call_later_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRING:
-                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.service = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.STRING:
-                    self.service_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
@@ -385,13 +385,13 @@ class call_later_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('call_later_args')
-        if self.key is not None:
-            oprot.writeFieldBegin('key', TType.STRING, 1)
-            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+        if self.service is not None:
+            oprot.writeFieldBegin('service', TType.STRING, 1)
+            oprot.writeString(self.service.encode('utf-8') if sys.version_info[0] == 2 else self.service)
             oprot.writeFieldEnd()
-        if self.service_name is not None:
-            oprot.writeFieldBegin('service_name', TType.STRING, 2)
-            oprot.writeString(self.service_name.encode('utf-8') if sys.version_info[0] == 2 else self.service_name)
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
             oprot.writeFieldEnd()
         if self.data is not None:
             oprot.writeFieldBegin('data', TType.STRING, 3)
@@ -420,8 +420,8 @@ class call_later_args(object):
 all_structs.append(call_later_args)
 call_later_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
+    (1, TType.STRING, 'service', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'data', 'UTF8', None, ),  # 3
     (4, TType.DOUBLE, 'delay', None, None, ),  # 4
 )
@@ -473,17 +473,17 @@ call_later_result.thrift_spec = (
 class call_repeat_args(object):
     """
     Attributes:
+     - service
      - key
-     - service_name
      - data
      - interval
 
     """
 
 
-    def __init__(self, key=None, service_name=None, data=None, interval=None,):
+    def __init__(self, service=None, key=None, data=None, interval=None,):
+        self.service = service
         self.key = key
-        self.service_name = service_name
         self.data = data
         self.interval = interval
 
@@ -498,12 +498,12 @@ class call_repeat_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRING:
-                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.service = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.STRING:
-                    self.service_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
@@ -526,13 +526,13 @@ class call_repeat_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('call_repeat_args')
-        if self.key is not None:
-            oprot.writeFieldBegin('key', TType.STRING, 1)
-            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+        if self.service is not None:
+            oprot.writeFieldBegin('service', TType.STRING, 1)
+            oprot.writeString(self.service.encode('utf-8') if sys.version_info[0] == 2 else self.service)
             oprot.writeFieldEnd()
-        if self.service_name is not None:
-            oprot.writeFieldBegin('service_name', TType.STRING, 2)
-            oprot.writeString(self.service_name.encode('utf-8') if sys.version_info[0] == 2 else self.service_name)
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
             oprot.writeFieldEnd()
         if self.data is not None:
             oprot.writeFieldBegin('data', TType.STRING, 3)
@@ -561,8 +561,8 @@ class call_repeat_args(object):
 all_structs.append(call_repeat_args)
 call_repeat_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
+    (1, TType.STRING, 'service', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'data', 'UTF8', None, ),  # 3
     (4, TType.DOUBLE, 'interval', None, None, ),  # 4
 )
@@ -614,15 +614,15 @@ call_repeat_result.thrift_spec = (
 class remove_timer_args(object):
     """
     Attributes:
+     - service
      - key
-     - service_name
 
     """
 
 
-    def __init__(self, key=None, service_name=None,):
+    def __init__(self, service=None, key=None,):
+        self.service = service
         self.key = key
-        self.service_name = service_name
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -635,12 +635,12 @@ class remove_timer_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRING:
-                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.service = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.STRING:
-                    self.service_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             else:
@@ -653,13 +653,13 @@ class remove_timer_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('remove_timer_args')
-        if self.key is not None:
-            oprot.writeFieldBegin('key', TType.STRING, 1)
-            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+        if self.service is not None:
+            oprot.writeFieldBegin('service', TType.STRING, 1)
+            oprot.writeString(self.service.encode('utf-8') if sys.version_info[0] == 2 else self.service)
             oprot.writeFieldEnd()
-        if self.service_name is not None:
-            oprot.writeFieldBegin('service_name', TType.STRING, 2)
-            oprot.writeString(self.service_name.encode('utf-8') if sys.version_info[0] == 2 else self.service_name)
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -680,8 +680,8 @@ class remove_timer_args(object):
 all_structs.append(remove_timer_args)
 remove_timer_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
+    (1, TType.STRING, 'service', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
 )
 
 
@@ -731,15 +731,15 @@ remove_timer_result.thrift_spec = (
 class _delete_timer_args(object):
     """
     Attributes:
+     - service
      - key
-     - service_name
 
     """
 
 
-    def __init__(self, key=None, service_name=None,):
+    def __init__(self, service=None, key=None,):
+        self.service = service
         self.key = key
-        self.service_name = service_name
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -752,12 +752,12 @@ class _delete_timer_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRING:
-                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.service = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.STRING:
-                    self.service_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.key = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             else:
@@ -770,13 +770,13 @@ class _delete_timer_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('_delete_timer_args')
-        if self.key is not None:
-            oprot.writeFieldBegin('key', TType.STRING, 1)
-            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
+        if self.service is not None:
+            oprot.writeFieldBegin('service', TType.STRING, 1)
+            oprot.writeString(self.service.encode('utf-8') if sys.version_info[0] == 2 else self.service)
             oprot.writeFieldEnd()
-        if self.service_name is not None:
-            oprot.writeFieldBegin('service_name', TType.STRING, 2)
-            oprot.writeString(self.service_name.encode('utf-8') if sys.version_info[0] == 2 else self.service_name)
+        if self.key is not None:
+            oprot.writeFieldBegin('key', TType.STRING, 2)
+            oprot.writeString(self.key.encode('utf-8') if sys.version_info[0] == 2 else self.key)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -797,8 +797,8 @@ class _delete_timer_args(object):
 all_structs.append(_delete_timer_args)
 _delete_timer_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRING, 'key', 'UTF8', None, ),  # 1
-    (2, TType.STRING, 'service_name', 'UTF8', None, ),  # 2
+    (1, TType.STRING, 'service', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
 )
 
 
