@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import time
+from binascii import crc32
 from random import choice
 from typing import Dict, ContextManager
 import gevent
@@ -25,9 +26,9 @@ class Service:
     def addresses(self):
         return self._registry.addresses(self._name)
 
-    def address(self, hint):
+    def address(self, hint: str):
         addresses = self._local_addresses or self._good_addresses or self._all_addresses
-        return addresses[hash(hint) % len(addresses)]
+        return addresses[crc32(hint.encode()) % len(addresses)]
 
     @contextlib.contextmanager
     def connection(self, address=None) -> ContextManager[TProtocolBase]:
