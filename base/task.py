@@ -69,7 +69,7 @@ class AsyncTask(_BaseTask):
         stream = self.stream_name(Task(path=path))
         vf = var_args(f)
 
-        @self.receiver(Task, stream)
+        @self.receiver(Task, stream=stream)
         def handler(task: Task):
             args = loads(task.args)  # type: list
             kwargs = loads(task.kwargs)  # type: dict

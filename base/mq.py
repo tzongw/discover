@@ -24,7 +24,7 @@ class Publisher:
 
 
 class ProtoDispatcher(Dispatcher):
-    def __call__(self, key_or_cls, stream=None):
+    def __call__(self, key_or_cls, *, stream=None):
         if not isinstance(key_or_cls, type) or not issubclass(key_or_cls, BaseModel):
             assert stream is None
             return super().__call__(key_or_cls)
@@ -64,8 +64,8 @@ class Receiver:
         def _wakeup(data, sid):
             logging.info(f'{sid} {data}')
 
-    def __call__(self, key_or_cls, stream=None):
-        return self._dispatcher(key_or_cls, stream)
+    def __call__(self, key_or_cls, *, stream=None):
+        return self._dispatcher(key_or_cls, stream=stream)
 
     def start(self):
         streams = self._dispatcher.keys()
