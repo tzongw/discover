@@ -14,19 +14,18 @@ def batched(iterable, n):
 
 
 class LazySequence(Generic[T]):
-    def __init__(self, get_more):
+    def __init__(self, iterable):
         self._values = []
-        self._get_more = get_more
+        self._cursor = iter(iterable)
         self._done = False
 
     @singleflight
     def _load(self):
         assert not self._done
-        values = self._get_more()
-        if not values:
+        try:
+            self._values += next(self._cursor)
+        except StopIteration:
             self._done = True
-            return
-        self._values += values
 
     def __iter__(self):
         return self.slice(0)
@@ -42,7 +41,22 @@ class LazySequence(Generic[T]):
 
     def gt_slice(self, x, key=None):
         pos = 0
-        while pos >= len(self._values) and not self._done:
-            self._load()
+        while True:
             pos = bisect.bisect_right(self._values, x, lo=pos, key=key)
+            if pos < len(self._values) or self._done:
+                break
+            self._load()
         return self.slice(pos)
+
+
+if __name__ == '__main__':
+    def get_more():
+        for c in batched(range(10), 3):
+            print('loading', c)
+            yield c
+
+
+    lazy = LazySequence(get_more())
+    for i in range(10):
+        gt = next(iter(lazy.gt_slice(i)), None)
+        print(i, gt)

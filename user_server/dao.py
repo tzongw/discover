@@ -99,17 +99,18 @@ class Profile(Document, CacheMixin):
         return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
-def get_all_profiles():
-    def get_more():
-        nonlocal last_id
-        ids = []
-        for p in Profile.objects(id__gt=last_id).only('id').order_by('id').limit(100):
-            ids.append(p.id)
-            last_id = p.id
-        return full_cache.mget(ids)
-
+def get_more():
     last_id = 0
-    lazy = LazySequence(get_more)
+    while True:
+        ids = [p.id for p in Profile.objects(id__gt=last_id).only('id').order_by('id').limit(100)]
+        if not ids:
+            return
+        yield full_cache.mget(ids)
+        last_id = ids[-1]
+
+
+def get_all_profiles():
+    lazy = LazySequence(get_more())
     return lazy, None
 
 
