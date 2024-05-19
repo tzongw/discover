@@ -47,10 +47,10 @@ class Cache(Generic[T]):
         return value
 
     def _set_value(self, key, value):
-        replace = key in self.lru
+        exists = key in self.lru
         self.lru[key] = value
         if self.maxsize is not None:
-            if replace:
+            if exists:  # size not changed
                 self.lru.move_to_end(key)
             elif len(self.lru) > self.maxsize:
                 self.lru.popitem(last=False)
@@ -101,12 +101,9 @@ class Cache(Generic[T]):
             if convert:
                 key_or_keys = convert(key)
                 made_keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
-                for made_key in made_keys:
-                    self.lru.pop(made_key, None)
-                    if made_key in self.locks:
-                        self.locks[made_key] = False
             else:
-                made_key = self.make_key(key)
+                made_keys = [self.make_key(key)]
+            for made_key in made_keys:
                 self.lru.pop(made_key, None)
                 if made_key in self.locks:
                     self.locks[made_key] = False
