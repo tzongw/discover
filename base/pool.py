@@ -26,49 +26,44 @@ class Pool(metaclass=abc.ABCMeta):
         return False
 
     def close_all(self):
-        self._maxsize = 0
+        self._maxsize = 0  # _return_conn will close using conns
         while not self._pool.empty():
             conn = self._pool.get_nowait()
-            self._size -= 1
-            self.close_connection(conn)
+            self._close_conn(conn)
 
-    def _get(self):
+    def _get_conn(self):
         pool = self._pool
         if not pool.empty() or self._size >= self._maxsize:
             return pool.get(timeout=self._timeout)
 
         self._size += 1
         try:
-            new_item = self.create_connection()
+            conn = self.create_connection()
         except Exception:
             self._size -= 1
             raise
-        return new_item
+        return conn
 
-    def _put(self, item):
-        self._pool.put(item)
+    def _close_conn(self, conn):
+        self._size -= 1
+        self.close_connection(conn)
+
+    def _return_conn(self, conn):
+        if self._pool.qsize() < self._maxsize:
+            self._pool.put(conn)
+        else:
+            self._close_conn(conn)
 
     @contextlib.contextmanager
     def connection(self):
-        conn = self._get()
-
-        def close_conn():
-            self.close_connection(conn)
-            self._size -= 1
-
-        def return_conn():
-            if self._pool.qsize() < self._maxsize:
-                self._put(conn)
-            else:
-                close_conn()
-
+        conn = self._get_conn()
         try:
             yield conn
         except Exception as e:
             if self.biz_exception(e):
-                return_conn()
+                self._return_conn(conn)
             else:
-                close_conn()
+                self._close_conn(conn)
             raise
         else:
-            return_conn()
+            self._return_conn(conn)
