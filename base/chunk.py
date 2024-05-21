@@ -28,7 +28,7 @@ class LazySequence(Generic[T]):
             self._done = True
 
     def __iter__(self):
-        return self.slice(0)
+        return iter(self._values) if self._done else self.slice(0)
 
     def slice(self, pos) -> Iterator[T]:
         while True:
