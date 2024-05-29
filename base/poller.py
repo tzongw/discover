@@ -9,6 +9,7 @@ from redis import Redis
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
+from .utils import var_args
 
 
 @dataclass
@@ -53,7 +54,7 @@ class Poller:
                 if status is not PollStatus.DONE:
                     return
                 logging.debug(f'no jobs, stop {queue}')
-                task_id = self.task_id(group, queue)
+                task_id = self._task_id(group, queue)
                 async_task.cancel(task_id)
                 status = PollStatus(config.poll(queue))
                 if status is not PollStatus.DONE:  # race
@@ -63,11 +64,11 @@ class Poller:
         self.poll_task = poll_task
 
     @staticmethod
-    def task_id(group: str, queue: str):
+    def _task_id(group: str, queue: str):
         return f'poll:{group}:{queue}'
 
-    def notify(self, group: str, queue: str):
-        task_id = self.task_id(group, queue)
+    def notify(self, group: str, queue=''):
+        task_id = self._task_id(group, queue)
         if self.async_task.exists(task_id):
             return
         config = self.configs[group]
@@ -78,7 +79,7 @@ class Poller:
     def __call__(self, group, interval=timedelta(seconds=1), spawn=None):
         def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(poll, interval, spawn)
+            self.configs[group] = Config(var_args(poll), interval, spawn)
             return poll
 
         return decorator
