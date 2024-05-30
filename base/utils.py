@@ -140,14 +140,20 @@ class Exclusion:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 
-    def __call__(self, timeout: timedelta):
+    def __call__(self, timeout: timedelta, *names):
         def decorator(f):
+            path = func_desc(f)
+            assert '<' not in path, 'CAN NOT be lambda or local function'
+            assert not path.startswith('__main__'), '__main__ is different in another process'
+            params = signature(f).parameters
+            indexes = {name: index for name in names for index, param in enumerate(params.values()) if
+                       param.name == name}
+            assert len(indexes) == len(names)
+
             @wraps(f)
             def wrapper(*args, **kwargs):
-                path = func_desc(f)
-                assert '<' not in path, 'CAN NOT be lambda or local function'
-                assert not path.startswith('__main__'), '__main__ is different in another process'
-                key = f'exclusion:{path}'
+                keys = {name: args[index] if index < len(args) else kwargs[name] for name, index in indexes.items()}
+                key = f'exclusion:{path}:{stable_hash(keys)}'
                 with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
                     f(*args, **kwargs)
 

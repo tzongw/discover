@@ -49,7 +49,7 @@ def init_trace():
 
 @async_task
 @run_in_process
-@run_exclusively(timedelta(seconds=30))
+@run_exclusively(timedelta(seconds=30), 'message')
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')
