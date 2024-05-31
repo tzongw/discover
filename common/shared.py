@@ -127,7 +127,7 @@ def spawn_worker(f, *args, **kwargs):
             f(*args, **kwargs)
         t = time.time() - start
         if t > const.SLOW_WORKER:
-            logging.warning(f'slow worker {t} {desc}')
+            logging.warning(f'slow worker {t} {desc} {args = } {kwargs = }')
 
     g = gevent.spawn(worker)
     _workers[g] = desc

@@ -10,7 +10,7 @@ from inspect import signature
 from random import shuffle
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
-
+from yaml import safe_dump
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, DoesNotExist, FloatField
@@ -21,7 +21,7 @@ from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 
 from .invalidator import Invalidator
-from .utils import func_desc, stable_hash
+from .utils import func_desc
 
 
 class ListConverter(BaseConverter):
@@ -246,7 +246,7 @@ class Exclusion:
             @wraps(f)
             def wrapper(*args, **kwargs):
                 keys = [args[index] if index < len(args) else kwargs[name] for name, index in indexes.items()]
-                key = f'exclusion:{path}:{stable_hash(keys)}'
+                key = f'exclusion:{path}:{safe_dump(keys)}'
                 with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
                     f(*args, **kwargs)
 
