@@ -152,7 +152,7 @@ class Exclusion:
 
             @wraps(f)
             def wrapper(*args, **kwargs):
-                keys = {name: args[index] if index < len(args) else kwargs[name] for name, index in indexes.items()}
+                keys = [args[index] if index < len(args) else kwargs[name] for name, index in indexes.items()]
                 key = f'exclusion:{path}:{stable_hash(keys)}'
                 with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
                     f(*args, **kwargs)
