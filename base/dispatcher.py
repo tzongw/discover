@@ -2,10 +2,14 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
+from calendar import MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
 from typing import Iterable, Union
 from binascii import crc32
 from .executor import Executor
 from .utils import var_args
+
+WEEKDAY = [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
+WEEKEND = [SATURDAY, SUNDAY]
 
 
 class Dispatcher:
