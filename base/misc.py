@@ -188,7 +188,7 @@ class Stocks:
             pipe.execute()
 
     def get(self, key):
-        return self.mget([key])
+        return self.mget([key])[0]
 
     def mget(self, keys):
         with self.redis.pipeline(transaction=False) as pipe:
