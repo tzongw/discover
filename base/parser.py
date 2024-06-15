@@ -77,7 +77,7 @@ class Parser:
     def mget(self, keys, cls: Type[M]) -> List[M]:
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
-    def mset(self, mapping: Dict[str, M]) -> bool:
+    def mset(self, mapping: Dict[str, M]):
         mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
         return self._redis.mset(mapping)
 

@@ -11,11 +11,9 @@ import shared
 import const
 from common.messages import Login, Logout
 from models import Online, Session
-from redis.client import Pipeline
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key, script, tick
 from config import options
-from base import create_parser
 import push
 
 
@@ -35,14 +33,20 @@ class Handler:
             session = shared.parser.get(session_key(uid), Session)
             if (session is None or session.token != token) and options.env is not const.Environment.DEV:
                 raise ValueError("token error")
-            old_online = shared.parser.set(online_key(uid), Online(address=address, conn_id=conn_id),
-                                           ex=self.ONLINE_TTL, get=True)
-            shared.publisher.publish(Login(uid=uid))
-            if old_online:
-                logging.info(f'kick conn {uid} {old_online}')
-                with shared.gate_service.client(old_online.address) as client:
-                    client.send_text(old_online.conn_id, f'login other device')
-                    client.remove_conn(old_online.conn_id)
+            key = online_key(uid)
+            with redis.pipeline() as pipe:  # transaction
+                pipe.hgetall(key)
+                pipe.hset(key, conn_id, Online(token=token, address=address).json())
+                pipe.expire(key, self.ONLINE_TTL)
+                conns = pipe.execute()[0]
+            for _conn_id, json_value in conns.items():
+                online = Online.parse_raw(json_value)
+                if online.token != token:
+                    continue
+                logging.info(f'kick conn {uid} {_conn_id}')
+                with shared.gate_service.client(online.address) as client:
+                    client.send_text(_conn_id, f'login again')
+                    client.remove_conn(_conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
                 logging.info(f'login fail {address} {conn_id} {params}')
@@ -52,6 +56,7 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
+            shared.publisher.publish(Login(uid=uid))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success')
@@ -61,9 +66,12 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            online = shared.parser.getex(key, Online, ex=self.ONLINE_TTL)
-            if online is None or online.conn_id != conn_id:
-                raise ValueError(f'{online} {conn_id}')
+            with redis.pipeline(transaction=False) as pipe:
+                pipe.hexists(key, conn_id)
+                pipe.expire(key, self.ONLINE_TTL)
+                exists = pipe.execute()[0]
+            if not exists:
+                raise ValueError(f'invalid {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
@@ -76,15 +84,8 @@ class Handler:
             return
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
-
-        def unset_online(pipe: Pipeline):
-            online = create_parser(pipe).get(key, Online)
-            if online and online.conn_id == conn_id:
-                logging.info(f'clear {uid} {online}')
-                pipe.multi()
-                pipe.delete(key)
-
-        if redis.transaction(unset_online, key):
+        if redis.hdel(key, conn_id):
+            logging.info(f'logout {uid} {conn_id}')
             shared.publisher.publish(Logout(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
