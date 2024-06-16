@@ -63,10 +63,10 @@ class Service:
     def _update_addresses(self):
         addresses = self._all_addresses = sorted(self.addresses())
         now = time.time()
-        expires = [addr for addr, cd in self._cooldown.items() if now >= cd]
-        if expires:
-            logging.info(f'- cool down {self._name} {expires}')
-        for addr in expires:
+        expired = [addr for addr, cd in self._cooldown.items() if cd <= now]
+        if expired:
+            logging.info(f'- cool down {self._name} {expired}')
+        for addr in expired:
             self._cooldown.pop(addr)
         self._good_addresses = [addr for addr in addresses if addr not in self._cooldown]
         local_host = ip_address()

@@ -284,18 +284,13 @@ def login(username: str, password: str):
         pipe.hgetall(key)
         pipe.hset(key, token, models.Session(expire=now + ttl).json())
         pipe.expire(key, int(ttl))
-        tokens = pipe.execute()[0]
+        tokens = {token: models.Session.parse_raw(json_value) for token, json_value in pipe.execute()[0].items()}
     to_delete = []
-    min_token, min_expire = None, float('inf')
-    for token, json_value in tokens.items():
-        session = models.Session.parse_raw(json_value)
-        if session.expire < now:
-            to_delete.append(token)
-        elif session.expire < min_expire:
-            min_token = token
-            min_expire = session.expire
-    if len(tokens) >= MAX_SESSIONS and not to_delete:
-        to_delete.append(min_token)
+    for token in sorted(tokens, key=lambda x: tokens[x].expire):
+        session = tokens[token]
+        if session.expire > now and len(tokens) - len(to_delete) < MAX_SESSIONS:
+            break
+        to_delete.append(token)
     if to_delete:
         redis.hdel(key, *to_delete)
         for token in to_delete:
