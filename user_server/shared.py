@@ -28,7 +28,7 @@ def session_key(uid: int):
     return f'session:{uid}'
 
 
-def get_session(uid: int):
+def _get_tokens(uid: int):
     tokens = {}
     now = time.time()
     ttl = 3600
@@ -41,5 +41,5 @@ def get_session(uid: int):
     return MappingProxyType(tokens), ttl
 
 
-sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=get_session, make_key=int)
+sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
 sessions.listen(invalidator, 'session')

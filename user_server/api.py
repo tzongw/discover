@@ -279,11 +279,11 @@ def login(username: str, password: str):
     flask.session.permanent = True
     key = session_key(account.id)
     now = time.time()
-    ttl = int(app.permanent_session_lifetime.total_seconds())
+    ttl = app.permanent_session_lifetime.total_seconds()
     with redis.pipeline() as pipe:
         pipe.hgetall(key)
         pipe.hset(key, token, models.Session(expire=now + ttl).json())
-        pipe.expire(key, ttl)
+        pipe.expire(key, int(ttl))
         tokens = pipe.execute()[0]
     to_delete = []
     min_token, min_expire = None, float('inf')
@@ -356,6 +356,16 @@ def whoami():
     """
     logging.info(f'{ctx.__dict__}')
     account = Account(id=g.uid)
+    token = flask.session.get(CTX_TOKEN)
+    session = sessions.get(g.uid)[token]
+    ttl = app.permanent_session_lifetime.total_seconds()
+    now = time.time()
+    if session.expire < now + 0.8 * ttl:
+        key = session_key(account.id)
+        with redis.pipeline() as pipe:  # extend token
+            pipe.hset(key, token, models.Session(expire=now + ttl).json())
+            pipe.expire(key, int(ttl))
+            pipe.execute()
     return account
 
 
