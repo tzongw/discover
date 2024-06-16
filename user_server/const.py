@@ -7,3 +7,5 @@ CTX_TOKEN = 'token'
 CTX_GROUP = 'group'
 
 ROOM = 'room'
+
+MAX_SESSIONS = 3

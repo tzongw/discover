@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 
 class Session(BaseModel):
-    token: str
+    expire: float
 
 
 class Online(BaseModel):

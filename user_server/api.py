@@ -23,10 +23,11 @@ from base.poller import PollStatus
 from base.utils import base62
 from common.shared import run_exclusively
 from config import options, ctx
-from const import CTX_UID, CTX_TOKEN
+from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
 from dao import Account, Session, collections
-from shared import app, parser, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
+from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
 from shared import session_key, async_task, run_in_process, script
+import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
@@ -241,36 +242,6 @@ def hash_password(uid: int, password: str) -> str:
     return sha1(f'{uid}{password}'.encode()).hexdigest()
 
 
-@app.route('/register', methods=['POST'])
-@use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
-def register(username: str, password: str):
-    """register
-    ---
-    tags:
-      - account
-    parameters:
-      - name: username
-        in: formData
-        type: string
-        required: true
-      - name: password
-        in: formData
-        type: string
-        required: true
-    responses:
-      200:
-        description: account
-    """
-    session = Session()
-    uid = id_generator.gen()
-    hashed = hash_password(uid, password)
-    account = Account(id=uid, username=username, hashed=hashed)
-    session.add(account)
-    session.commit()
-    dispatcher.signal(account)
-    return account
-
-
 @app.route('/login', methods=['POST'])
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(username: str, password: str):
@@ -293,16 +264,43 @@ def login(username: str, password: str):
     """
     session = Session()
     account = session.query(Account).filter(Account.username == username).first()  # type: Account
-    if account is None or account.hashed != hash_password(account.id, password):
+    if account is None:  # register
+        uid = id_generator.gen()
+        hashed = hash_password(uid, password)
+        account = Account(id=uid, username=username, hashed=hashed)
+        session.add(account)
+        session.commit()
+        dispatcher.signal(account)
+    elif account.hashed != hash_password(account.id, password):
         return 'account not exist or password error'
-    else:
-        flask.session[CTX_UID] = account.id
-        token = str(uuid.uuid4())
-        flask.session[CTX_TOKEN] = token
-        flask.session.permanent = True
-        key = session_key(account.id)
-        parser.set(key, models.Session(token=token), ex=app.permanent_session_lifetime)
-        return account
+    flask.session[CTX_UID] = account.id
+    token = str(uuid.uuid4())
+    flask.session[CTX_TOKEN] = token
+    flask.session.permanent = True
+    key = session_key(account.id)
+    now = time.time()
+    ttl = int(app.permanent_session_lifetime.total_seconds())
+    with redis.pipeline() as pipe:
+        pipe.hgetall(key)
+        pipe.hset(key, token, models.Session(expire=now + ttl).json())
+        pipe.expire(key, ttl)
+        tokens = pipe.execute()[0]
+    to_delete = []
+    min_token, min_expire = None, float('inf')
+    for token, json_value in tokens.items():
+        session = models.Session.parse_raw(json_value)
+        if session.expire < now:
+            to_delete.append(token)
+        elif session.expire < min_expire:
+            min_token = token
+            min_expire = session.expire
+    if len(tokens) >= MAX_SESSIONS and not to_delete:
+        to_delete.append(min_token)
+    if to_delete:
+        redis.hdel(key, *to_delete)
+        for token in to_delete:
+            push.kick(account.id, token, 'token expired')
+    return account
 
 
 bp = Blueprint('/', __name__)
@@ -313,8 +311,7 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
         raise Unauthorized
-    session = sessions.get(uid)
-    if not session or token != session.token:
+    if token not in sessions.get(uid):
         raise Unauthorized
     ctx.uid = g.uid = uid
 

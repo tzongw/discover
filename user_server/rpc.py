@@ -10,7 +10,7 @@ from thrift.server import TServer
 import shared
 import const
 from common.messages import Login, Logout
-from models import Online, Session
+from models import Online
 from service import user
 from shared import dispatcher, app, online_key, redis, session_key, script, tick
 from config import options
@@ -26,12 +26,11 @@ class Handler:
             params = {k[2:].lower() if k.startswith('X-') else k.lower(): v for k, v in params.items()}
             if cookie := params.pop('cookie', None):
                 request = app.request_class({'HTTP_COOKIE': cookie})
-                session = app.open_session(request)
+                session = app.session_interface.open_session(app, request)
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            session = shared.parser.get(session_key(uid), Session)
-            if (session is None or session.token != token) and options.env is not const.Environment.DEV:
+            if token not in shared.sessions.get(uid) and options.env is not const.Environment.DEV:
                 raise ValueError("token error")
             key = online_key(uid)
             with redis.pipeline() as pipe:  # transaction

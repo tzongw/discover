@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from types import MappingProxyType
 from common.shared import *
 import functools
 from flasgger import Swagger
@@ -28,12 +29,17 @@ def session_key(uid: int):
 
 
 def get_session(uid: int):
-    key = session_key(uid)
-    with redis.pipeline(transaction=False) as pipe:
-        create_parser(pipe).get(key, Session)
-        pipe.ttl(key)
-        return pipe.execute()
+    tokens = {}
+    now = time.time()
+    ttl = 3600
+    for token, json_value in redis.hgetall(session_key(uid)).items():
+        session = Session.parse_raw(json_value)
+        if session.expire < now:
+            continue
+        tokens[token] = session
+        ttl = min(session.expire - now, ttl)
+    return MappingProxyType(tokens), ttl
 
 
-sessions: TtlCache[Session] = TtlCache(get=get_session)
+sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=get_session, make_key=int)
 sessions.listen(invalidator, 'session')
