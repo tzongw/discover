@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Union, Type, Optional, List, Dict, TypeVar
+from typing import Union, Type, Optional, List, TypeVar
 from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
@@ -28,8 +28,8 @@ def patch_callbacks(callbacks):
     callbacks['GET'] = callback
     callbacks['GETDEL'] = callback
     callbacks['GETEX'] = callback
-    callbacks['HMGET'] = callback
     callbacks['MGET'] = mget_callback
+    callbacks['HMGET'] = callback
 
 
 patch_callbacks(Redis.RESPONSE_CALLBACKS)
@@ -48,7 +48,7 @@ class Parser:
         return lambda value: cls.parse_raw(value) if value is not None else None
 
     def set(self, name: str, model: M, **kwargs) -> Union[M, bool]:
-        response = self._redis.set(name, model.json(exclude_defaults=True), **kwargs)
+        response = self._redis.set(name, model, **kwargs)
         if kwargs.get('get'):
             convert = self._parser(model.__class__)
             if response is self._redis:  # pipeline command staged
@@ -77,10 +77,6 @@ class Parser:
     def mget(self, keys, cls: Type[M]) -> List[M]:
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
-    def mset(self, mapping: Dict[str, M]):
-        mapping = {k: v.json(exclude_defaults=True) for k, v in mapping.items()}
-        return self._redis.mset(mapping)
-
     def hget(self, name, cls: Type[M], *, include=(), exclude=()) -> Optional[M]:
         if not include:
             include = [field for field in cls.__fields__ if field not in exclude]
@@ -98,7 +94,6 @@ class Parser:
         return self._redis.hset(name, mapping=mapping)
 
     mget_nonatomic = mget
-    mset_nonatomic = mset
 
 
 class ParserCluster(Parser):
@@ -114,15 +109,6 @@ class ParserCluster(Parser):
             for key in keys:
                 parser.get(key, cls)
             return pipe.execute()
-
-    def mset_nonatomic(self, mapping: Dict[str, M]) -> bool:
-        assert type(self._redis) is RedisCluster
-        with self._redis.pipeline(transaction=False) as pipe:
-            parser = ParserCluster(pipe)
-            for k, v in mapping.items():
-                parser.set(k, v)
-            pipe.execute()
-        return True
 
 
 def create_parser(redis):
