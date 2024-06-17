@@ -18,7 +18,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden, Conflict
 
 import models
-from base import singleflight
+from base import singleflight, create_parser
 from base.poller import PollStatus
 from base.utils import base62
 from common.shared import run_exclusively
@@ -281,10 +281,10 @@ def login(username: str, password: str):
     now = time.time()
     ttl = app.permanent_session_lifetime.total_seconds()
     with redis.pipeline() as pipe:
-        pipe.hgetall(key)
-        pipe.hset(key, token, models.Session(expire=now + ttl).json())
+        create_parser(pipe).hgetall(key, models.Session)
+        pipe.hset(key, token, models.Session(expire=now + ttl))
         pipe.expire(key, int(ttl))
-        tokens = {token: models.Session.parse_raw(json_value) for token, json_value in pipe.execute()[0].items()}
+        tokens = pipe.execute()[0]
     to_delete = []
     for token in sorted(tokens, key=lambda x: tokens[x].expire):
         session = tokens[token]
@@ -359,7 +359,7 @@ def whoami():
         session.expire = now + ttl
         key = session_key(account.id)
         with redis.pipeline() as pipe:  # extend token
-            pipe.hset(key, token, session.json())
+            pipe.hset(key, token, session)
             pipe.expire(key, int(ttl))
             pipe.execute()
     return account

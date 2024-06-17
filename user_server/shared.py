@@ -32,8 +32,7 @@ def _get_tokens(uid: int):
     tokens = {}
     now = time.time()
     ttl = 3600
-    for token, json_value in redis.hgetall(session_key(uid)).items():
-        session = Session.parse_raw(json_value)
+    for token, session in parser.hgetall(session_key(uid), Session).items():
         if session.expire > now:
             tokens[token] = session
             ttl = min(session.expire - now, ttl)

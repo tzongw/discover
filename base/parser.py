@@ -20,6 +20,11 @@ def mget_callback(response, convert=None):
     return [convert(value) for value in response] if convert else response
 
 
+def hgetall_callback(response, convert=None):
+    response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
+    return {k: convert(v) for k, v in response.items()} if convert else response
+
+
 def patch_callbacks(callbacks):
     if 'SET_ORIG' in callbacks:  # already done
         return
@@ -30,6 +35,8 @@ def patch_callbacks(callbacks):
     callbacks['GETEX'] = callback
     callbacks['MGET'] = mget_callback
     callbacks['HMGET'] = callback
+    callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
+    callbacks['HGETALL'] = hgetall_callback
 
 
 patch_callbacks(Redis.RESPONSE_CALLBACKS)
@@ -92,6 +99,9 @@ class Parser:
     def hset(self, name: str, model: M) -> int:
         mapping = model.dict(exclude_unset=True)
         return self._redis.hset(name, mapping=mapping)
+
+    def hgetall(self, name, cls: Type[M]):
+        return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
 
     mget_nonatomic = mget
 

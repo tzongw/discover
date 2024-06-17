@@ -9,10 +9,11 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 import shared
 import const
+from base import create_parser
 from common.messages import Login, Logout
 from models import Online
 from service import user
-from shared import dispatcher, app, online_key, redis, session_key, script, tick
+from shared import dispatcher, app, online_key, redis, script, tick
 from config import options
 import push
 
@@ -34,12 +35,11 @@ class Handler:
                 raise ValueError("token error")
             key = online_key(uid)
             with redis.pipeline() as pipe:  # transaction
-                pipe.hgetall(key)
-                pipe.hset(key, conn_id, Online(token=token, address=address).json())
+                create_parser(pipe).hgetall(key, Online)
+                pipe.hset(key, conn_id, Online(token=token, address=address))
                 pipe.expire(key, self.ONLINE_TTL)
                 conns = pipe.execute()[0]
-            for _conn_id, json_value in conns.items():
-                online = Online.parse_raw(json_value)
+            for _conn_id, online in conns.items():
                 if online.token != token:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
