@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
 from redis import Redis, RedisCluster
+from redis.connection import Encoder
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
-from datetime import timedelta
+from pydantic import BaseModel
 from .utils import LogSuppress, Addr, ip_address, stream_name
 from .misc import ListConverter, Exclusion
 from .singleflight import Singleflight, singleflight
@@ -61,3 +63,13 @@ def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
 RedisCluster.transaction = _transaction
 _orig_pipeline = RedisCluster.pipeline
 RedisCluster.pipeline = _pipeline
+
+
+def _encode(self: Encoder, value):
+    if isinstance(value, BaseModel):
+        value = value.json(exclude_defaults=True)
+    return _orig_encode(self, value)
+
+
+_orig_encode = Encoder.encode
+Encoder.encode = _encode

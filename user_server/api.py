@@ -356,9 +356,10 @@ def whoami():
     ttl = app.permanent_session_lifetime.total_seconds()
     now = time.time()
     if session.expire < now + 0.8 * ttl:
+        session.expire = now + ttl
         key = session_key(account.id)
         with redis.pipeline() as pipe:  # extend token
-            pipe.hset(key, token, models.Session(expire=now + ttl).json())
+            pipe.hset(key, token, session.json())
             pipe.expire(key, int(ttl))
             pipe.execute()
     return account
