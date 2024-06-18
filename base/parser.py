@@ -27,7 +27,7 @@ def hgetall_callback(response, convert=None):
 
 
 def patch_callbacks(callbacks):
-    if 'SET_ORIG' not in callbacks and 'SET' in callbacks:  # already done
+    if 'SET_ORIG' not in callbacks and 'SET' in callbacks:
         callbacks['SET_ORIG'] = callbacks['SET']
         callbacks['SET'] = set_callback
         callbacks['GET'] = callback

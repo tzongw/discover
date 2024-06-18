@@ -65,7 +65,7 @@ class Registry:
         with self._redis.pipeline(transaction=False) as pipe:
             for name in self._services:
                 pipe.hkeys(self._full_key(name))
-            for keys in pipe.execute():
+            for name, keys in zip(self._services, pipe.execute()):
                 addresses[name] = set(keys)
         if addresses != self._addresses:
             logging.info(f'{self._addresses} -> {addresses}')
