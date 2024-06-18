@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
 from pydantic import BaseModel
 
 
 class Session(BaseModel):
-    expire: float
+    create_time: datetime
 
 
 class Online(BaseModel):

@@ -29,14 +29,10 @@ def session_key(uid: int):
 
 
 def _get_tokens(uid: int):
-    tokens = {}
-    now = time.time()
-    ttl = 3600
-    for token, session in parser.hgetall(session_key(uid), Session).items():
-        if session.expire > now:
-            tokens[token] = session
-            ttl = min(session.expire - now, ttl)
-    return MappingProxyType(tokens), ttl
+    key = session_key(uid)
+    tokens = parser.hgetall(key, Session)
+    ttls = redis.httl(key, *tokens)
+    return MappingProxyType(tokens), max(min(ttls), 0)
 
 
 sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=_get_tokens, make_key=int)

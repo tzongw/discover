@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections import OrderedDict
-from datetime import timedelta
+from datetime import timedelta, datetime
 from hashlib import sha1
 
 import flask
@@ -278,20 +278,15 @@ def login(username: str, password: str):
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     key = session_key(account.id)
-    now = time.time()
-    ttl = app.permanent_session_lifetime.total_seconds()
     with redis.pipeline() as pipe:
-        create_parser(pipe).hgetall(key, models.Session)
-        pipe.hset(key, token, models.Session(expire=now + ttl))
-        pipe.expire(key, int(ttl))
+        pipe.hkeys(key)
+        pipe.hset(key, token, models.Session(create_time=datetime.now()))
+        pipe.hexpire(key, app.permanent_session_lifetime, token)
         tokens = pipe.execute()[0]
-    to_delete = []
-    for token in sorted(tokens, key=lambda x: tokens[x].expire):
-        session = tokens[token]
-        if session.expire > now and len(tokens) - len(to_delete) < MAX_SESSIONS:
-            break
-        to_delete.append(token)
-    if to_delete:
+    if len(tokens) >= MAX_SESSIONS:
+        ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
+        tokens.sort(key=lambda x: ttls[x])
+        to_delete = tokens[:len(tokens) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
         for token in to_delete:
             push.kick(account.id, token, 'token expired')
@@ -352,16 +347,11 @@ def whoami():
     logging.info(f'{ctx.__dict__}')
     account = Account(id=g.uid)
     token = flask.session.get(CTX_TOKEN)
-    session = sessions.get(g.uid)[token]
+    key = session_key(account.id)
     ttl = app.permanent_session_lifetime.total_seconds()
     now = time.time()
-    if session.expire < now + 0.8 * ttl:
-        session.expire = now + ttl
-        key = session_key(account.id)
-        with redis.pipeline() as pipe:  # extend token
-            pipe.hset(key, token, session)
-            pipe.expire(key, int(ttl))
-            pipe.execute()
+    if redis.httl(key, token)[0] < now + 0.8 * ttl:
+        redis.hexpire(key, token, int(ttl))  # extend token
     return account
 
 
