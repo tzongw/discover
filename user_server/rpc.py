@@ -37,7 +37,7 @@ class Handler:
             with redis.pipeline() as pipe:  # transaction
                 create_parser(pipe).hgetall(key, Online)
                 pipe.hset(key, conn_id, Online(token=token, address=address))
-                pipe.expire(key, self.ONLINE_TTL)
+                pipe.hexpire(key, self.ONLINE_TTL, token)
                 conns = pipe.execute()[0]
             for _conn_id, online in conns.items():
                 if online.token != token:
@@ -65,11 +65,8 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            with redis.pipeline(transaction=False) as pipe:
-                pipe.hexists(key, conn_id)
-                pipe.expire(key, self.ONLINE_TTL)
-                exists = pipe.execute()[0]
-            if not exists:
+            values = redis.hexpire(key, self.ONLINE_TTL, conn_id)
+            if not values or values[0] != 1:
                 raise ValueError(f'invalid {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')

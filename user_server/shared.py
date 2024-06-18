@@ -32,7 +32,7 @@ def _get_tokens(uid: int):
     key = session_key(uid)
     tokens = parser.hgetall(key, Session)
     ttls = redis.httl(key, *tokens)
-    return MappingProxyType(tokens), max(min(ttls), 0)
+    return MappingProxyType(tokens), min(ttls)
 
 
 sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
