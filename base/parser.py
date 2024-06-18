@@ -4,12 +4,13 @@ from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
 from redis.cluster import ClusterPipeline
+from redis.client import _RedisCallbacks, _RedisCallbacksRESP2
 
 M = TypeVar('M', bound=BaseModel)
 
 
 def set_callback(response, convert=None, **options):
-    return convert(response) if convert else Redis.RESPONSE_CALLBACKS['SET_ORIG'](response, **options)
+    return convert(response) if convert else _RedisCallbacks['SET_ORIG'](response, **options)
 
 
 def callback(response, convert=None):
@@ -21,25 +22,26 @@ def mget_callback(response, convert=None):
 
 
 def hgetall_callback(response, convert=None):
-    response = Redis.RESPONSE_CALLBACKS['HGETALL_ORIG'](response)
+    response = _RedisCallbacksRESP2['HGETALL_ORIG'](response)
     return {k: convert(v) for k, v in response.items()} if convert else response
 
 
 def patch_callbacks(callbacks):
-    if 'SET_ORIG' in callbacks:  # already done
-        return
-    callbacks['SET_ORIG'] = callbacks['SET']
-    callbacks['SET'] = set_callback
-    callbacks['GET'] = callback
-    callbacks['GETDEL'] = callback
-    callbacks['GETEX'] = callback
-    callbacks['MGET'] = mget_callback
-    callbacks['HMGET'] = callback
-    callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
-    callbacks['HGETALL'] = hgetall_callback
+    if 'SET_ORIG' not in callbacks and 'SET' in callbacks:  # already done
+        callbacks['SET_ORIG'] = callbacks['SET']
+        callbacks['SET'] = set_callback
+        callbacks['GET'] = callback
+        callbacks['GETDEL'] = callback
+        callbacks['GETEX'] = callback
+        callbacks['MGET'] = mget_callback
+        callbacks['HMGET'] = callback
+    if 'HGETALL_ORIG' not in callbacks and 'HGETALL' in callbacks:
+        callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
+        callbacks['HGETALL'] = hgetall_callback
 
 
-patch_callbacks(Redis.RESPONSE_CALLBACKS)
+patch_callbacks(_RedisCallbacks)
+patch_callbacks(_RedisCallbacksRESP2)
 
 
 class Parser:
