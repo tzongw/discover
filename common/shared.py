@@ -29,7 +29,7 @@ dispatcher = Dispatcher()
 tick = TimeDispatcher()
 
 app_name = options.app_name
-registry = Registry(Redis.from_url(options.registry, decode_responses=True))
+registry = Registry(Redis.from_url(options.registry, decode_responses=True), const.SERVICES)
 
 redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
     Redis.from_url(options.redis, decode_responses=True)

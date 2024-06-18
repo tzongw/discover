@@ -18,6 +18,8 @@ RPC_TIMER = f'rpc_{APP_TIMER}'
 RPC_GATE = f'rpc_{APP_GATE}'
 WS_GATE = f'ws_{APP_GATE}'
 
+SERVICES = [RPC_USER, RPC_USER, RPC_TIMER, RPC_GATE, WS_GATE]
+
 
 class Environment(Enum):
     DEV = 'dev'

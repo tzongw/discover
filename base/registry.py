@@ -13,8 +13,8 @@ class Registry:
     COOLDOWN = _TTL + _INTERVAL
 
     @classmethod
-    def _full_key(cls, name, address):
-        return f'{cls._PREFIX}:{name}:{address}'
+    def _full_key(cls, name):
+        return f'{cls._PREFIX}:{name}'
 
     @classmethod
     def _unpack(cls, key: str):
@@ -22,9 +22,10 @@ class Registry:
         assert prefix == cls._PREFIX
         return name, address
 
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Redis, services):
         self._redis = redis
-        self._services = {}  # type: dict[str, str]
+        self._services = services
+        self._registered = {}  # type: dict[str, str]
         self._stopped = False
         self._addresses = {}  # type: dict[str, frozenset[str]]
         self._callbacks = []
@@ -38,32 +39,34 @@ class Registry:
         return [gevent.spawn(self._run)]
 
     def stop(self):
-        logging.info(f'stop {self._services}')
+        logging.info(f'stop {self._registered}')
         self._stopped = True
         self._unregister()
 
     def register(self, services):
         logging.info(f'register {services}')
-        self._services.update(services)
+        self._registered.update(services)
         self._unregister()  # remove first & wake up
 
     def _unregister(self):
-        if not self._services:
+        if not self._registered:
             return
-        keys = [self._full_key(name, address) for name, address in self._services.items()]
-        self._redis.delete(*keys)
-        self._redis.publish(self._PREFIX, 'unregister')
+        with self._redis.pipeline(transaction=False) as pipe:
+            for name, address in self._registered.items():
+                pipe.hdel(self._full_key(name), address)
+            pipe.publish(self._PREFIX, 'unregister')
+            pipe.execute()
 
     def addresses(self, name) -> frozenset[str]:  # constant
         return self._addresses.get(name) or frozenset()
 
     def _refresh(self):
-        keys = set(self._redis.scan_iter(match=f'{self._PREFIX}:*', count=1000))
-        addresses = defaultdict(set)
-        for key in keys:
-            with LogSuppress():
-                name, address = self._unpack(key)
-                addresses[name].add(address)
+        addresses = {}
+        with self._redis.pipeline(transaction=False) as pipe:
+            for name in self._services:
+                pipe.hkeys(self._full_key(name))
+            for keys in pipe.execute():
+                addresses[name] = set(keys)
         if addresses != self._addresses:
             logging.info(f'{self._addresses} -> {addresses}')
             self._addresses = {k: frozenset(v) for k, v in addresses.items()}
@@ -75,16 +78,17 @@ class Registry:
         sub = None
         while True:
             try:
-                if self._services and not self._stopped:
-                    with self._redis.pipeline(transaction=False) as pipe:
-                        for name, address in self._services.items():
-                            key = self._full_key(name, address)
-                            pipe.set(key, '', ex=self._TTL, get=True)
+                if self._registered and not self._stopped:
+                    with self._redis.pipeline() as pipe:
+                        for name, address in self._registered.items():
+                            key = self._full_key(name)
+                            pipe.hset(key, address, '')
+                            pipe.hexpire(key, self._TTL, address)
                         values = pipe.execute()
                     if self._stopped:  # race
                         self._unregister()
-                    elif any(v is None for v in values):
-                        logging.info(f'publish {self._services}')
+                    elif any(added for added in values[::2]):
+                        logging.info(f'publish {self._registered}')
                         self._redis.publish(self._PREFIX, 'register')
                 if not sub:
                     sub = self._redis.pubsub()
