@@ -18,7 +18,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden, Conflict
 
 import models
-from base import singleflight, create_parser
+from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
 from common.shared import run_exclusively
