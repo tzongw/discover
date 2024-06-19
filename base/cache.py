@@ -21,7 +21,7 @@ def expire_at(expire):
     if isinstance(expire, timedelta):
         return time.time() + expire.total_seconds()
     if isinstance(expire, (int, float)):
-        return float('inf') if expire < 0 else time.time() + expire
+        return time.time() + expire
     raise ValueError(f'{expire} not valid')
 
 
