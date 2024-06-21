@@ -37,7 +37,7 @@ define('config', type=str, help='path to config file',
 define('app_name', 'app', str, 'app name')
 define('env', Environment.DEV, Environment, 'environment')
 define('registry', 'redis://', str, 'registry redis url')
-define('redis', 'redis://', str, 'biz redis url')
+define('redis', '', str, 'biz redis url')
 define('redis_cluster', '', str, 'biz redis cluster url')
 define('datacenter', 0, int, 'data center id')
 define('log_file', type=str, help='log file path')
