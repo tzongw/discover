@@ -66,10 +66,10 @@ class Registry:
             for name in self._services:
                 pipe.hkeys(self._full_key(name))
             for name, keys in zip(self._services, pipe.execute()):
-                addresses[name] = set(keys)
+                addresses[name] = frozenset(keys)
         if addresses != self._addresses:
             logging.info(f'{self._addresses} -> {addresses}')
-            self._addresses = {k: frozenset(v) for k, v in addresses.items()}
+            self._addresses = addresses
             for cb in self._callbacks:
                 with LogSuppress():
                     cb()

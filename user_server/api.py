@@ -351,7 +351,7 @@ def whoami():
     ttl = app.permanent_session_lifetime.total_seconds()
     now = time.time()
     if redis.httl(key, token)[0] < now + 0.8 * ttl:
-        redis.hexpire(key, token, int(ttl))  # extend token
+        redis.hexpire(key, token, int(ttl))  # will invalidate local cache
     return account
 
 
