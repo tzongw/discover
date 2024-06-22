@@ -73,7 +73,7 @@ _kw_mark = object()
 def make_key(key, *args, **kwargs):
     if not args and not kwargs:
         return key
-    return key, *args, _kw_mark, *kwargs.items()
+    return key, args, _kw_mark, *kwargs.items()
 
 
 def stream_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:

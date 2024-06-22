@@ -37,31 +37,34 @@ class Invalidator:
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
 
-    def _invalidate_all(self):
-        for group in self.groups:
-            self.dispatcher.dispatch(group, '')
+    def publish(self, group, key):
+        full_key = self.full_key(group, key)
+        self.redis.publish('__redis__:invalidate', full_key)
 
     def future(self, group, key):
         assert group in self.getters
-        full_key = f'{group}{self.sep}{key}'
+        full_key = self.full_key(group, key)
         fut = self.futures.get(full_key)
         if not fut:
             fut = self.futures[full_key] = Future()
         return fut
 
-    def publish(self, group, key):
+    def full_key(self, group, key):
         assert self.sep not in group
-        full_key = f'{group}{self.sep}{key}'
-        self.redis.publish('__redis__:invalidate', full_key)
+        return f'{group}{self.sep}{key}'
 
-    def _get_result(self, fut: Future, group, key):
+    def _get_result(self, fut: Future, full_key, group):
         try:
-            getter = self.getters.get(group)
-            value = getter(key) if getter else self.redis.get(key)
+            getter = self.getters[group]
+            value = getter(full_key)
             fut.set_result(value)
         except Exception as e:
             fut.set_exception(e)
             raise
+
+    def _invalidate_all(self):
+        for group in self.groups:
+            self.dispatcher.dispatch(group, '')
 
     def _run(self, redis, subscribe=True):
         sub = None
@@ -95,7 +98,7 @@ class Invalidator:
                     group, key = full_key.split(self.sep, maxsplit=1)
                     self.dispatcher.dispatch(group, key)
                     if fut := self.futures.pop(full_key, None):
-                        self.executor.submit(self._get_result, fut, group, key)
+                        self.executor.submit(self._get_result, fut, full_key, group)
             except Exception:
                 logging.exception(f'')
                 sub = None

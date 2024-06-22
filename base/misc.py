@@ -87,7 +87,7 @@ class GetterMixin:
         if not keys:
             return []
         query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query).only(*only).limit(len(keys))}
+        mapping = {o.id: o for o in cls.objects(**query).only(*only)}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod

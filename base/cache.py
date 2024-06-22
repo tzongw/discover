@@ -214,14 +214,16 @@ class FullTtlCache(FullMixin[T], TtlCache[T]):
 
 def ttl_cache(expire, *, maxsize=128):
     def decorator(f):
-        def get(_, *args, **kwargs):
-            return f(*args, **kwargs), expire
+        def get(key):
+            args, *items = key
+            return f(*args, **dict(items)), expire
 
         cache = TtlCache(get=get, maxsize=maxsize)
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
-            return cache.get(None, *args, **kwargs)
+            key = (args, *kwargs.items())
+            return cache.get(key)
 
         wrapper.cache = cache
         return wrapper

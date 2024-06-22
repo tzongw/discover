@@ -51,13 +51,15 @@ class Singleflight:
 
 
 def singleflight(f):
-    def get(_, *args, **kwargs):
-        return f(*args, **kwargs)
+    def get(key):
+        args, *items = key
+        return f(*args, **dict(items))
 
     sf = Singleflight(get=get)
 
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        return sf.get(None, *args, **kwargs)
+        key = (args, *kwargs.items())
+        return sf.get(key)
 
     return wrapper

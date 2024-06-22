@@ -105,14 +105,14 @@ def echo(message):
 
 
 @invalidator.getter('future')
-def getter(key):
-    return redis.get(f'future:{key}')
+def getter(full_key):
+    return redis.get(full_key)
 
 
 @app.route('/future/<key>')
 @singleflight
 def get_future(key):
-    full_key = f'future:{key}'
+    full_key = invalidator.full_key('future', key)
     placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
     value = redis.set(full_key, placeholder, nx=True, ex=10, get=True)
     if value is None:  # first request
