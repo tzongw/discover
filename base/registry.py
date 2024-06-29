@@ -16,12 +16,6 @@ class Registry:
     def _full_key(cls, name):
         return f'{cls._PREFIX}:{name}'
 
-    @classmethod
-    def _unpack(cls, key: str):
-        prefix, name, address = key.split(sep=':', maxsplit=2)
-        assert prefix == cls._PREFIX
-        return name, address
-
     def __init__(self, redis: Redis, services):
         self._redis = redis
         self._services = services
@@ -79,7 +73,7 @@ class Registry:
         while True:
             try:
                 if self._registered and not self._stopped:
-                    with self._redis.pipeline() as pipe:
+                    with self._redis.pipeline(transaction=True) as pipe:
                         for name, address in self._registered.items():
                             key = self._full_key(name)
                             pipe.hset(key, address, '')

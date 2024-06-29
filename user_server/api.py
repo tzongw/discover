@@ -278,7 +278,7 @@ def login(username: str, password: str):
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     key = session_key(account.id)
-    with redis.pipeline() as pipe:
+    with redis.pipeline(transaction=True, shard_hint=key) as pipe:
         pipe.hkeys(key)
         pipe.hset(key, token, models.Session(create_time=datetime.now()))
         pipe.hexpire(key, app.permanent_session_lifetime, token)
@@ -308,25 +308,25 @@ def authorize():
 
 def user_limiter(cooldown):
     def decorator(f):
-        current = OrderedDict()
+        users = OrderedDict()
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
             now = time.time()
-            if current.get(g.uid, 0) > now:
+            if users.get(g.uid, 0) > now:
                 raise TooManyRequests
             count = 10
-            while current and count > 0:
-                uid, expire = next(iter(current.items()))
+            while users and count > 0:
+                uid, expire = next(iter(users.items()))
                 if expire > now:
                     break
-                current.pop(uid)
+                users.pop(uid)
                 count -= 1
             try:
-                current[g.uid] = float('inf')  # not reentrant
+                users[g.uid] = float('inf')  # not reentrant
                 return f(*args, **kwargs)
             finally:
-                current[g.uid] = now + cooldown
+                users[g.uid] = now + cooldown
 
         return wrapper
 

@@ -50,8 +50,6 @@ def _transaction(self: RedisCluster, func, *watches, **kwargs):
 
 
 def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
-    if transaction is None:
-        transaction = shard_hint is not None
     if transaction:
         node = self.get_node_from_key(shard_hint)
         redis: Redis = self.get_redis_connection(node)

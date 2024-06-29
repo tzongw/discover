@@ -34,7 +34,7 @@ class Handler:
             if token not in shared.sessions.get(uid) and options.env is not const.Environment.DEV:
                 raise ValueError("token error")
             key = online_key(uid)
-            with redis.pipeline() as pipe:  # transaction
+            with redis.pipeline(transaction=True, shard_hint=key) as pipe:
                 create_parser(pipe).hgetall(key, Online)
                 pipe.hset(key, conn_id, Online(token=token, address=address))
                 pipe.hexpire(key, self.ONLINE_TTL, token)
