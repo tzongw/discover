@@ -114,11 +114,8 @@ class ParserCluster(Parser):
 
     def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
         assert type(self._redis) is RedisCluster
-        with self._redis.pipeline(transaction=False) as pipe:
-            parser = ParserCluster(pipe)
-            for key in keys:
-                parser.get(key, cls)
-            return pipe.execute()
+        response = self._redis.mget_nonatomic(keys)
+        return mget_callback(response, convert=self._parser(cls))
 
 
 def create_parser(redis):
