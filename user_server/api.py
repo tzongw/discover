@@ -231,12 +231,6 @@ def args_error(e: UnprocessableEntity):
     return e.data['messages']
 
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    logging.exception(f'{request.path}, {request.args}, {request.data}')
-    return '', 500
-
-
 def hash_password(uid: int, password: str) -> str:
     # uid as salt
     return sha1(f'{uid}{password}'.encode()).hexdigest()
@@ -351,7 +345,7 @@ def whoami():
     ttl = app.permanent_session_lifetime.total_seconds()
     now = time.time()
     if redis.httl(key, token)[0] < now + 0.8 * ttl:
-        redis.hexpire(key, token, int(ttl))  # will invalidate local cache
+        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
     return account
 
 
