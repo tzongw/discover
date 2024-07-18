@@ -170,8 +170,8 @@ class MigratingReceiver(ShardingReceiver):
 
     def __call__(self, key_or_cls, stream=None):
         def decorator(f):
-            self.old_receiver(key_or_cls, stream)(f)
-            self._dispatcher(key_or_cls, stream)(f)
+            self.old_receiver(key_or_cls, stream=stream)(f)
+            self._dispatcher(key_or_cls, stream=stream)(f)
             return f
 
         return decorator
