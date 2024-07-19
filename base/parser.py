@@ -105,6 +105,8 @@ class Parser:
     def hgetall(self, name, cls: Type[M]):
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
 
+    mget_nonatomic = mget
+
 
 class ParserCluster(Parser):
     def update_callbacks(self):
