@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-import functools
 import json
 import logging
 import time
 import uuid
-from collections import OrderedDict
 from datetime import timedelta, datetime
 from hashlib import sha1
 
@@ -15,7 +13,7 @@ from gevent import pywsgi
 from marshmallow.validate import Range
 from webargs import fields
 from webargs.flaskparser import use_kwargs
-from werkzeug.exceptions import UnprocessableEntity, Unauthorized, TooManyRequests, Forbidden, Conflict
+from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
 from base import singleflight
@@ -25,7 +23,7 @@ from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
 from dao import Account, Session, collections
-from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator
+from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
 from shared import session_key, async_task, run_in_process, script
 import push
 
@@ -298,33 +296,6 @@ def authorize():
     if token not in sessions.get(uid):
         raise Unauthorized
     ctx.uid = g.uid = uid
-
-
-def user_limiter(cooldown):
-    def decorator(f):
-        users = OrderedDict()
-
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs):
-            now = time.time()
-            if users.get(g.uid, 0) > now:
-                raise TooManyRequests
-            count = 10
-            while users and count > 0:
-                uid, expire = next(iter(users.items()))
-                if expire > now:
-                    break
-                users.pop(uid)
-                count -= 1
-            try:
-                users[g.uid] = float('inf')  # not reentrant
-                return f(*args, **kwargs)
-            finally:
-                users[g.uid] = now + cooldown
-
-        return wrapper
-
-    return decorator
 
 
 @bp.route('/whoami')

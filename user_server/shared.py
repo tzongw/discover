@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from types import MappingProxyType
+from werkzeug.exceptions import TooManyRequests
 from common.shared import *
-import functools
 from flasgger import Swagger
-from flask import Flask
+from flask import Flask, g
 from base import ListConverter
 from base.misc import JSONProvider, make_response
 from base.cache import TtlCache
@@ -37,3 +37,30 @@ def _get_tokens(uid: int):
 
 sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
 sessions.listen(invalidator, 'session')
+
+
+def user_limiter(cooldown):
+    users = {}
+
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            if users.get(g.uid, 0) > now:
+                raise TooManyRequests
+            count = 10
+            while users and count > 0:
+                uid, expire = next(iter(users.items()))
+                if expire > now:
+                    break
+                users.pop(uid)
+                count -= 1
+            try:
+                users[g.uid] = float('inf')  # not reentrant
+                return f(*args, **kwargs)
+            finally:
+                users[g.uid] = now + cooldown
+
+        return wrapper
+
+    return decorator
