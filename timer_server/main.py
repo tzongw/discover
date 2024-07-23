@@ -17,7 +17,7 @@ from typing import Dict, Callable
 from base.scheduler import PeriodicCallback
 from base.service import Service
 from setproctitle import setproctitle
-from base import LogSuppress
+from base import LogSuppress, batched
 from base.utils import DefaultDict
 import time
 from pydantic import BaseModel
@@ -49,21 +49,17 @@ class Handler:
             lambda name: Service(shared.registry, name))  # type: Dict[str, Service]
 
     def load_timers(self):
-        cursor = '0'
-        while cursor != 0:
-            cursor, full_keys = shared.redis.scan(cursor=cursor, match=f'{self._PREFIX}:*', count=1000)
-            if not full_keys:
-                continue
+        for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
             for info in shared.parser.mget_nonatomic(full_keys, Info):
-                with LogSuppress():
-                    if info.addr != options.rpc_address or self._full_key(info.service, info.key) in self._timers:
-                        continue
-                    if info.deadline is not None:
-                        self.call_later(info.service, info.key, info.data, info.deadline - time.time())
-                    elif info.interval is not None:
-                        self.call_repeat(info.service, info.key, info.data, info.interval)
-                    else:
-                        logging.error(f'invalid timer: {info}')
+                if info is None or info.addr != options.rpc_address or \
+                        self._full_key(info.service, info.key) in self._timers:
+                    continue
+                if info.deadline is not None:
+                    self.call_later(info.service, info.key, info.data, info.deadline - time.time())
+                elif info.interval is not None:
+                    self.call_repeat(info.service, info.key, info.data, info.interval)
+                else:
+                    logging.error(f'invalid timer: {info}')
 
     @classmethod
     def _full_key(cls, service, key):
@@ -155,7 +151,7 @@ class Handler:
             return
         addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
         if not addresses:
-            logging.error(f'can not retreat timers: {len(self._timers)}')
+            logging.error(f'CAN NOT retreat timers: {len(self._timers)}')
             return
         logging.info(f'retreat timers: {len(self._timers)}')
         for addr in addresses:
