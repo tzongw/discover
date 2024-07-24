@@ -13,6 +13,10 @@ def batched(iterable, n):
         yield batch
 
 
+class LoadTimesError(Exception):
+    pass
+
+
 class LazySequence(Generic[T]):
     def __init__(self, iterable):
         self._values = []
@@ -31,17 +35,16 @@ class LazySequence(Generic[T]):
         except StopIteration:
             self._done = True
 
-    def __iter__(self):
-        return iter(self._values) if self._done else self.slice(0)
-
     def slice(self, pos, load_times=None) -> Iterator[T]:
         while True:
             while pos < len(self._values):
                 yield self._values[pos]
                 pos += 1
-            if self._done or load_times == 0:
+            if self._done:
                 return
             if load_times is not None:
+                if load_times <= 0:
+                    raise LoadTimesError
                 load_times -= 1
             self._load()
 
@@ -49,9 +52,11 @@ class LazySequence(Generic[T]):
         pos = 0
         while True:
             pos = bisect.bisect_right(self._values, x, lo=pos, key=key)
-            if pos < len(self._values) or self._done or load_times == 0:
+            if pos < len(self._values) or self._done:
                 break
             if load_times is not None:
+                if load_times <= 0:
+                    raise LoadTimesError
                 load_times -= 1
             self._load()
         return self.slice(pos, load_times)
