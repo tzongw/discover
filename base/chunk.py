@@ -18,24 +18,24 @@ class LoadTimesError(Exception):
 
 
 class LazySequence(Generic[T]):
-    def __init__(self, iterable):
+    def __init__(self, get_more):
         self._values = []
-        self._cursor = iter(iterable)
+        self._get_more = get_more
         self._done = False
-
-    @property
-    def done(self):
-        return self._done
 
     @singleflight
     def _load(self):
         assert not self._done
-        try:
-            self._values += next(self._cursor)
-        except StopIteration:
+        values = self._get_more()
+        if values is None:
             self._done = True
+        else:
+            self._values += values
 
-    def slice(self, pos, load_times=None) -> Iterator[T]:
+    def __iter__(self):
+        return iter(self._values) if self._done else self.slice()
+
+    def slice(self, pos=0, load_times=3) -> Iterator[T]:
         while True:
             while pos < len(self._values):
                 yield self._values[pos]
@@ -48,7 +48,7 @@ class LazySequence(Generic[T]):
                 load_times -= 1
             self._load()
 
-    def gt_slice(self, x, key=None, load_times=None):
+    def gt_slice(self, x, key=None, load_times=3):
         pos = 0
         while True:
             pos = bisect.bisect_right(self._values, x, lo=pos, key=key)
@@ -63,13 +63,18 @@ class LazySequence(Generic[T]):
 
 
 if __name__ == '__main__':
-    def get_more():
-        for c in batched(range(10), 3):
-            print('loading', c)
-            yield c
+    def _get_more():
+        global last_id
+        if last_id >= 10:
+            return
+        print('loading', last_id)
+        values = range(last_id, min(last_id + 3, 10))
+        last_id += 3
+        return values
 
 
-    lazy = LazySequence(get_more())
+    last_id = 0
+    lazy = LazySequence(_get_more)
     for i in range(10):
         gt = next(iter(lazy.gt_slice(i)), None)
         print(i, gt)
