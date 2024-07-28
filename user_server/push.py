@@ -5,7 +5,7 @@ from models import Online
 
 
 def send(uid_or_uids, message):
-    uids = [uid_or_uids] if isinstance(uid_or_uids, int) else uid_or_uids
+    uids = [uid_or_uids] if isinstance(uid_or_uids, (int, str)) else uid_or_uids
     with redis.pipeline(transaction=False) as pipe:
         parser = create_parser(pipe)
         for uid in uids:
@@ -34,12 +34,13 @@ def kick(uid, token=None, message=None):
 
 
 def broadcast(group, message, *, exclude=()):
-    with redis.pipeline(transaction=False) as pipe:
-        for uid in exclude:
-            pipe.hkeys(online_key(uid))
-        exclude = []
-        for conn_ids in pipe.execute():
-            exclude += conn_ids
+    if exclude:
+        with redis.pipeline(transaction=False) as pipe:
+            for uid in exclude:
+                pipe.hkeys(online_key(uid))
+            exclude = []
+            for conn_ids in pipe.execute():
+                exclude += conn_ids
     if isinstance(message, str):
         gate_service.broadcast_text(group, exclude, message)
     else:

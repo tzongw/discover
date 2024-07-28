@@ -20,7 +20,7 @@ class _WorkItem:
         self.kwargs = kwargs
 
     def run(self):
-        if self.future.done():  # cancelled
+        if self.future is None or self.future.done():
             return
         fut = self.future
         self.future = None

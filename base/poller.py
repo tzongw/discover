@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import math
 import logging
 from datetime import timedelta
 from enum import Enum, auto
@@ -9,7 +10,6 @@ from redis import Redis
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
-from .utils import var_args
 
 
 @dataclass
@@ -32,6 +32,7 @@ class PollStatus(Enum):
 class Poller:
     def __init__(self, redis: Redis, async_task: AsyncTask, timeout=timedelta(minutes=1)):
         self.configs = {}  # type: dict[str, Config]
+        self.redis = redis
         self.async_task = async_task
 
         @async_task
@@ -67,7 +68,7 @@ class Poller:
     def _task_id(group: str, queue: str):
         return f'poll:{group}:{queue}'
 
-    def notify(self, group: str, queue=''):
+    def notify(self, group: str, queue):
         task_id = self._task_id(group, queue)
         if self.async_task.exists(task_id):
             return
@@ -76,10 +77,17 @@ class Poller:
         if self.async_task.post(task_id, task, config.interval, loop=True):
             self.async_task.publish(task)
 
+    def push_and_notify(self, group, queue, value_or_values):
+        values = value_or_values if isinstance(value_or_values, (tuple, list, set)) else [value_or_values]
+        after = self.redis.rpush(queue, *values)
+        before = after - len(values)
+        if before == 0 or int(math.log(after, 2)) != int(math.log(before, 2)):
+            self.notify(group, queue)
+
     def __call__(self, group, interval=timedelta(seconds=1), spawn=None):
         def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(var_args(poll), interval, spawn)
+            self.configs[group] = Config(poll, interval, spawn)
             return poll
 
         return decorator
