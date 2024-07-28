@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 import gevent
 from redis import Redis
 
