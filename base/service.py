@@ -47,7 +47,7 @@ class Service:
                     if len(self._cooldown) > count:
                         logging.warning(f'+ cool down {self._name} {address}')
                         expire = self._update_addresses()
-                        if not count:
+                        if count == 0:
                             gevent.spawn_later(expire, self._reap_cooldown)
                 raise
 

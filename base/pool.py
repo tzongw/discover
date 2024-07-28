@@ -4,7 +4,7 @@ from gevent.queue import Queue
 
 
 class Pool(metaclass=abc.ABCMeta):
-    def __init__(self, maxsize=128, timeout=5):
+    def __init__(self, maxsize=128, timeout=3):
         self._maxsize = maxsize
         self._timeout = timeout
         self._pool = Queue()
