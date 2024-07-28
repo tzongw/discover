@@ -7,7 +7,7 @@ class Pool(metaclass=abc.ABCMeta):
     def __init__(self, maxsize=128, timeout=3):
         self._maxsize = maxsize
         self._timeout = timeout
-        self._pool = Queue()
+        self._idle = Queue()
         self._size = 0
 
     def __del__(self):
@@ -27,14 +27,13 @@ class Pool(metaclass=abc.ABCMeta):
 
     def close_all(self):
         self._maxsize = 0  # _return_conn will close using conns
-        while not self._pool.empty():
-            conn = self._pool.get_nowait()
+        while not self._idle.empty():
+            conn = self._idle.get_nowait()
             self._close_conn(conn)
 
     def _get_conn(self):
-        pool = self._pool
-        if not pool.empty() or self._size >= self._maxsize:
-            return pool.get(timeout=self._timeout)
+        if not self._idle.empty() or self._size >= self._maxsize:
+            return self._idle.get(timeout=self._timeout)
 
         self._size += 1
         try:
@@ -49,8 +48,8 @@ class Pool(metaclass=abc.ABCMeta):
         self.close_connection(conn)
 
     def _return_conn(self, conn):
-        if self._pool.qsize() < self._maxsize:
-            self._pool.put(conn)
+        if self._idle.qsize() < self._maxsize:
+            self._idle.put(conn)
         else:
             self._close_conn(conn)
 
