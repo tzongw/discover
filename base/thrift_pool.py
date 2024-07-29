@@ -27,5 +27,5 @@ class ThriftPool(Pool):
 
     @staticmethod
     def biz_exception(e: Exception):
-        return (isinstance(e, TException) and
-                not isinstance(e, (TTransportException, TProtocolException, TApplicationException)))
+        return isinstance(e, TException) and \
+            not isinstance(e, (TTransportException, TProtocolException, TApplicationException))
