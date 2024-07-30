@@ -22,6 +22,7 @@ class Service:
         self._all_addresses = []  # same as addresses, but as a list
         registry.add_callback(self._clean_pools)
         self._update_addresses()
+        self._reaping = False
 
     def addresses(self):
         return self._registry.addresses(self._name)
@@ -42,12 +43,13 @@ class Service:
                 yield conn
             except Exception as e:
                 if not ThriftPool.biz_exception(e):
-                    count = len(self._cooldown)
+                    exists = address in self._cooldown
                     self._cooldown[address] = time.time() + Registry.COOLDOWN
-                    if len(self._cooldown) > count:
+                    if not exists:
                         logging.warning(f'+ cool down {self._name} {address}')
                         expire = self._update_addresses()
-                        if count == 0:
+                        if not self._reaping:
+                            self._reaping = True
                             gevent.spawn_later(expire, self._reap_cooldown)
                 raise
 
@@ -76,3 +78,4 @@ class Service:
     def _reap_cooldown(self):
         while expire := self._update_addresses():
             gevent.sleep(expire)
+        self._reaping = False
