@@ -1,14 +1,18 @@
 import abc
 import contextlib
+import time
+import gevent
 from gevent.queue import Queue
 
 
 class Pool(metaclass=abc.ABCMeta):
-    def __init__(self, maxsize=128, timeout=3):
+    def __init__(self, maxsize=64, timeout=3, stale=None):
         self._maxsize = maxsize
         self._timeout = timeout
         self._idle = Queue()
         self._size = 0
+        self._stale = stale
+        self._reaping = False
 
     def __del__(self):
         self.close_all()
@@ -28,12 +32,12 @@ class Pool(metaclass=abc.ABCMeta):
     def close_all(self):
         self._maxsize = 0  # _return_conn will close using conns
         while not self._idle.empty():
-            conn = self._idle.get_nowait()
+            conn = self._idle.get_nowait()[0]
             self._close_conn(conn)
 
     def _get_conn(self):
         if not self._idle.empty() or self._size >= self._maxsize:
-            return self._idle.get(timeout=self._timeout)
+            return self._idle.get(timeout=self._timeout)[0]
 
         self._size += 1
         try:
@@ -43,13 +47,31 @@ class Pool(metaclass=abc.ABCMeta):
             raise
         return conn
 
+    def _reap_stale(self):
+        while self._idle.qsize():
+            _, expire = self._idle.peek_nowait()
+            interval = expire - time.time()
+            if interval > 0:
+                gevent.sleep(interval)
+            else:
+                conn, _ = self._idle.get_nowait()
+                self._close_conn(conn)
+        self._reaping = False
+
     def _close_conn(self, conn):
         self._size -= 1
         self.close_connection(conn)
 
     def _return_conn(self, conn):
         if self._idle.qsize() < self._maxsize:
-            self._idle.put(conn)
+            if self._stale is None:
+                item = (conn, None)
+            else:
+                item = (conn, time.time() + self._stale)
+                if not self._reaping:
+                    self._reaping = True
+                    gevent.spawn_later(self._stale, self._reap_stale)
+            self._idle.put(item)
         else:
             self._close_conn(conn)
 
