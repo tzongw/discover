@@ -37,7 +37,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_time=1, name='executor'):
+    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_time=3, name='executor'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
@@ -102,8 +102,8 @@ class Executor:
 
 
 class WaitGroup(Executor):
-    def __init__(self, max_workers=10, slow_time=10, name='wait_group'):
-        super().__init__(max_workers, queue_size=max_workers, idle=0, slow_time=slow_time, name=name)
+    def __init__(self, max_workers=10, queue_size=1, idle=30, slow_time=20, name='wait_group'):
+        super().__init__(max_workers, queue_size=queue_size, idle=idle, slow_time=slow_time, name=name)
         self._futures = WeakSet()
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
