@@ -10,12 +10,14 @@ from redis import Redis
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
+from .utils import var_args
 
 
 @dataclass
 class Config:
     poll: Callable
     interval: timedelta
+    united: bool
     spawn: Optional[Callable]
 
 
@@ -48,7 +50,8 @@ class Poller:
 
         def do_poll(config: Config, group: str, queue: str):
             task = poll_task(group, queue)
-            lock = Lock(redis, f'lock:{group}:{queue}', timeout=timeout.total_seconds(), blocking=False)
+            key = f'poll_lock:{group}' if config.united else f'poll_lock:{group}:{queue}'
+            lock = Lock(redis, key, timeout=timeout.total_seconds(), blocking=False)
             with ExitStack() as stack, suppress(LockError), lock:
                 status = PollStatus(config.poll(queue))
                 stack.callback(lambda: status is PollStatus.ASAP and async_task.publish(task))  # without lock
@@ -64,11 +67,11 @@ class Poller:
 
         self.poll_task = poll_task
 
-    @staticmethod
-    def _task_id(group: str, queue: str):
-        return f'poll:{group}:{queue}'
+    def _task_id(self, group: str, queue: str):
+        config = self.configs[group]
+        return f'poll_task:{group}' if config.united else f'poll_task:{group}:{queue}'
 
-    def notify(self, group: str, queue):
+    def notify(self, group: str, queue: str):
         task_id = self._task_id(group, queue)
         if self.async_task.exists(task_id):
             return
@@ -84,10 +87,10 @@ class Poller:
         if before == 0 or int(math.log(after, 2)) != int(math.log(before, 2)):
             self.notify(group, queue)
 
-    def __call__(self, group, interval=timedelta(seconds=1), spawn=None):
+    def __call__(self, group, interval=timedelta(seconds=3), united=False, spawn=None):
         def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(poll, interval, spawn)
+            self.configs[group] = Config(var_args(poll), interval, united, spawn)
             return poll
 
         return decorator
