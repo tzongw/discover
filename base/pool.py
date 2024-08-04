@@ -1,6 +1,7 @@
 import abc
-import contextlib
 import time
+import contextlib
+from functools import partial
 import gevent
 from gevent.queue import Queue
 
@@ -88,3 +89,10 @@ class Pool(metaclass=abc.ABCMeta):
             raise
         else:
             self._return_conn(conn)
+
+    def _invoke(self, name, *args, **kwargs):
+        with self.connection() as conn:
+            return getattr(conn, name)(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return partial(self._invoke, name)
