@@ -102,8 +102,8 @@ class Executor:
 
 
 class WaitGroup(Executor):
-    def __init__(self, max_workers=10, queue_size=1, idle=30, slow_time=20, name='wait_group'):
-        super().__init__(max_workers, queue_size=queue_size, idle=idle, slow_time=slow_time, name=name)
+    def __init__(self, max_workers=10, queue_size=1, idle=5, slow_time=20, name='wait_group'):
+        super().__init__(max_workers, queue_size, idle, slow_time, name)
         self._futures = WeakSet()
 
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
