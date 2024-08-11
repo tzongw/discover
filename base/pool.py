@@ -4,6 +4,7 @@ import contextlib
 from functools import partial
 import gevent
 from gevent.queue import Queue
+from .utils import LogSuppress
 
 
 class Pool(metaclass=abc.ABCMeta):
@@ -34,7 +35,8 @@ class Pool(metaclass=abc.ABCMeta):
         self._maxsize = 0  # _return_conn will close using conns
         while not self._idle.empty():
             conn = self._idle.get_nowait()[0]
-            self._close_conn(conn)
+            with LogSuppress():
+                self._close_conn(conn)
 
     def _get_conn(self):
         if not self._idle.empty() or self._size >= self._maxsize:

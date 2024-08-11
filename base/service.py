@@ -47,10 +47,10 @@ class Service:
                     self._cooldown[address] = time.time() + Registry.COOLDOWN
                     if not exists:
                         logging.warning(f'+ cool down {self._name} {address}')
-                        expire = self._update_addresses()
+                        interval = self._update_addresses()
                         if not self._reaping:
                             self._reaping = True
-                            gevent.spawn_later(expire, self._reap_cooldown)
+                            gevent.spawn_later(interval, self._reap_cooldown)
                 raise
 
     def _clean_pools(self):
@@ -60,6 +60,7 @@ class Service:
             logging.info(f'clean {self._name} {removed}')
             pool = self._pools.pop(removed)
             pool.close_all()
+            self._cooldown.pop(removed, None)
         self._update_addresses()
 
     def _update_addresses(self):
@@ -73,9 +74,9 @@ class Service:
         self._good_addresses = [addr for addr in addresses if addr not in self._cooldown]
         local_host = ip_address()
         self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
-        return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire
+        return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire interval
 
     def _reap_cooldown(self):
-        while expire := self._update_addresses():
-            gevent.sleep(expire)
+        while interval := self._update_addresses():
+            gevent.sleep(interval)
         self._reaping = False
