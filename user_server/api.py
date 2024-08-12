@@ -24,7 +24,7 @@ from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
 from dao import Account, Session, collections
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, run_in_process, script
+from shared import session_key, async_task, run_in_process, script, scheduler
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -286,16 +286,27 @@ def login(username: str, password: str):
 
 
 bp = Blueprint('/', __name__)
+user_actives = {}
+
+
+@scheduler(timedelta(seconds=1))
+def reap_user_active():
+    past = time.time() - timedelta(minutes=10).total_seconds()
+    while user_actives:
+        uid, active = next(iter(user_actives.items()))
+        if active > past:
+            break
+        user_actives.pop(uid)
 
 
 @bp.before_request
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
-    if not uid or not token:
-        raise Unauthorized
-    if token not in sessions.get(uid):
+    if not uid or not token or token not in sessions.get(uid):
         raise Unauthorized
     ctx.uid = g.uid = uid
+    if uid not in user_actives:
+        user_actives[uid] = time.time()
 
 
 @bp.route('/whoami')

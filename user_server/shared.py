@@ -48,13 +48,11 @@ def user_limiter(cooldown):
             now = time.time()
             if users.get(g.uid, 0) > now:
                 raise TooManyRequests
-            count = 10
-            while users and count > 0:
+            while users:
                 uid, expire = next(iter(users.items()))
                 if expire > now:
                     break
                 users.pop(uid)
-                count -= 1
             try:
                 users[g.uid] = float('inf')  # not reentrant
                 return f(*args, **kwargs)
