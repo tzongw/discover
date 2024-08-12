@@ -12,7 +12,7 @@ from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .mq import Receiver, Publisher
 from .timer import Timer
-from .utils import var_args, func_desc
+from .utils import var_args, func_desc, stream_name
 
 
 class Task(BaseModel):
@@ -61,7 +61,6 @@ class AsyncTask(_BaseTask):
 
     @staticmethod
     def stream_name(task: Task):
-        from .utils import stream_name
         return f'{stream_name(task)}:{task.path}'
 
     def __call__(self, f: F) -> F:

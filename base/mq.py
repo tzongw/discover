@@ -91,8 +91,7 @@ class Receiver:
         streams = {stream: '>' for stream in streams}
         while not self._stopped:
             try:
-                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch,
-                                               block=0,
+                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0,
                                                noack=True)
                 for stream, messages in result:
                     for message in messages:
