@@ -104,17 +104,28 @@ class CaseDict(dict):
         return super().__getitem__(item)
 
 
-def base62(n):
-    assert n >= 0
-    charset = string.ascii_letters + string.digits
+class base62:
+    charset = string.digits + string.ascii_letters
     base = len(charset)
-    chars = []
-    while True:
-        n, r = divmod(n, base)
-        chars.append(charset[r])
-        if n == 0:
-            break
-    return ''.join(chars[::-1])
+    mapping = {c: index for index, c in enumerate(charset)}
+
+    @classmethod
+    def encode(cls, n):
+        assert n >= 0
+        chars = []
+        while True:
+            n, r = divmod(n, cls.base)
+            chars.append(cls.charset[r])
+            if n == 0:
+                break
+        return ''.join(chars[::-1])
+
+    @classmethod
+    def decode(cls, s):
+        n = 0
+        for c in s:
+            n = n * cls.base + cls.mapping[c]
+        return n
 
 
 def redis_name(redis: Union[Redis, RedisCluster]):

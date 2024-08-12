@@ -43,7 +43,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = base62(id_generator.gen())
+    ctx.trace = base62.encode(id_generator.gen())
 
 
 @async_task

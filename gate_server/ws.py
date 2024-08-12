@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
-from typing import Dict
 from urllib import parse
 from collections import defaultdict
-from typing import Set
 import gevent
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
-from base import utils
+from base.utils import base62
 import shared
 import const
 from config import options
@@ -112,8 +110,8 @@ class Client:
             self.context.pop(key, None)
 
 
-clients = {}  # type: Dict[str, Client]
-groups = defaultdict(set)  # type: Dict[str, Set[Client]]
+clients = {}  # type: dict[str, Client]
+groups = defaultdict(set)  # type: dict[str, set[Client]]
 
 
 def remove_from_group(client: Client, group):
@@ -124,7 +122,7 @@ def remove_from_group(client: Client, group):
 
 
 def client_serve(ws: WebSocket):
-    conn_id = utils.base62(shared.id_generator.gen())
+    conn_id = base62.encode(shared.id_generator.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
     environ = ws.environ
