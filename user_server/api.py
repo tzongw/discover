@@ -307,6 +307,7 @@ def authorize():
     ctx.uid = g.uid = uid
     if uid not in user_actives:
         user_actives[uid] = time.time()
+        logging.info('user active')
 
 
 @bp.route('/whoami')
@@ -320,7 +321,7 @@ def whoami():
       200:
         description: account
     """
-    logging.info(f'{ctx.__dict__}')
+    logging.info('')
     account = Account(id=g.uid)
     token = flask.session.get(CTX_TOKEN)
     key = session_key(account.id)
