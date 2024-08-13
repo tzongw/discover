@@ -105,8 +105,8 @@ class CaseDict(dict):
 
 
 class base62:
-    charset = string.digits + string.ascii_letters
-    base = len(charset)
+    charset = string.digits + string.ascii_uppercase + string.ascii_lowercase
+    base = 62
     mapping = {c: index for index, c in enumerate(charset)}
 
     @classmethod
