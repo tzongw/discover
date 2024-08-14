@@ -29,13 +29,16 @@ class ShardingKey:
         shard = random.randrange(self.shards)
         return f'{{{shard}}}:{key}'
 
+    def get_shard(self, key):
+        # `shard` consistent across different processes
+        return 0 if key in self.fixed else crc32(key.encode()) % self.shards
+
     def sharded_key(self, key: str):
         return self.sharded_keys(key)[0]
 
     def sharded_keys(self, *keys):
         assert all(not key.startswith('{') for key in keys)
-        # `shard` consistent across different processes
-        shard = 0 if keys[0] in self.fixed else crc32(keys[0].encode()) % self.shards
+        shard = self.get_shard(keys[0])
         return [f'{{{shard}}}:{key}' for key in keys]
 
     @staticmethod
@@ -199,12 +202,14 @@ class ShardingStocks(Stocks):
                     pipe.expire(sharded_key, expire)
             pipe.execute()
 
-    def mget(self, keys):
+    def mget(self, keys, hint=None):
         with self.redis.pipeline(transaction=False) as pipe:
             for key in keys:
                 for sharded_key in self.sharding_key.all_sharded_keys(key):
                     pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            return [sum(values[0] for values in chunk) for chunk in batched(pipe.execute(), self.sharding_key.shards)]
+            shard = None if hint is None else self.sharding_key.get_shard(hint)
+            return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
+                    for chunk in batched(pipe.execute(), self.sharding_key.shards)]
 
     def incrby(self, key, total):
         assert total >= 0

@@ -187,10 +187,10 @@ class Stocks:
                 pipe.expire(key, expire)
             pipe.execute()
 
-    def get(self, key):
-        return self.mget([key])[0]
+    def get(self, key, hint=None):
+        return self.mget([key], hint)[0]
 
-    def mget(self, keys):
+    def mget(self, keys, hint=None):
         with self.redis.pipeline(transaction=False) as pipe:
             for key in keys:
                 pipe.bitfield(key).get(fmt='u32', offset=0).execute()
