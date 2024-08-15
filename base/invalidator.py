@@ -55,8 +55,7 @@ class Invalidator:
 
     def _get_result(self, fut: Future, full_key, group):
         try:
-            getter = self.getters[group]
-            value = getter(full_key)
+            value = self.getters[group](full_key)
             fut.set_result(value)
         except Exception as e:
             fut.set_exception(e)

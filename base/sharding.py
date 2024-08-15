@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name
-from .misc import Stocks
+from .misc import Stock
 from .timer import Timer
 from .chunk import batched
 
@@ -180,10 +180,19 @@ class MigratingReceiver(ShardingReceiver):
         return decorator
 
 
-class ShardingStocks(Stocks):
+class ShardingStock(Stock):
     def __init__(self, redis: RedisCluster):
         super().__init__(redis)
         self.sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+
+    def mget(self, keys, hint=None):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                for sharded_key in self.sharding_key.all_sharded_keys(key):
+                    pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
+            shard = None if hint is None else self.sharding_key.get_shard(hint)
+            return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
+                    for chunk in batched(pipe.execute(), self.sharding_key.shards)]
 
     def _fair_amounts(self, total):
         shards = self.sharding_key.shards
@@ -201,15 +210,6 @@ class ShardingStocks(Stocks):
                 if expire is not None:
                     pipe.expire(sharded_key, expire)
             pipe.execute()
-
-    def mget(self, keys, hint=None):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for key in keys:
-                for sharded_key in self.sharding_key.all_sharded_keys(key):
-                    pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            shard = None if hint is None else self.sharding_key.get_shard(hint)
-            return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
-                    for chunk in batched(pipe.execute(), self.sharding_key.shards)]
 
     def incrby(self, key, total):
         assert total >= 0

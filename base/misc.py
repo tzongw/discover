@@ -175,17 +175,9 @@ class Semaphore:
         return sum(self.redis.exists(*self.names))
 
 
-class Stocks:
+class Stock:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
-
-    def reset(self, key, total=0, expire=None):
-        assert total >= 0
-        with self.redis.pipeline(transaction=False) as pipe:
-            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
-            if expire is not None:
-                pipe.expire(key, expire)
-            pipe.execute()
 
     def get(self, key, hint=None):
         return self.mget([key], hint)[0]
@@ -195,6 +187,14 @@ class Stocks:
             for key in keys:
                 pipe.bitfield(key).get(fmt='u32', offset=0).execute()
             return [values[0] for values in pipe.execute()]
+
+    def reset(self, key, total=0, expire=None):
+        assert total >= 0
+        with self.redis.pipeline(transaction=True) as pipe:
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            if expire is not None:
+                pipe.expire(key, expire)
+            pipe.execute()
 
     def incrby(self, key, total):
         assert total >= 0
