@@ -305,9 +305,15 @@ def authorize():
     if not uid or not token or token not in sessions.get(uid):
         raise Unauthorized
     ctx.uid = g.uid = uid
-    if uid not in user_actives:
-        user_actives[uid] = time.time()
-        logging.info('user active')
+    if uid in user_actives:
+        return
+    # refresh last active & token ttl
+    logging.info('user active')
+    user_actives[uid] = time.time()
+    key = session_key(uid)
+    ttl = app.permanent_session_lifetime.total_seconds()
+    if redis.httl(key, token)[0] < 0.8 * ttl:
+        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
 
 
 @bp.route('/whoami')
@@ -323,12 +329,6 @@ def whoami():
     """
     logging.info('')
     account = Account(id=g.uid)
-    token = flask.session.get(CTX_TOKEN)
-    key = session_key(account.id)
-    ttl = app.permanent_session_lifetime.total_seconds()
-    now = time.time()
-    if redis.httl(key, token)[0] < now + 0.8 * ttl:
-        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
     return account
 
 

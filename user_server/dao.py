@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
-from base.utils import CaseDict
+from base.utils import PascalCaseDict
 from base.misc import CacheMixin, TimeDeltaField
 from config import options
 from shared import invalidator, id_generator
@@ -40,7 +40,7 @@ class Account(Base):
 
 Base.metadata.create_all(engine)
 
-collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = CaseDict()
+collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = PascalCaseDict()
 
 
 def collection(coll):

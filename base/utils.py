@@ -97,9 +97,10 @@ class DefaultDict(defaultdict):
         return value
 
 
-class CaseDict(dict):
+class PascalCaseDict(dict):
     def __getitem__(self, item):
         if isinstance(item, str):
+            item = item.replace('_', '-')
             item = ''.join(s[0].upper() + s[1:] for s in item.split('-'))
         return super().__getitem__(item)
 
