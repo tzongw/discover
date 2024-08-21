@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import contextlib
 import dataclasses
 import json
@@ -10,7 +9,6 @@ from inspect import signature
 from random import shuffle
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
-from yaml import safe_dump
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, DoesNotExist, FloatField
@@ -19,9 +17,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-
 from .invalidator import Invalidator
-from .utils import func_desc
 
 
 class ListConverter(BaseConverter):
@@ -233,20 +229,15 @@ class Exclusion:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 
-    def __call__(self, timeout: timedelta, *names):
+    def __call__(self, pattern: str, timeout=timedelta(minutes=1)):
         def decorator(f):
-            path = func_desc(f)
-            assert '<' not in path, 'CAN NOT be lambda or local function'
-            assert not path.startswith('__main__'), '__main__ is different in another process'
             params = signature(f).parameters
-            indexes = {name: index for name in names for index, param in enumerate(params.values()) if
-                       param.name == name}
-            assert len(indexes) == len(names)
+            names = {index: param.name for index, param in enumerate(params.values())}
 
             @wraps(f)
             def wrapper(*args, **kwargs):
-                keys = [args[index] if index < len(args) else kwargs[name] for name, index in indexes.items()]
-                key = f'exclusion:{path}:{safe_dump(keys)}'
+                values = {names[index]: value for index, value in enumerate(args)}
+                key = pattern.format(*args, **values, **kwargs)
                 with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
                     f(*args, **kwargs)
 
