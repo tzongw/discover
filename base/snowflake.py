@@ -1,12 +1,12 @@
-from datetime import datetime
 import time
+from datetime import datetime
 
 # twitter's snowflake parameters
 twepoch = 1288834974657
+timestamp_bits = 41
 datacenter_id_bits = 5
 worker_id_bits = 10
 sequence_id_bits = 7
-timestamp_bits = 63 - datacenter_id_bits - worker_id_bits - sequence_id_bits
 
 max_timestamp = 1 << timestamp_bits
 timestamp_mask = max_timestamp - 1
@@ -22,6 +22,9 @@ def make(timestamp_ms: int, datacenter_id: int, worker_id: int, sequence_id: int
     """generate a twitter-snowflake id, based on 
     https://github.com/twitter/snowflake/blob/master/src/main/scala/com/twitter/service/snowflake/IdWorker.scala
     :param: timestamp_ms time since UNIX epoch in milliseconds"""
+
+    assert 0 <= timestamp_ms < max_timestamp and 0 <= datacenter_id < max_datacenter_id and \
+           0 <= worker_id < max_worker_id and 0 <= sequence_id < max_sequence_id
     sid = timestamp_ms - twepoch
     sid = (sid << datacenter_id_bits) | datacenter_id
     sid = (sid << worker_id_bits) | worker_id
