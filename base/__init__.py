@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
+from functools import lru_cache
 from redis import Redis, RedisCluster
 from redis.connection import Encoder
+from redis._parsers.commands import CommandsParser
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from pydantic import BaseModel
@@ -58,9 +60,16 @@ def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
         return _orig_pipeline(self, transaction=transaction, shard_hint=shard_hint)
 
 
+@lru_cache()
+def _get_moveable_keys(self: CommandsParser, redis_conn, *args):
+    return _orig_get_moveable_keys(self, redis_conn, *args)
+
+
 RedisCluster.transaction = _transaction
 _orig_pipeline = RedisCluster.pipeline
 RedisCluster.pipeline = _pipeline
+_orig_get_moveable_keys = CommandsParser._get_moveable_keys
+CommandsParser._get_moveable_keys = _get_moveable_keys
 
 
 def _encode(self: Encoder, value):
