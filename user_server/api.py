@@ -176,11 +176,10 @@ def get_document(collection: str, doc_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
-    doc.invalidate(invalidator)  # before update
-    if not doc.modify(**kwargs):  # if doc is default
+    if not doc.modify(**kwargs):  # not exists, when doc is default
         kwargs[coll.id.name] = doc_id
         doc = coll(**kwargs).save()
-    doc.invalidate(invalidator)  # updated
+    doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
 
