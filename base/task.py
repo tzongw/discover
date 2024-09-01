@@ -146,9 +146,9 @@ class HeavyTask(_BaseTask):
     @staticmethod
     def exec(task: Task):
         logging.info(f'doing task {task}')
-        index = task.path.rindex('.')
-        module = import_module(task.path[:index])
-        func = getattr(module, task.path[index + 1:])
+        module_name, func_name = task.path.rsplit('.', maxsplit=1)
+        module = import_module(module_name)
+        func = getattr(module, func_name)
         while hasattr(func, 'wrapped'):
             func = func.wrapped
         args = loads(task.args)  # type: list
