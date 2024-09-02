@@ -307,7 +307,7 @@ def authorize():
     if uid in user_actives:
         return
     # refresh last active & token ttl
-    logging.info('user active')
+    logging.info(f'user active: {uid}')
     user_actives[uid] = time.time()
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
