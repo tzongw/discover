@@ -18,6 +18,7 @@ from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 from .invalidator import Invalidator
+from .snowflake import extract_datetime
 
 
 class ListConverter(BaseConverter):
@@ -76,7 +77,7 @@ class GetterMixin:
     objects: Callable
     _fields: dict
     _data: dict
-    __include__ = None
+    __include__ = ()
 
     @classmethod
     def mget(cls, keys, *, only=()) -> list[Optional[Self]]:
@@ -102,7 +103,10 @@ class GetterMixin:
             include = [field for field in self._fields if field not in exclude and not field.startswith('_')]
         elif not include:
             include = self.__include__
-        return {k: v for k, v in self._data.items() if k in include}
+        d = {k: v for k, v in self._data.items() if k in include}
+        if 'create_time' in self.__include__ and 'create_time' not in d:
+            d['create_time'] = extract_datetime(self.id)
+        return d
 
 
 class CacheMixin(GetterMixin):

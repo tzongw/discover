@@ -85,7 +85,7 @@ Role.mget = cache.mget
 
 @collection
 class Profile(Document, CacheMixin):
-    __include__ = ['name', 'addr']
+    __include__ = ['name', 'addr', 'create_time']
     meta = {'strict': False}
 
     id = IntField(primary_key=True, default=id_generator.gen)
