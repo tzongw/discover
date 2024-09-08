@@ -56,7 +56,7 @@ class CRUD(StrEnum):
     DELETE = 'delete'
 
 
-class Privilege(EmbeddedDocument):
+class Permission(EmbeddedDocument):
     meta = {'strict': False}
 
     coll = StringField(required=True)
@@ -72,10 +72,10 @@ class Role(Document, CacheMixin):
 
     id = StringField(primary_key=True)
     admin = BooleanField(default=False)
-    privileges = EmbeddedDocumentListField(Privilege, required=True)
+    permissions = EmbeddedDocumentListField(Permission, required=True)
 
     def can_access(self, coll, op: CRUD):
-        return self.admin or any(privilege.can_access(coll, op) for privilege in self.privileges)
+        return self.admin or any(permission.can_access(coll, op) for permission in self.permissions)
 
 
 cache: Cache[Role] = Cache(mget=Role.mget, make_key=Role.make_key, maxsize=None)

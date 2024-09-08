@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
+from common.shared import *
 from types import MappingProxyType
 from werkzeug.exceptions import TooManyRequests
-from common.shared import *
 from flasgger import Swagger
 from flask import Flask, g
 from base import ListConverter
