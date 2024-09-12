@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 import time
+import uuid
+import functools
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
 from typing import TypeVar, Optional, Generic, Callable, Sequence
-import functools
-
+from redis import Redis, RedisCluster
+import gevent
 from . import utils
 from .singleflight import Singleflight, singleflight
 from .invalidator import Invalidator
 from .chunk import LazySequence
+from .redis_script import Script
 
 T = TypeVar('T')
 
@@ -229,3 +232,69 @@ def ttl_cache(expire, *, maxsize=128):
         return wrapper
 
     return decorator
+
+
+class RedisCache(Singleflight[T]):
+    def __init__(self, redis: Redis | RedisCluster, slow_mget, make_key, expire: timedelta,
+                 serialize=None, deserialize=None,
+                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), retry=3):
+        super().__init__(mget=self._mget, make_key=make_key)
+        self.redis = redis
+        self.slow_mget = slow_mget
+        self.make_key = make_key
+        self.expire = expire
+        self.serialize = serialize
+        self.deserialize = deserialize
+        self.prefix = prefix
+        self.timeout = timeout
+        self.retry = retry
+
+    def _mget(self, keys, *args, **kwargs):
+        placeholder = self.prefix + str(uuid.uuid4())
+        made_keys = []
+        todo_indexes = []
+        wait_indexes = []
+        with self.redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                made_key = self.make_key(key, *args, **kwargs)
+                made_keys.append(made_key)
+                pipe.set(made_key, placeholder, nx=True, px=self.timeout * self.retry, get=True)
+            values = pipe.execute()
+        for index, value in enumerate(values):
+            if value is None:
+                todo_indexes.append(index)
+            elif value.startswith(self.prefix):
+                wait_indexes.append(index)
+            elif self.deserialize:
+                values[index] = self.deserialize(value)
+        if todo_indexes:
+            new_values = self.slow_mget([keys[index] for index in todo_indexes], *args, **kwargs)
+            with self.redis.pipeline(transaction=False) as pipe:
+                script = Script(pipe)
+                for index, value in zip(todo_indexes, new_values):
+                    values[index] = value
+                    if self.serialize:
+                        value = self.serialize(value)
+                    script.compare_set(made_keys[index], placeholder, value, self.expire)
+                pipe.execute()
+        retry = 0
+        while wait_indexes:
+            gevent.sleep(self.timeout.total_seconds())
+            mget_nonatomic = self.redis.mget_nonatomic if isinstance(self.redis, RedisCluster) else self.redis.mget
+            new_values = mget_nonatomic(*[made_keys[index] for index in wait_indexes])
+            fail_indexes = []
+            for index, value in zip(wait_indexes, new_values):
+                if value is None or value.startswith(self.prefix):
+                    fail_indexes.append(index)
+                else:
+                    if self.deserialize:
+                        value = self.deserialize(value)
+                    values[index] = value
+            if not fail_indexes:
+                break
+            if retry >= self.retry:
+                fail_keys = ', '.join(f'`{keys[index]}`' for index in fail_indexes)
+                raise ValueError(f'{fail_keys} not resolve')
+            wait_indexes = fail_indexes
+            retry += 1
+        return values

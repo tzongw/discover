@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import functools
 from concurrent.futures import Future
+from typing import TypeVar, Generic, Sequence
 from . import utils
 
+T = TypeVar('T')
 
-class Singleflight:
+
+class Singleflight(Generic[T]):
     def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
         assert get or mget
         if mget is None:
@@ -16,11 +19,11 @@ class Singleflight:
         self._mget = mget
         self._futures = {}  # type: dict[any, Future]
 
-    def get(self, key, *args, **kwargs):
+    def get(self, key, *args, **kwargs) -> T:
         value, = self.mget([key], *args, **kwargs)
         return value
 
-    def mget(self, keys, *args, **kwargs):
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
         futures = []
         missing_keys = []
         made_keys = []
