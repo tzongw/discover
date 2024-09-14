@@ -28,14 +28,19 @@ def expire_at(expire):
     raise ValueError(f'{expire} not valid')
 
 
-class Cache(Generic[T]):
+class Cache(Singleflight[T]):
+    # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
     placeholder = object()
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
-        self.singleflight = Singleflight(get=get, mget=mget, make_key=make_key)
+        assert get or mget
+        if mget is None:  # simulate mget to reuse code
+            def mget(keys, *args, **kwargs):
+                assert len(keys) == 1
+                return [get(key, *args, **kwargs) for key in keys]
+        super().__init__(mget=self._cached_mget, make_key=make_key)
+        self.raw_mget = mget
         self.lru = OrderedDict()
-        self.locks = {}  # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
-        self.make_key = make_key
         self.maxsize = maxsize
         self.hits = 0
         self.misses = 0
@@ -58,12 +63,11 @@ class Cache(Generic[T]):
             elif len(self.lru) > self.maxsize:
                 self.lru.popitem(last=False)
 
-    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+    def _cached_mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
-        locked_keys = set()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
@@ -77,19 +81,14 @@ class Cache(Generic[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                if made_key not in self.locks:
-                    self.locks[made_key] = True
-                    locked_keys.add(made_key)
+                self._set_value(made_key, self.placeholder)
         if missing_keys:
-            try:
-                values = self.singleflight.mget(missing_keys, *args, **kwargs)
-            finally:
-                locked_keys = {k for k in locked_keys if self.locks.pop(k)}
+            values = self.raw_mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if made_key in locked_keys:
-                    self._set_value(made_key, value)
+                if made_key in self.lru:
+                    self.lru[made_key] = value
         return results
 
     def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
@@ -98,8 +97,6 @@ class Cache(Generic[T]):
             self.invalids += 1
             if not key:
                 self.lru.clear()
-                for made_key in self.locks:
-                    self.locks[made_key] = False
                 return
             if convert:
                 key_or_keys = convert(key)
@@ -108,19 +105,16 @@ class Cache(Generic[T]):
                 made_keys = [self.make_key(key)]
             for made_key in made_keys:
                 self.lru.pop(made_key, None)
-                if made_key in self.locks:
-                    self.locks[made_key] = False
 
 
 class TtlCache(Cache[T]):
     Pair = namedtuple('Pair', ['value', 'expire_at'])
 
-    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+    def _cached_mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = [self.placeholder] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
-        locked_keys = set()
         now = time.time()
         for index, key in enumerate(keys):
             made_key = self.make_key(key, *args, **kwargs)
@@ -135,20 +129,15 @@ class TtlCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                if made_key not in self.locks:
-                    self.locks[made_key] = True
-                    locked_keys.add(made_key)
+                self._set_value(made_key, self.placeholder)
         if missing_keys:
-            try:
-                tuples = self.singleflight.mget(missing_keys, *args, **kwargs)
-            finally:
-                locked_keys = {k for k in locked_keys if self.locks.pop(k)}
+            tuples = self.raw_mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if made_key in locked_keys:
+                if made_key in self.lru:
                     pair = TtlCache.Pair(value, expire_at(expire))
-                    self._set_value(made_key, pair)
+                    self.lru[made_key] = pair
         return results
 
 
@@ -235,12 +224,11 @@ def ttl_cache(expire, *, maxsize=128):
 
 
 class RedisCache(Singleflight[T]):
-    def __init__(self, redis: Redis | RedisCluster, slow_mget, make_key, serialize, deserialize, expire: timedelta,
+    def __init__(self, redis: Redis | RedisCluster, mget, make_key, serialize, deserialize, expire: timedelta,
                  prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), retry=3):
-        super().__init__(mget=self._mget, make_key=make_key)
+        super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis
-        self.slow_mget = slow_mget
-        self.make_key = make_key
+        self.raw_mget = mget
         self.serialize = serialize
         self.deserialize = deserialize
         self.expire = expire
@@ -248,7 +236,7 @@ class RedisCache(Singleflight[T]):
         self.timeout = timeout
         self.retry = retry
 
-    def _mget(self, keys, *args, **kwargs):
+    def _cached_mget(self, keys, *args, **kwargs):
         placeholder = self.prefix + str(uuid.uuid4())
         made_keys = []
         todo_indexes = []
@@ -267,7 +255,7 @@ class RedisCache(Singleflight[T]):
             else:
                 values[index] = self.deserialize(value)
         if todo_indexes:
-            new_values = self.slow_mget([keys[index] for index in todo_indexes], *args, **kwargs)
+            new_values = self.raw_mget([keys[index] for index in todo_indexes], *args, **kwargs)
             with self.redis.pipeline(transaction=False) as pipe:
                 script = Script(pipe)
                 for index, value in zip(todo_indexes, new_values):

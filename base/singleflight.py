@@ -10,8 +10,7 @@ T = TypeVar('T')
 class Singleflight(Generic[T]):
     def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
         assert get or mget
-        if mget is None:
-            # simulate mget to reuse code
+        if mget is None:  # simulate mget to reuse code
             def mget(keys, *args, **kwargs):
                 assert len(keys) == 1
                 return [get(key, *args, **kwargs) for key in keys]
