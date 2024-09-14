@@ -235,16 +235,15 @@ def ttl_cache(expire, *, maxsize=128):
 
 
 class RedisCache(Singleflight[T]):
-    def __init__(self, redis: Redis | RedisCluster, slow_mget, make_key, expire: timedelta,
-                 serialize=None, deserialize=None,
+    def __init__(self, redis: Redis | RedisCluster, slow_mget, make_key, serialize, deserialize, expire: timedelta,
                  prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), retry=3):
         super().__init__(mget=self._mget, make_key=make_key)
         self.redis = redis
         self.slow_mget = slow_mget
         self.make_key = make_key
-        self.expire = expire
         self.serialize = serialize
         self.deserialize = deserialize
+        self.expire = expire
         self.prefix = prefix
         self.timeout = timeout
         self.retry = retry
@@ -265,7 +264,7 @@ class RedisCache(Singleflight[T]):
                 todo_indexes.append(index)
             elif value.startswith(self.prefix):
                 wait_indexes.append(index)
-            elif self.deserialize:
+            else:
                 values[index] = self.deserialize(value)
         if todo_indexes:
             new_values = self.slow_mget([keys[index] for index in todo_indexes], *args, **kwargs)
@@ -273,9 +272,7 @@ class RedisCache(Singleflight[T]):
                 script = Script(pipe)
                 for index, value in zip(todo_indexes, new_values):
                     values[index] = value
-                    if self.serialize:
-                        value = self.serialize(value)
-                    script.compare_set(made_keys[index], placeholder, value, self.expire)
+                    script.compare_set(made_keys[index], placeholder, self.serialize(value), self.expire)
                 pipe.execute()
         retry = 0
         while wait_indexes:
@@ -287,9 +284,7 @@ class RedisCache(Singleflight[T]):
                 if value is None or value.startswith(self.prefix):
                     fail_indexes.append(index)
                 else:
-                    if self.deserialize:
-                        value = self.deserialize(value)
-                    values[index] = value
+                    values[index] = self.deserialize(value)
             if not fail_indexes:
                 break
             if retry >= self.retry:
