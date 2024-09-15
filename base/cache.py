@@ -225,7 +225,7 @@ def ttl_cache(expire, *, maxsize=128):
 
 class RedisCache(Singleflight[T]):
     def __init__(self, redis: Redis | RedisCluster, mget, make_key, serialize, deserialize, expire: timedelta,
-                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), retry=3):
+                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), try_times=3):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis
         self.raw_mget = mget
@@ -234,7 +234,7 @@ class RedisCache(Singleflight[T]):
         self.expire = expire
         self.prefix = prefix
         self.timeout = timeout
-        self.retry = retry
+        self.try_times = try_times
 
     def _cached_mget(self, keys, *args, **kwargs):
         placeholder = self.prefix + str(uuid.uuid4())
@@ -242,10 +242,11 @@ class RedisCache(Singleflight[T]):
         todo_indexes = []
         wait_indexes = []
         with self.redis.pipeline(transaction=False) as pipe:
+            lock_time = self.timeout * (self.try_times + 1)
             for key in keys:
                 made_key = self.make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
-                pipe.set(made_key, placeholder, nx=True, px=self.timeout * self.retry, get=True)
+                pipe.set(made_key, placeholder, nx=True, px=lock_time, get=True)
             values = pipe.execute()
         for index, value in enumerate(values):
             if value is None:
@@ -262,8 +263,9 @@ class RedisCache(Singleflight[T]):
                     values[index] = value
                     script.compare_set(made_keys[index], placeholder, self.serialize(value), self.expire)
                 pipe.execute()
-        retry = 0
+        try_times = 0
         while wait_indexes:
+            try_times += 1
             gevent.sleep(self.timeout.total_seconds())
             mget_nonatomic = self.redis.mget_nonatomic if isinstance(self.redis, RedisCluster) else self.redis.mget
             new_values = mget_nonatomic(*[made_keys[index] for index in wait_indexes])
@@ -273,11 +275,10 @@ class RedisCache(Singleflight[T]):
                     fail_indexes.append(index)
                 else:
                     values[index] = self.deserialize(value)
-            if not fail_indexes:
+            if not fail_indexes:  # all done
                 break
-            if retry >= self.retry:
+            if try_times >= self.try_times:
                 fail_keys = ', '.join(f'`{keys[index]}`' for index in fail_indexes)
                 raise ValueError(f'{fail_keys} not resolve')
             wait_indexes = fail_indexes
-            retry += 1
         return values
