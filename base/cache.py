@@ -33,13 +33,8 @@ class Cache(Singleflight[T]):
     placeholder = object()
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
-        assert get or mget
-        if mget is None:  # simulate mget to reuse code
-            def mget(keys, *args, **kwargs):
-                assert len(keys) == 1
-                return [get(key, *args, **kwargs) for key in keys]
         super().__init__(mget=self._cached_mget, make_key=make_key)
-        self.raw_mget = mget
+        self.raw_mget = utils.make_mget(get, mget)
         self.lru = OrderedDict()
         self.maxsize = maxsize
         self.hits = 0
@@ -224,11 +219,11 @@ def ttl_cache(expire, *, maxsize=128):
 
 
 class RedisCache(Singleflight[T]):
-    def __init__(self, redis: Redis | RedisCluster, mget, make_key, serialize, deserialize, expire: timedelta,
-                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), try_times=3):
+    def __init__(self, redis: Redis | RedisCluster, *, get=None, mget=None, make_key, serialize, deserialize,
+                 expire: timedelta, prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), try_times=3):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis
-        self.raw_mget = mget
+        self.raw_mget = utils.make_mget(get, mget)
         self.serialize = serialize
         self.deserialize = deserialize
         self.expire = expire

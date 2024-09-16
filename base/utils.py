@@ -76,6 +76,15 @@ def make_key(key, *args, **kwargs):
     return key, args, _kw_mark, *kwargs.items()
 
 
+def make_mget(get=None, mget=None):
+    assert get or mget
+    if mget is None:  # simulate mget to reuse code
+        def mget(keys, *args, **kwargs):
+            assert len(keys) == 1
+            return [get(key, *args, **kwargs) for key in keys]
+    return mget
+
+
 def stream_name(message_or_cls: Union[BaseModel, Type[BaseModel]]) -> str:
     cls = message_or_cls.__class__ if isinstance(message_or_cls, BaseModel) else message_or_cls
     return f'stream:{cls.__name__}'
