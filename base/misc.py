@@ -3,6 +3,7 @@ import contextlib
 import dataclasses
 import json
 import uuid
+from binascii import crc32
 from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
@@ -135,6 +136,16 @@ class FlashCacheMixin(CacheMixin):
     @classmethod
     def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
         return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
+
+
+class RedisCacheMixin(CacheMixin):
+    __fields_version__: int
+
+    @classmethod
+    def make_key(cls, key, *_, **__):
+        if '__fields_version__' not in cls.__dict__:
+            cls.__fields_version__ = crc32(' '.join(cls._fields).encode())
+        return f'{cls.__name__}.{cls.__fields_version__}:{cls.id.to_python(key)}'
 
 
 class Semaphore:
