@@ -220,9 +220,10 @@ def ttl_cache(expire, *, maxsize=128):
 
 class RedisCache(Singleflight[T]):
     def __init__(self, redis: Redis | RedisCluster, *, get=None, mget=None, make_key, serialize, deserialize,
-                 expire: timedelta, prefix='PLACEHOLDER', timeout=timedelta(milliseconds=100), try_times=3):
+                 expire: timedelta, prefix='PLACEHOLDER', timeout=timedelta(milliseconds=50), try_times=5):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis
+        self.mget_nonatomic = redis.mget_nonatomic if isinstance(redis, RedisCluster) else redis.mget
         self.raw_mget = utils.make_mget(get, mget)
         self.serialize = serialize
         self.deserialize = deserialize
@@ -262,8 +263,7 @@ class RedisCache(Singleflight[T]):
         while wait_indexes:
             try_times += 1
             gevent.sleep(self.timeout.total_seconds())
-            mget_nonatomic = self.redis.mget_nonatomic if isinstance(self.redis, RedisCluster) else self.redis.mget
-            new_values = mget_nonatomic(*[made_keys[index] for index in wait_indexes])
+            new_values = self.mget_nonatomic(*[made_keys[index] for index in wait_indexes])
             fail_indexes = []
             for index, value in zip(wait_indexes, new_values):
                 if value is None or value.startswith(self.prefix):
