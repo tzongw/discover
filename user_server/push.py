@@ -55,9 +55,7 @@ def broadcast(group, message, *, exclude=()):
         with redis.pipeline(transaction=False) as pipe:
             for uid in exclude:
                 pipe.hkeys(online_key(uid))
-            exclude = []
-            for conn_ids in pipe.execute():
-                exclude += conn_ids
+            exclude = sum(pipe.execute(), [])
     if isinstance(message, str):
         gate_service.broadcast_text(group, exclude, message)
     else:
