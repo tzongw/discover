@@ -18,14 +18,11 @@ class UniqueId:
         self._keys = set()
         gevent.spawn(self._run)
 
-    def _key(self, biz: str, id: int):
-        return f'{self._PREFIX}:{biz}:{id}'
-
     def gen(self, biz: str, r: range):
         partition = randrange(r.start, r.stop)
         range_chain = chain(range(partition, r.stop), range(r.start, partition))
         for id in range_chain:
-            key = self._key(biz, id)
+            key = f'{self._PREFIX}:{biz}:{id}'
             if not self._redis.set(key, '', ex=self._TTL, nx=True):
                 logging.info(f'{biz} conflict id {id}, retry next')
                 continue

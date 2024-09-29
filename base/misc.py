@@ -148,6 +148,17 @@ class RedisCacheMixin(CacheMixin):
         return f'{cls.__name__}.{cls.__fields_version__}:{cls.id.to_python(key)}'
 
 
+class MakeKeyMixin:
+    __fields__: dict
+    __fields_version__: int
+
+    @classmethod
+    def make_key(cls, key, *_, **__):
+        if '__fields_version__' not in cls.__dict__:
+            cls.__fields_version__ = crc32(' '.join(cls.__fields__).encode())
+        return f'{cls.__name__}.{cls.__fields_version__}:{key}'
+
+
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
