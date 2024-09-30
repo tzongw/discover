@@ -145,14 +145,15 @@ def _sig_handler(sig, frame):
     def graceful_exit():
         logging.info(f'exit {sig}')
         _cleanup()
-        if sig != signal.SIGUSR1:
-            seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
-            gevent.sleep(seconds)  # wait for requests & messages
-            gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
-            for worker, desc in _workers.items():
-                if worker:  # still active
-                    logging.error(f'worker {desc} not finish')
-            sys.exit(0)
+        if sig == signal.SIGUSR1:
+            return
+        seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
+        gevent.sleep(seconds)  # wait for requests & messages
+        gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
+        for worker, desc in _workers.items():
+            if worker:  # still active
+                logging.error(f'worker {desc} not finish')
+        sys.exit(0)
 
     gevent.spawn(graceful_exit)
 

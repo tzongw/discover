@@ -55,7 +55,7 @@ class Executor:
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
         self._items.put(item)
-        if not self._overload and len(self._items) >= self._max_workers * 2:
+        if not self._overload and self._unfinished >= self._max_workers * 2:
             self._overload = True
             logging.warning(f'+ overload {self} {item}')
         return fut
@@ -81,9 +81,6 @@ class Executor:
         try:
             while True:
                 item = self._items.get(timeout=self._idle)  # type: _WorkItem
-                if self._overload and len(self._items) <= self._max_workers:
-                    self._overload = False
-                    logging.warning(f'- overload {self} {item}')
                 start = time.time()
                 try:
                     item.run()
@@ -93,6 +90,9 @@ class Executor:
                 if t > self._slow_time:
                     logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
+                if self._overload and self._unfinished <= self._max_workers:
+                    self._overload = False
+                    logging.warning(f'- overload {self} {item}')
         except queue.Empty:
             logging.debug(f'worker idle exit')
         finally:
