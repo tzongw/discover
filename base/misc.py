@@ -132,10 +132,12 @@ class CacheMixin(GetterMixin):
         return get_expire
 
 
-class FlashCacheMixin(CacheMixin):
+class TtlCacheMixin(CacheMixin):
+    __cache_ttl__ = timedelta(seconds=1)
+
     @classmethod
     def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
-        return [(value, timedelta(seconds=1)) for value in super().mget(keys)]
+        return [(value, cls.__cache_ttl__) for value in super().mget(keys)]
 
 
 class RedisCacheMixin(CacheMixin):
