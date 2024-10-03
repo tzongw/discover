@@ -41,6 +41,8 @@ class JSONEncoder(json.JSONEncoder):
             return o.to_dict()
         elif isinstance(o, BaseModel):
             return o.dict()
+        elif dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
         elif isinstance(o, datetime):
             return o.strftime('%Y-%m-%d %H:%M:%S')
         elif isinstance(o, date):

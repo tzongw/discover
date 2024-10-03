@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Union, Type, Self
+from contextlib import contextmanager
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from pymongo import monitoring
@@ -22,9 +24,20 @@ from base.misc import CacheMixin, TimeDeltaField
 from config import options
 from shared import invalidator, id_generator
 
+
+class SessionMaker(sessionmaker):
+    @contextmanager
+    def begin(self):
+        with self() as session:
+            with session.begin(), tx_lock:
+                session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+                yield session
+
+
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
-engine = create_engine('sqlite:///db.sqlite3', echo=echo)
-Session = sessionmaker(engine)
+engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
+Session = SessionMaker(engine, expire_on_commit=False)
+tx_lock = threading.Lock()
 Base = declarative_base()
 
 

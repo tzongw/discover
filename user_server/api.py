@@ -253,17 +253,16 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    session = Session()
-    account = session.query(Account).filter(Account.username == username).first()  # type: Account
-    if account is None:  # register
-        uid = id_generator.gen()
-        hashed = hash_password(uid, password)
-        account = Account(id=uid, username=username, hashed=hashed)
-        session.add(account)
-        session.commit()
-        dispatcher.signal(account)
-    elif account.hashed != hash_password(account.id, password):
-        return 'account not exist or password error'
+    with Session.begin() as session:
+        account = session.query(Account).filter(Account.username == username).first()  # type: Account
+        if account is None:  # register
+            uid = id_generator.gen()
+            hashed = hash_password(uid, password)
+            account = Account(id=uid, username=username, hashed=hashed)
+            session.add(account)
+            dispatcher.signal(account)
+        elif account.hashed != hash_password(account.id, password):
+            return 'account not exist or password error'
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
     flask.session[CTX_TOKEN] = token
