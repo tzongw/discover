@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+import os
 import logging
 import threading
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from mongoengine import Document, IntField, StringField, connect, DateTimeField,
 from pymongo import monitoring
 from sqlalchemy import BigInteger
 from sqlalchemy import Column
-from sqlalchemy import String
+from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -28,10 +29,9 @@ from shared import invalidator, id_generator
 class SessionMaker(sessionmaker):
     @contextmanager
     def begin(self):
-        with self() as session:
-            with session.begin(), tx_lock:
-                session.connection().exec_driver_sql('BEGIN IMMEDIATE')
-                yield session
+        with self() as session, session.begin(), tx_lock:
+            session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+            yield session
 
 
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
@@ -39,6 +39,10 @@ engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolati
 Session = SessionMaker(engine, expire_on_commit=False)
 tx_lock = threading.Lock()
 Base = declarative_base()
+
+if not os.path.exists('db.sqlite3'):
+    with Session() as s:
+        s.connection().exec_driver_sql('PRAGMA journal_mode=wal')
 
 
 @dataclass
@@ -49,6 +53,7 @@ class Account(Base):
     id = Column(BigInteger, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
+    last_active = Column(DateTime, nullable=False, default=datetime.now)
 
 
 Base.metadata.create_all(engine)
