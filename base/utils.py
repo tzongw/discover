@@ -1,3 +1,5 @@
+import os
+import fcntl
 import contextlib
 import logging
 import socket
@@ -152,3 +154,19 @@ def redis_name(redis: Union[Redis, RedisCluster]):
 def stable_hash(o):
     s = safe_dump(o)
     return crc32(s.encode())
+
+
+def flock(path):
+    f = open(path, 'a+')
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        f.seek(0)
+        pid = f.readline()
+        f.close()
+        raise BlockingIOError(f'locking by {pid}')
+    f.seek(0)
+    f.truncate(0)
+    f.write(str(os.getpid()))
+    f.flush()
+    return f
