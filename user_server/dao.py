@@ -12,7 +12,7 @@ from mongoengine import Document, IntField, StringField, connect, DateTimeField,
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from pymongo import monitoring
 from sqlalchemy import BigInteger
-from sqlalchemy import Column
+from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -55,8 +55,8 @@ class Account(Base):
     hashed = Column(String(40), nullable=False)
     last_active = Column(DateTime, nullable=False, default=datetime.now)
 
+    Index('idx_last_active', last_active)
 
-Base.metadata.create_all(engine)
 
 collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = PascalCaseDict()
 
