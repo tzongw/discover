@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import time
+import heapq
 import threading
 from datetime import timedelta, datetime
-from typing import List, Union
+from typing import List, Union, Optional, Callable
 import gevent
-import heapq
-from typing import Optional, Callable
 from .utils import LogSuppress, func_desc
 from .executor import Executor
 
