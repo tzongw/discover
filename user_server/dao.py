@@ -11,7 +11,7 @@ from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from pymongo import monitoring
-from sqlalchemy import BigInteger
+from sqlalchemy import Integer
 from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
@@ -50,7 +50,7 @@ class Account(Base):
     id: int
 
     __tablename__ = "accounts"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(Integer, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
     last_active = Column(DateTime, nullable=False, default=datetime.now)
