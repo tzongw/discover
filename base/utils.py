@@ -156,10 +156,10 @@ def stable_hash(o):
     return crc32(s.encode())
 
 
-def flock(path, operation):
+def flock(path):
     f = open(path, 'a+')
     try:
-        fcntl.flock(f, operation)
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         f.seek(0)
         pid = f.readline()
@@ -168,9 +168,8 @@ def flock(path, operation):
     except Exception:
         f.close()
         raise
-    if operation | fcntl.LOCK_EX:
-        f.seek(0)
-        f.truncate(0)
-        f.write(str(os.getpid()))
-        f.flush()
+    f.seek(0)
+    f.truncate(0)
+    f.write(str(os.getpid()))
+    f.flush()
     return f
