@@ -278,8 +278,8 @@ def login(username: str, password: str):
         tokens.sort(key=lambda x: ttls[x])
         to_delete = tokens[:len(tokens) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
-        for token in to_delete:
-            push.kick(account.id, token, 'token expired')
+        for token in to_delete:  # normally, len(to_delete) == 1
+            push.kick(account.id, 'token expired', token=token)
     return account
 
 
