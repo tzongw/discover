@@ -32,4 +32,5 @@ class LazyProxy:
     def __getattr__(self, name):
         if self._target is None:
             self._target = self._create()
+            self._create = None
         return getattr(self._target, name)
