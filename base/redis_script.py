@@ -81,4 +81,5 @@ class Script:
         return self.redis.fcall('compare_set', 1, *keys_and_args)
 
     def compare_del(self, key: str, expected):
-        return self.redis.fcall('compare_del', 1, key, expected)
+        keys_and_args = [key, expected]
+        return self.redis.fcall('compare_del', 1, *keys_and_args)

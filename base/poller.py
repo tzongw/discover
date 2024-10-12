@@ -80,13 +80,6 @@ class Poller:
         if self.async_task.post(task_id, task, config.interval, loop=True):
             self.async_task.publish(task)
 
-    def push_and_notify(self, group, queue, value_or_values):
-        values = value_or_values if isinstance(value_or_values, (tuple, list, set)) else [value_or_values]
-        after = self.redis.rpush(queue, *values)
-        before = after - len(values)
-        if before == 0 or int(math.log(after, 2)) != int(math.log(before, 2)):
-            self.notify(group, queue)
-
     def __call__(self, group, interval=timedelta(seconds=3), united=False, spawn=None):
         def decorator(poll):
             assert group not in self.configs
