@@ -16,8 +16,7 @@ end
 
 local function array_to_table(array)
     local t = {}
-    for i = 1, #array, 2
-    do
+    for i = 1, #array, 2 do
         t[array[i]] = array[i + 1]
     end
     return t
@@ -28,8 +27,7 @@ local function timer_tick(keys, args)
     local info = array_to_table(redis.call('XINFO', 'STREAM', keys[1]))
     local tick_ts = string.sub(info['last-generated-id'], 1, -3)
     local init_ts = math.max(tick_ts + 1, cur_ts - args[1])
-    for ts = init_ts, cur_ts
-    do
+    for ts = init_ts, cur_ts do
         redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], ts, '', '')
     end
     return math.max(cur_ts - init_ts + 1, 0)

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import math
 import logging
 from datetime import timedelta
 from enum import Enum, auto
