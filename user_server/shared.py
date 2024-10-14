@@ -4,9 +4,10 @@ from types import MappingProxyType
 from werkzeug.exceptions import TooManyRequests
 from flasgger import Swagger
 from flask import Flask, g
+from base import ZTimer
+from base import TtlCache
 from base import ListConverter
 from base.misc import JSONProvider, make_response
-from base.cache import TtlCache
 import const
 from models import Session
 
@@ -18,6 +19,8 @@ app.json.ensure_ascii = False
 app.debug = options.env is const.Environment.DEV
 app.make_response = functools.partial(make_response, app)
 swagger = Swagger(app)
+
+ztimer = ZTimer(redis, 'user')
 
 
 def online_key(uid: int):

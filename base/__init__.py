@@ -29,6 +29,7 @@ from .cache import Cache, TtlCache, FullCache, FullTtlCache
 from .task import AsyncTask, HeavyTask
 from .poller import Poller
 from .redis_script import Script
+from .ztimer import ZTimer
 
 
 def _represent_timedelta(self, data):
