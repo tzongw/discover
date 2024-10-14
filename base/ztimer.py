@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 from typing import Union
 from datetime import timedelta
 from redis import Redis, RedisCluster
@@ -65,8 +66,8 @@ class ZTimer:
             redis.function_load(_SCRIPT, replace=True)
             self.loaded.add(name)
         self.redis = redis
-        self._meta_key = f'timer.meta:{{{service}}}'
-        self._timeout_key = f'timer.timeout:{{{service}}}'
+        self._timeout_key = f'ztimer.timeout:{{{service}}}'
+        self._meta_key = f'ztimer.meta:{{{service}}}'
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         keys_and_args = [self._timeout_key, self._meta_key, key, data, interval.total_seconds()]
@@ -76,12 +77,27 @@ class ZTimer:
 
     def kill(self, key: str):
         with self.redis.pipeline(transaction=True) as pipe:
-            pipe.hdel(self._meta_key, key)
             pipe.zrem(self._timeout_key, key)
+            pipe.hdel(self._meta_key, key)
             return pipe.execute()[0]
 
     def exists(self, key: str):
         return self.redis.hexists(self._meta_key, key)
+
+    def info(self, key: str):
+        with self.redis.pipeline(transaction=True) as pipe:
+            pipe.zscore(self._timeout_key, key)
+            pipe.hget(self._meta_key, key)
+            timeout, meta = pipe.execute()
+        if timeout is None:
+            return
+        loop, interval, data = meta.split('|', maxsplit=2)
+        return {
+            'remaining': max(timeout - time.time(), 0),
+            'data': data,
+            'interval': float(interval),
+            'loop': loop == '1',
+        }
 
     def poll(self, limit=100):
         keys_and_args = [self._timeout_key, self._meta_key, limit]
