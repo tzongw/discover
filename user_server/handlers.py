@@ -3,13 +3,14 @@ import os
 import logging
 import const
 from datetime import timedelta, datetime
-from base import ip_address
+from base import ip_address, LogSuppress
 from common.messages import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, tick, \
     run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler
 from models import Runtime
 from dao import Account
 from config import options
+from rpc import Handler
 
 
 @dispatcher('welcome')
@@ -24,9 +25,10 @@ def on_notice(key, data):
 
 @scheduler(timedelta(seconds=1))
 def poll_timeout():
+    handler = Handler()
     for full_key, data in ztimer.poll().items():
-        group, key = full_key.split(':', maxsplit=1)
-        dispatcher.dispatch(group, key, data)
+        with LogSuppress():
+            handler.timeout(full_key, data)
 
 
 at_exit(poll_timeout.stop)
@@ -90,10 +92,14 @@ def init():
         timer_service.call_later(const.RPC_USER, 'notice:1', 'one shot', delay=3)
         timer_service.call_repeat(const.RPC_USER, 'welcome:2', 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer(const.RPC_USER, 'welcome:2'))
+        timer_service.call_repeat(const.RPC_USER, const.TICK_TIMER, '', interval=1)
+        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
         at_exit(lambda: ztimer.kill('welcome:2'))
+        ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+        at_exit(lambda: ztimer.kill(const.TICK_TIMER))
     elif options.init_timer == 'task':
         oneshot_id = 'timer:oneshot'
         timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))
