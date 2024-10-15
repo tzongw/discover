@@ -7,7 +7,7 @@ from .utils import LogSuppress
 
 class Registry:
     _PREFIX = 'service'
-    _INTERVAL = 3
+    _INTERVAL = 10
     _TTL = 3 * _INTERVAL
     COOLDOWN = _TTL + _INTERVAL
 

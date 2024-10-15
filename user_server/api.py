@@ -302,7 +302,7 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token or token not in sessions.get(uid):
         raise Unauthorized
-    ctx.uid = g.uid = uid
+    g.uid = uid
     if uid in user_actives:
         return
     # refresh last active & token ttl
@@ -327,7 +327,7 @@ def whoami():
       200:
         description: account
     """
-    logging.info('')
+    logging.info(f'uid: {g.uid}')
     account = Account(id=g.uid)
     return account
 
