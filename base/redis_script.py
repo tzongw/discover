@@ -72,14 +72,14 @@ class Script:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)
 
-    def compare_set(self, key: str, expected, value, expire: timedelta = None, keepttl: bool = False):
+    def compare_set(self, key: str, expected: str, value: str, expire: timedelta = None, keepttl=False):
         keys_and_args = [key, expected, value]
-        if expire is not None:
+        if expire:
             keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
         if keepttl:
             keys_and_args.append('KEEPTTL')
         return self.redis.fcall('compare_set', 1, *keys_and_args)
 
-    def compare_del(self, key: str, expected):
+    def compare_del(self, key: str, expected: str):
         keys_and_args = [key, expected]
         return self.redis.fcall('compare_del', 1, *keys_and_args)
