@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import logging
 import random
+import bisect
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
 from typing import Union
+from collections import namedtuple
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
@@ -14,11 +17,26 @@ from .misc import Stock
 from .timer import Timer
 from .chunk import batched
 
+Node = namedtuple('Node', ['hash', 'shard'])
+
 
 class ShardingKey:
-    def __init__(self, shards, fixed=()):
+    def __init__(self, shards, fixed=(), replicas=5):
         self.shards = shards
         self.fixed = fixed  # keys fixed in shard 0
+        self.ring = []  # consistent hash ring
+        for shard in range(shards):
+            for replica in range(replicas):
+                self.ring.append(Node(crc32(f'{shard}_{replica}'.encode()), shard))
+        self.ring.sort()
+
+    def get_shard(self, key):
+        if key in self.fixed:
+            return 0
+        i = bisect.bisect(self.ring, Node(crc32(key.encode()), 0))
+        if i >= len(self.ring):
+            i = 0
+        return self.ring[i].shard
 
     def all_sharded_keys(self, key: str):
         assert not key.startswith('{')
@@ -28,10 +46,6 @@ class ShardingKey:
         assert not key.startswith('{')
         shard = random.randrange(self.shards)
         return f'{{{shard}}}:{key}'
-
-    def get_shard(self, key):
-        # `shard` consistent across different processes
-        return 0 if key in self.fixed else crc32(key.encode()) % self.shards
 
     def sharded_key(self, key: str):
         return self.sharded_keys(key)[0]
@@ -161,6 +175,7 @@ class MigratingTimer(ShardingTimer):
 
 class MigratingReceiver(ShardingReceiver):
     def __init__(self, redis, group: str, consumer: str, *, batch=50, old_receiver: Receiver):
+        assert old_receiver.redis is not redis, 'same redis, use ShardingReceiver instead'
         super().__init__(redis, group, consumer, batch=batch)
         self.old_receiver = old_receiver
 
