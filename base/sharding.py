@@ -144,31 +144,56 @@ class MigratingTimer(ShardingTimer):
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 
+    def is_moved(self, key):
+        consistent = self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingTimer) and \
+                     self._sharding_key.get_shard(key) == self.old_timer._sharding_key.get_shard(key)
+        return not consistent
+
+    @property
+    def is_migrating(self):
+        return datetime.now() >= self.start_time
+
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
-        if datetime.now() >= self.start_time:
-            self.old_timer.kill(key)
-            return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
-        else:
+        if not self.is_migrating:
             return self.old_timer.create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        added = super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        if added and self.is_moved(key):
+            added = 0 if self.old_timer.kill(key) else 1
+        return added
 
     def kill(self, key):
-        return super().kill(key) or self.old_timer.kill(key)
+        if not self.is_migrating:
+            return self.old_timer.kill(key)
+        deleted = super().kill(key)
+        if not deleted and self.is_moved(key):
+            deleted = self.old_timer.kill(key)
+        return deleted
 
     def exists(self, key: str):
-        return super().exists(key) or self.old_timer.exists(key)
+        if not self.is_migrating:
+            return self.old_timer.exists(key)
+        exists = super().exists(key)
+        if not exists and self.is_moved(key):
+            exists = self.old_timer.exists(key)
+        return exists
 
     def info(self, key: str):
-        return super().info(key) or self.old_timer.info(key)
+        if not self.is_migrating:
+            return self.old_timer.info(key)
+        info = super().info(key)
+        if info is None and self.is_moved(key):
+            info = self.old_timer.info(key)
+        return info
 
     def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         if self.redis is not self.old_timer.redis and self.old_timer.kill(key):
-            _, new_stream = self._sharding_key.sharded_keys(key, stream)
             if isinstance(self.old_timer, ShardingTimer):
                 _, old_stream = self.old_timer._sharding_key.sharded_keys(key, stream)
             else:
                 old_stream = stream
             last_id = self.old_timer.redis.xinfo_stream(old_stream)['last-generated-id']
             last_tick = int(last_id[:-2])
+            _, new_stream = self._sharding_key.sharded_keys(key, stream)
             self.redis.xadd(new_stream, fields={'': ''}, id=str(last_tick + 1))
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 

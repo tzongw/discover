@@ -67,9 +67,9 @@ class Timer:
 
     def info(self, key: str):
         res = self.redis.execute_command('TIMER.INFO', key)
-        if isinstance(res, list):
-            return dict(zip(res[::2], res[1::2]))
-        return res
+        if res is None:
+            return
+        return dict(zip(res[::2], res[1::2]))
 
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
