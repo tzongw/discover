@@ -62,8 +62,14 @@ def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
 
 
 @lru_cache()
-def _get_moveable_keys(self: CommandsParser, redis_conn, *args):
+def _cached_get_moveable_keys(self: CommandsParser, redis_conn, *args):
     return _orig_get_moveable_keys(self, redis_conn, *args)
+
+
+def _get_moveable_keys(self: CommandsParser, redis_conn, *args):
+    if args[0] == 'FCALL':
+        args = args[:3 + args[2]]
+    return _cached_get_moveable_keys(self, redis_conn, *args)
 
 
 RedisCluster.transaction = _transaction

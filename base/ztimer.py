@@ -76,7 +76,7 @@ class ZTimer:
         return self.redis.fcall('ztimer_add', 2, *keys_and_args)
 
     def kill(self, key: str):
-        with self.redis.pipeline(transaction=True) as pipe:
+        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
             pipe.zrem(self._timeout_key, key)
             pipe.hdel(self._meta_key, key)
             return pipe.execute()[0]
@@ -85,7 +85,7 @@ class ZTimer:
         return self.redis.hexists(self._meta_key, key)
 
     def info(self, key: str):
-        with self.redis.pipeline(transaction=True) as pipe:
+        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
             pipe.zscore(self._timeout_key, key)
             pipe.hget(self._meta_key, key)
             timeout, meta = pipe.execute()

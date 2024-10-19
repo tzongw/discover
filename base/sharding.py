@@ -15,6 +15,7 @@ from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name
 from .misc import Stock
 from .timer import Timer
+from .ztimer import ZTimer
 from .chunk import batched
 
 Node = namedtuple('Node', ['hash', 'shard'])
@@ -265,3 +266,40 @@ class ShardingStock(Stock):
             _, sharded_key = self.sharding_key.sharded_keys(hint, key)
         bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+
+
+class ShardingZTimer(ZTimer):
+    def __init__(self, redis: RedisCluster, service, *, sharding_key: ShardingKey):
+        super().__init__(redis, service)
+        self.sharding_key = sharding_key
+        self._orig_timeout_key = self._timeout_key
+        self._orig_meta_key = self._meta_key
+
+    def _update_sharded(self, key: str):
+        _, self._timeout_key, self._meta_key = self.sharding_key.sharded_keys(key, self._orig_timeout_key,
+                                                                              self._orig_meta_key)
+
+    def new(self, key: str, data: str, interval: timedelta, *, loop=False):
+        self._update_sharded(key)
+        return super().new(key, data, interval, loop=loop)
+
+    def kill(self, key: str):
+        self._update_sharded(key)
+        return super().kill(key)
+
+    def exists(self, key: str):
+        self._update_sharded(key)
+        return super().exists(key)
+
+    def info(self, key: str):
+        self._update_sharded(key)
+        return super().info(key)
+
+    def poll(self, limit=100):
+        with self.redis.pipeline(transaction=False) as pipe:
+            for timeout_key, meta_key in zip(self.sharding_key.all_sharded_keys(self._orig_timeout_key),
+                                             self.sharding_key.all_sharded_keys(self._orig_meta_key)):
+                keys_and_args = [timeout_key, meta_key, limit]
+                pipe.fcall('ztimer_poll', 2, *keys_and_args)
+            res = sum(pipe.execute(), [])
+        return dict(zip(res[::2], res[1::2]))

@@ -8,6 +8,7 @@ from base import ZTimer
 from base import TtlCache
 from base import ListConverter
 from base.misc import JSONProvider, make_response
+from base.sharding import ShardingKey, ShardingZTimer
 import const
 from models import Session
 
@@ -20,7 +21,8 @@ app.debug = options.env is const.Environment.DEV
 app.make_response = functools.partial(make_response, app)
 swagger = Swagger(app)
 
-ztimer = ZTimer(redis, 'user')
+ztimer = ShardingZTimer(redis, 'user', sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER])) if isinstance(
+    redis, RedisCluster) else ZTimer(redis, 'user')
 
 
 def online_key(uid: int):
