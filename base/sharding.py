@@ -158,8 +158,8 @@ class MigratingTimer(ShardingTimer):
         if not self.is_migrating:
             return self.old_timer.create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
         added = super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
-        if added and self.is_moved(key):
-            added = 0 if self.old_timer.kill(key) else 1
+        if added and self.is_moved(key) and self.old_timer.kill(key):
+            added = 0
         return added
 
     def kill(self, key):
@@ -271,13 +271,13 @@ class ShardingStock(Stock):
 class ShardingZTimer(ZTimer):
     def __init__(self, redis: RedisCluster, service, *, sharding_key: ShardingKey):
         super().__init__(redis, service)
-        self.sharding_key = sharding_key
+        self._sharding_key = sharding_key
         self._orig_timeout_key = self._timeout_key
         self._orig_meta_key = self._meta_key
 
     def _update_sharded(self, key: str):
-        _, self._timeout_key, self._meta_key = self.sharding_key.sharded_keys(key, self._orig_timeout_key,
-                                                                              self._orig_meta_key)
+        _, self._timeout_key, self._meta_key = self._sharding_key.sharded_keys(key, self._orig_timeout_key,
+                                                                               self._orig_meta_key)
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         self._update_sharded(key)
@@ -297,9 +297,65 @@ class ShardingZTimer(ZTimer):
 
     def poll(self, limit=100):
         with self.redis.pipeline(transaction=False) as pipe:
-            for timeout_key, meta_key in zip(self.sharding_key.all_sharded_keys(self._orig_timeout_key),
-                                             self.sharding_key.all_sharded_keys(self._orig_meta_key)):
+            for timeout_key, meta_key in zip(self._sharding_key.all_sharded_keys(self._orig_timeout_key),
+                                             self._sharding_key.all_sharded_keys(self._orig_meta_key)):
                 keys_and_args = [timeout_key, meta_key, limit]
                 pipe.fcall('ztimer_poll', 2, *keys_and_args)
             res = sum(pipe.execute(), [])
         return dict(zip(res[::2], res[1::2]))
+
+
+class MigratingZTimer(ShardingZTimer):
+    def __init__(self, redis, service, *, sharding_key: ShardingKey, old_timer: ZTimer, start_time: datetime):
+        super().__init__(redis, service, sharding_key=sharding_key)
+        self.old_timer = old_timer
+        self.start_time = start_time  # migration start time, after deployment
+
+    def is_moved(self, key):
+        consistent = self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingZTimer) and \
+                     self._sharding_key.get_shard(key) == self.old_timer._sharding_key.get_shard(key)
+        return not consistent
+
+    @property
+    def is_migrating(self):
+        return datetime.now() >= self.start_time
+
+    def new(self, key: str, data: str, interval: timedelta, *, loop=False):
+        if not self.is_migrating:
+            return self.old_timer.new(key, data, interval, loop=loop)
+        added = super().new(key, data, interval, loop=loop)
+        if added and self.is_moved(key) and self.old_timer.kill(key):
+            added = 0
+        return added
+
+    def kill(self, key):
+        if not self.is_migrating:
+            return self.old_timer.kill(key)
+        deleted = super().kill(key)
+        if not deleted and self.is_moved(key):
+            deleted = self.old_timer.kill(key)
+        return deleted
+
+    def exists(self, key: str):
+        if not self.is_migrating:
+            return self.old_timer.exists(key)
+        exists = super().exists(key)
+        if not exists and self.is_moved(key):
+            exists = self.old_timer.exists(key)
+        return exists
+
+    def info(self, key: str):
+        if not self.is_migrating:
+            return self.old_timer.info(key)
+        info = super().info(key)
+        if info is None and self.is_moved(key):
+            info = self.old_timer.info(key)
+        return info
+
+    def poll(self, limit=100):
+        if not self.is_migrating:
+            return self.old_timer.poll(limit)
+        if self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingZTimer):
+            return super().poll(limit) if self._sharding_key.shards >= self.old_timer._sharding_key.shards \
+                else self.old_timer.poll(limit)
+        return super().poll(limit) | self.old_timer.poll(limit)

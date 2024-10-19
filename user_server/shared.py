@@ -21,8 +21,8 @@ app.debug = options.env is const.Environment.DEV
 app.make_response = functools.partial(make_response, app)
 swagger = Swagger(app)
 
-ztimer = ShardingZTimer(redis, 'user', sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER])) if isinstance(
-    redis, RedisCluster) else ZTimer(redis, 'user')
+ztimer = ShardingZTimer(redis, 'user', sharding_key=ShardingKey(shards=3)) if isinstance(redis, RedisCluster) \
+    else ZTimer(redis, 'user')
 
 
 def online_key(uid: int):
