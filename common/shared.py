@@ -29,10 +29,9 @@ dispatcher = Dispatcher()
 tick = TimeDispatcher()
 
 app_name = options.app_name
-registry = Registry(Redis.from_url(options.registry, decode_responses=True), const.SERVICES)
-
 redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
-    Redis.from_url(options.redis or options.registry, decode_responses=True)
+    Redis.from_url(options.redis, decode_responses=True)
+registry = Registry(redis, const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)

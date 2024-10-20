@@ -4,6 +4,7 @@ import logging
 import const
 from datetime import timedelta, datetime
 from base import ip_address, LogSuppress
+from base.scheduler import PeriodicCallback
 from common.messages import Login, Logout, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, tick, \
     run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler
@@ -23,15 +24,11 @@ def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-@scheduler(timedelta(seconds=1))
 def poll_timeout():
     handler = Handler()
     for full_key, data in ztimer.poll().items():
         with LogSuppress():
             handler.timeout(full_key, data)
-
-
-at_exit(poll_timeout.stop)
 
 
 @dispatcher(Account)
@@ -100,6 +97,8 @@ def init():
         at_exit(lambda: ztimer.kill('welcome:2'))
         ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
         at_exit(lambda: ztimer.kill(const.TICK_TIMER))
+        pc = PeriodicCallback(scheduler, poll_timeout, timedelta(seconds=1))
+        at_exit(pc.stop)
     elif options.init_timer == 'task':
         oneshot_id = 'timer:oneshot'
         timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))

@@ -1,6 +1,6 @@
 import logging
 import gevent
-from redis import Redis
+from redis import Redis, RedisCluster
 
 from .utils import LogSuppress
 
@@ -15,7 +15,7 @@ class Registry:
     def _full_key(cls, name):
         return f'{cls._PREFIX}:{name}'
 
-    def __init__(self, redis: Redis, services):
+    def __init__(self, redis: Redis | RedisCluster, services):
         self._redis = redis
         self._services = services
         self._registered = {}  # type: dict[str, str]
@@ -47,8 +47,8 @@ class Registry:
         with self._redis.pipeline(transaction=False) as pipe:
             for name, address in self._registered.items():
                 pipe.hdel(self._full_key(name), address)
-            pipe.publish(self._PREFIX, 'unregister')
             pipe.execute()
+        self._redis.publish(self._PREFIX, 'unregister')
 
     def addresses(self, name) -> frozenset[str]:  # constant
         return self._addresses.get(name) or frozenset()
@@ -59,7 +59,8 @@ class Registry:
             for name in self._services:
                 pipe.hkeys(self._full_key(name))
             for name, keys in zip(self._services, pipe.execute()):
-                addresses[name] = frozenset(keys)
+                if keys:
+                    addresses[name] = frozenset(keys)
         if addresses != self._addresses:
             logging.info(f'{self._addresses} -> {addresses}')
             self._addresses = addresses
@@ -72,12 +73,13 @@ class Registry:
         while True:
             try:
                 if self._registered and not self._stopped:
-                    with self._redis.pipeline(transaction=True) as pipe:
-                        for name, address in self._registered.items():
-                            key = self._full_key(name)
+                    values = []
+                    for name, address in self._registered.items():
+                        key = self._full_key(name)
+                        with self._redis.pipeline(transaction=True, shard_hint=key) as pipe:
                             pipe.hset(key, address, '')
                             pipe.hexpire(key, self._TTL, address)
-                        values = pipe.execute()
+                            values += pipe.execute()
                     if self._stopped:  # race
                         self._unregister()
                     elif any(added for added in values[::2]):
