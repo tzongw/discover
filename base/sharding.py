@@ -22,14 +22,25 @@ Node = namedtuple('Node', ['hash', 'shard'])
 
 
 class ShardingKey:
+    _ring_cache = {}
+
+    @classmethod
+    def get_ring(cls, shards, replicas):
+        key = (shards, replicas)
+        ring = cls._ring_cache.get(key)
+        if ring is None:
+            ring = []  # consistent hash ring
+            for shard in range(shards):
+                for replica in range(replicas):
+                    ring.append(Node(crc32(f'{shard}_{replica}'.encode()), shard))
+            ring.sort()
+            cls._ring_cache[key] = ring
+        return ring
+
     def __init__(self, shards, fixed=(), replicas=5):
         self.shards = shards
         self.fixed = fixed  # keys fixed in shard 0
-        self.ring = []  # consistent hash ring
-        for shard in range(shards):
-            for replica in range(replicas):
-                self.ring.append(Node(crc32(f'{shard}_{replica}'.encode()), shard))
-        self.ring.sort()
+        self.ring = self.get_ring(shards, replicas)
 
     def get_shard(self, key):
         if key in self.fixed:
