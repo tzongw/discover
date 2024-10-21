@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import heapq
 import threading
+import functools
 from datetime import timedelta, datetime
 from typing import List, Union, Optional, Callable
 import gevent
@@ -80,30 +81,34 @@ class Scheduler:
 
 
 class PeriodicCallback:
-    __slots__ = ['_scheduler', '_callback', '_period', '_handle']
+    __slots__ = ['_scheduler', '_callback', '_period', '_handle', '_run']
 
     def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
         if isinstance(period, timedelta):
             period = period.total_seconds()
         assert callable(callback) and period > 0
+
+        @functools.wraps(callback)
+        def run():
+            if cb := self._callback:
+                with LogSuppress():
+                    cb()
+            if self._handle:
+                self._schedule_next()
+
         self._scheduler = scheduler
         self._callback = callback
         self._period = period
+        self._run = run
         self._handle = None  # type: Optional[Handle]
         self._schedule_next()
-
-    def _run(self):
-        if cb := self._callback:
-            with LogSuppress():
-                cb()
-        if self._handle:
-            self._schedule_next()
 
     def _schedule_next(self):
         self._handle = self._scheduler.call_later(self._run, self._period)
 
     def stop(self):
-        self._callback = None
         if self._handle:
             self._handle.cancel()
             self._handle = None
+            self._callback = None
+            self._run = None
