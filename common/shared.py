@@ -39,7 +39,7 @@ hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
 script = Script(redis)
-run_in_process = heavy_task = HeavyTask(redis, 'heavy_tasks')
+run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
 run_exclusively = Exclusion(redis)
 
 if options.redis_cluster:
