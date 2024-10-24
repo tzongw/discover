@@ -51,14 +51,14 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, batch=50, dispatcher=ProtoDispatcher):
+    def __init__(self, redis: Redis, group: str, consumer: str, workers=50, dispatcher=ProtoDispatcher):
         self.redis = redis
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = False
-        self._batch = batch
-        self._dispatcher = dispatcher(executor=Executor(max_workers=batch, queue_size=1, name='receiver'))
+        self._workers = workers
+        self._dispatcher = dispatcher(executor=Executor(max_workers=workers, queue_size=1, name='receiver'))
 
         @self._dispatcher(self._waker)
         def _wakeup(data, sid):
@@ -89,13 +89,19 @@ class Receiver:
 
     def _run(self, streams):
         streams = {stream: '>' for stream in streams}
+        count = self._workers
         while not self._stopped:
             try:
-                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=self._batch, block=0,
-                                               noack=True)
+                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=count, block=0, noack=True)
+                total = 0
                 for stream, messages in result:
+                    total += len(messages)
                     for message in messages:
                         self._dispatcher.dispatch(stream, *message[::-1])
+                if total > self._workers:
+                    count = count // 2 or 1
+                elif count < self._workers:
+                    count += 1
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)

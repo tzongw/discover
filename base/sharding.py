@@ -91,8 +91,8 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardingReceiver(Receiver):
-    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, batch=50):
-        super().__init__(redis, group, consumer, batch, dispatcher=NormalizedDispatcher)
+    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=50):
+        super().__init__(redis, group, consumer, workers, dispatcher=NormalizedDispatcher)
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
     def start(self):
@@ -211,9 +211,9 @@ class MigratingTimer(ShardingTimer):
 
 
 class MigratingReceiver(ShardingReceiver):
-    def __init__(self, redis, group: str, consumer: str, *, batch=50, old_receiver: Receiver):
+    def __init__(self, redis, group: str, consumer: str, *, workers=50, old_receiver: Receiver):
         assert old_receiver.redis is not redis, 'same redis, use ShardingReceiver instead'
-        super().__init__(redis, group, consumer, batch=batch)
+        super().__init__(redis, group, consumer, workers=workers)
         self.old_receiver = old_receiver
 
     def start(self):
