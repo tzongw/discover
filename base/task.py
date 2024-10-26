@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from importlib import import_module
@@ -112,6 +113,7 @@ class HeavyTask(_BaseTask):
         super().__init__()
         self.redis = redis
         self.key = key
+        self.waker = f'waker:{{{key}}}:{uuid.uuid4()}'
 
     def __call__(self, f: F) -> F:
         path = self.path(f)
@@ -131,12 +133,18 @@ class HeavyTask(_BaseTask):
         total = self.redis.rpush(self.key, task.json(exclude_defaults=True))
         logging.info(f'+task {task} total {total}')
 
-    def pop(self, *, timeout=0, block=True) -> Optional[Task]:
-        r = self.redis.blpop([self.key], timeout) if block else self.redis.lpop(self.key)
-        if r is None:
+    def pop(self, *, timeout=0) -> Optional[Task]:
+        r = self.redis.blpop([self.key, self.waker], timeout)
+        if r is None or r[0] == self.waker:
             return
-        value = r[1] if isinstance(r, (list, tuple)) else r
-        return self.parse(value)
+        return self.parse(r[1])
+
+    def stop(self):
+        logging.info(f'stop {self.waker}')
+        with self.redis.pipeline(transaction=True, shard_hint=self.waker) as pipe:
+            pipe.rpush(self.waker, 'wake up')
+            pipe.expire(self.waker, 10)
+            pipe.execute()
 
     @staticmethod
     def parse(value) -> Task:

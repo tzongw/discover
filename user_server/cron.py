@@ -32,9 +32,11 @@ def main():
             logging.info(f'doing task {entry}')
             module.main()
             logging.info(f'done task {entry} {time.time() - start}')
-    elif task := shared.heavy_task.pop(block=False):
-        setproctitle(f'{app_name}-{app_id}-{task.path}')
-        shared.heavy_task.exec(task)
+    else:
+        shared.at_exit(shared.heavy_task.stop)
+        while not shared.status.exiting:
+            if task := shared.heavy_task.pop():
+                shared.heavy_task.exec(task)
 
 
 if __name__ == '__main__':
