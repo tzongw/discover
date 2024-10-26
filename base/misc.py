@@ -201,7 +201,7 @@ class Semaphore:
         return sum(self.redis.exists(*self.names))
 
 
-class Stock:
+class Inventory:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 
