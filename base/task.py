@@ -137,7 +137,7 @@ class HeavyTask(_BaseTask):
         r = self.redis.blpop([self.key, self.waker], timeout)
         if r is None or r[0] == self.waker:
             return
-        return self.parse(r[1])
+        return Task.parse_raw(r[1])
 
     def stop(self):
         logging.info(f'stop {self.waker}')
@@ -145,11 +145,6 @@ class HeavyTask(_BaseTask):
             pipe.rpush(self.waker, 'wake up')
             pipe.expire(self.waker, 10)
             pipe.execute()
-
-    @staticmethod
-    def parse(value) -> Task:
-        task = Task.parse_raw(value)
-        return task
 
     @staticmethod
     def exec(task: Task):
