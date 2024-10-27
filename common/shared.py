@@ -76,6 +76,7 @@ def _on_tick(_, sid):
 class Status:
     inited: bool = False
     exiting: bool = False
+    exited: bool = False
 
 
 status = Status()
@@ -105,6 +106,14 @@ atexit.register(unique_id.stop)  # after cleanup
 
 
 @atexit.register
+def _wait_workers():
+    gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
+    for worker, desc in _workers.items():
+        if worker:  # still active
+            logging.error(f'worker {desc} not finish')
+
+
+@atexit.register
 def _cleanup():
     if status.exiting:
         return
@@ -115,6 +124,7 @@ def _cleanup():
                 fn()
         else:
             executor.gather(_exits)
+    status.exited = True
 
 
 def spawn_worker(f, *args, **kwargs):
@@ -146,12 +156,8 @@ def _sig_handler(sig, frame):
         _cleanup()
         if sig == signal.SIGUSR1:
             return
-        seconds = {const.Environment.DEV: 0, const.Environment.TEST: 10}.get(options.env, 30)
+        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
         gevent.sleep(seconds)  # wait for requests & messages
-        gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
-        for worker, desc in _workers.items():
-            if worker:  # still active
-                logging.error(f'worker {desc} not finish')
         sys.exit(0)
 
     gevent.spawn(graceful_exit)

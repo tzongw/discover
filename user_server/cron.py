@@ -2,6 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
+import gevent
 from config import options, remaining
 import time
 from importlib import import_module
@@ -37,6 +38,8 @@ def main():
         while not shared.status.exiting:
             if task := shared.heavy_task.pop():
                 shared.heavy_task.exec(task)
+        while not shared.status.exited:
+            gevent.sleep(1)
 
 
 if __name__ == '__main__':
