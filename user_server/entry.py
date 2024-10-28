@@ -13,6 +13,7 @@ from base import LogSuppress
 
 
 def main():
+    shared.status.sysexit = False
     logging.info(f'{app_name} app id: {app_id}')
     shared.registry.start()
     shared.invalidator.start()

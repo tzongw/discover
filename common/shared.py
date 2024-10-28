@@ -77,6 +77,7 @@ class Status:
     inited: bool = False
     exiting: bool = False
     exited: bool = False
+    sysexit: bool = True
 
 
 status = Status()
@@ -154,7 +155,7 @@ def _sig_handler(sig, frame):
     def graceful_exit():
         logging.info(f'exit {sig}')
         _cleanup()
-        if sig == signal.SIGUSR1:
+        if sig == signal.SIGUSR1 or not status.sysexit:
             return
         seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
         gevent.sleep(seconds)  # wait for requests & messages
