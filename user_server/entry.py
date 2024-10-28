@@ -2,6 +2,7 @@
 from gevent import monkey
 
 monkey.patch_all()
+import gevent
 from config import options, remaining
 import time
 import logging
@@ -28,6 +29,8 @@ def main():
     logging.info(f'doing task {entry}')
     module.main()
     logging.info(f'done task {entry} {time.time() - start}')
+    while shared.status.exiting and not shared.status.exited:
+        gevent.sleep(0.1)
 
 
 if __name__ == '__main__':

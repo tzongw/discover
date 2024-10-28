@@ -15,5 +15,3 @@ def main():
         if task := shared.heavy_task.pop():
             wg.submit(shared.heavy_task.exec, task)
     wg.join()
-    while not shared.status.exited:
-        gevent.sleep(0.1)
