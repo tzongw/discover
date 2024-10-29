@@ -26,9 +26,9 @@ def main():
     module = import_module(entry)
     options.parse_command_line(remaining, final=False)
     start = time.time()
-    logging.info(f'doing task {entry}')
+    logging.info(f'doing module {entry}')
     module.main()
-    logging.info(f'done task {entry} {time.time() - start}')
+    logging.info(f'done module {entry} {time.time() - start}')
     while shared.status.exiting and not shared.status.exited:
         gevent.sleep(0.1)
 
