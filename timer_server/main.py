@@ -154,8 +154,8 @@ class Handler:
             logging.error(f'CAN NOT retreat timers: {len(self._timers)}')
             return
         logging.info(f'retreat timers: {len(self._timers)}')
-        for addr in addresses:
-            spawn_worker(self._do_retreat, addr)
+        workers = [spawn_worker(self._do_retreat, addr) for addr in addresses]
+        gevent.joinall(workers)
 
 
 def rpc_serve(handler):
