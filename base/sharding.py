@@ -17,6 +17,7 @@ from .misc import Inventory
 from .timer import Timer
 from .ztimer import ZTimer
 from .chunk import batched
+from .task import HeavyTask
 
 Node = namedtuple('Node', ['hash', 'shard'])
 
@@ -370,3 +371,28 @@ class MigratingZTimer(ShardingZTimer):
             return super().poll(limit) if self._sharding_key.shards >= self.old_timer._sharding_key.shards \
                 else self.old_timer.poll(limit)
         return super().poll(limit) | self.old_timer.poll(limit)
+
+
+class ShardingHeavyTask(HeavyTask):
+    def __init__(self, redis: RedisCluster, key: str):
+        super().__init__(redis, key)
+        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+
+    def push(self, task):
+        key = self._sharding_key.random_sharded_key(self._key)
+        total = self.redis.rpush(key, task.json(exclude_defaults=True))
+        logging.info(f'+task {task} total {total}')
+
+    def start(self, exec_func=None):
+        return [gevent.spawn(self._run, exec_func or self.exec, key, waker)
+                for key, waker in zip(self._sharding_key.all_sharded_keys(self._key),
+                                      self._sharding_key.all_sharded_keys(self._waker))]
+
+    def stop(self):
+        logging.info(f'stop {self._waker}')
+        self._stopped = True
+        with self.redis.pipeline(transaction=False) as pipe:
+            for waker in self._sharding_key.all_sharded_keys(self._waker):
+                pipe.rpush(waker, 'wake up')
+                pipe.expire(waker, 10)
+            pipe.execute()

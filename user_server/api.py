@@ -84,7 +84,7 @@ def hello(names):
         if redis.rpush('queue:hello', *names) == len(names):  # head of the queue
             poller.notify('hello', 'queue:hello')
     else:
-        async_task.post(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=5))
+        async_task.post(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=3))
     return f'say hello {names}'
 
 

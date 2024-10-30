@@ -15,7 +15,7 @@ from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
-from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher
+from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask
 from base.utils import func_desc, ip_address
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
@@ -39,17 +39,18 @@ hint = f'{options.env.value}:{ip_address()}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
 script = Script(redis)
-run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
 run_exclusively = Exclusion(redis)
 
 if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
+    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
 else:
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
+    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -58,7 +59,7 @@ user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService,
 gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]
 
-_exits = [registry.stop, receiver.stop]
+_exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
 if options.env is const.Environment.DEV:

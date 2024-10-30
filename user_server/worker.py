@@ -5,16 +5,11 @@ from base.executor import WaitGroup
 import shared
 
 define('concurrency', 10, int, 'number of workers')
-define('slow_time', 600, int, 'time threshold for slow task, valid if concurrency > 1')
+define('slow_time', 600, int, 'time threshold for slow task')
 
 
 def main():
-    shared.at_exit(shared.heavy_task.stop)
     wg = WaitGroup(max_workers=options.concurrency, slow_time=options.slow_time)
-    while not shared.status.exiting:
-        if task := shared.heavy_task.pop():
-            if options.concurrency > 1:
-                wg.submit(shared.heavy_task.exec, task)
-            else:
-                shared.heavy_task.exec(task)
+    workers = shared.heavy_task.start(exec_func=lambda task: wg.submit(shared.heavy_task.exec, task))
+    gevent.joinall(workers, raise_error=True)
     wg.join()

@@ -7,7 +7,8 @@ from datetime import timedelta
 from importlib import import_module
 from typing import TypeVar, Callable, Optional
 import functools
-from redis import Redis
+import gevent
+from redis import Redis, RedisCluster
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
@@ -109,11 +110,12 @@ class AsyncTask(_BaseTask):
 
 
 class HeavyTask(_BaseTask):
-    def __init__(self, redis: Redis, key: str):
+    def __init__(self, redis: Redis | RedisCluster, key: str):
         super().__init__()
         self.redis = redis
         self._key = key
         self._waker = f'waker:{{{key}}}:{uuid.uuid4()}'
+        self._stopped = False
 
     def __call__(self, f: F) -> F:
         path = self.path(f)
@@ -133,18 +135,28 @@ class HeavyTask(_BaseTask):
         total = self.redis.rpush(self._key, task.json(exclude_defaults=True))
         logging.info(f'+task {task} total {total}')
 
-    def pop(self, *, timeout=0) -> Optional[Task]:
-        r = self.redis.blpop([self._key, self._waker], timeout)
-        if r is None or r[0] == self._waker:
-            return
-        return Task.parse_raw(r[1])
+    def start(self, exec_func=None):
+        return [gevent.spawn(self._run, exec_func or self.exec, self._key, self._waker)]
 
     def stop(self):
         logging.info(f'stop {self._waker}')
+        self._stopped = True
         with self.redis.pipeline(transaction=True, shard_hint=self._waker) as pipe:
             pipe.rpush(self._waker, 'wake up')
             pipe.expire(self._waker, 10)
             pipe.execute()
+
+    def _run(self, exec_func, key, waker):
+        while not self._stopped:
+            try:
+                r = self.redis.blpop([key, waker])
+                if r is None or r[0] == waker:
+                    continue
+                task = Task.parse_raw(r[1])
+                exec_func(task)
+            except Exception:
+                logging.exception(f'')
+                gevent.sleep(1)
 
     @staticmethod
     def exec(task: Task):
