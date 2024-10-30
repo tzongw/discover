@@ -7,7 +7,7 @@ from redis._parsers.commands import CommandsParser
 from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from pydantic import BaseModel
-from .utils import LogSuppress, Addr, ip_address, stream_name
+from .utils import LogSuppress, Addr, ip_address, stream_name, base62, func_desc
 from .misc import ListConverter, Exclusion
 from .singleflight import Singleflight, singleflight
 from .parser import create_parser, Parser
@@ -16,7 +16,7 @@ from .chunk import batched
 from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool
-from .executor import Executor
+from .executor import Executor, WaitGroup
 from .dispatcher import Dispatcher, TimeDispatcher
 from .scheduler import Scheduler
 from .invalidator import create_invalidator, Invalidator

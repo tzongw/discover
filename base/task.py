@@ -115,7 +115,7 @@ class HeavyTask(_BaseTask):
         self.redis = redis
         self._key = key
         self._waker = f'waker:{{{key}}}:{uuid.uuid4()}'
-        self._stopped = False
+        self._stopped = True
 
     def __call__(self, f: F) -> F:
         path = self.path(f)
@@ -136,10 +136,14 @@ class HeavyTask(_BaseTask):
         logging.info(f'+task {task} total {total}')
 
     def start(self, exec_func=None):
+        logging.info(f'start {self._key}')
+        self._stopped = False
         return [gevent.spawn(self._run, exec_func or self.exec, self._key, self._waker)]
 
     def stop(self):
-        logging.info(f'stop {self._waker}')
+        if self._stopped:
+            return
+        logging.info(f'stop {self._key}')
         self._stopped = True
         with self.redis.pipeline(transaction=True, shard_hint=self._waker) as pipe:
             pipe.rpush(self._waker, 'wake up')

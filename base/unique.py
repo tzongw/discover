@@ -4,7 +4,7 @@ from random import randrange
 from itertools import chain
 
 import gevent
-from redis import Redis
+from redis import Redis, RedisCluster
 from .utils import LogSuppress
 
 
@@ -13,7 +13,7 @@ class UniqueId:
     _INTERVAL = 10
     _TTL = 600
 
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Redis | RedisCluster):
         self._redis = redis
         self._keys = set()
         gevent.spawn(self._run)

@@ -16,11 +16,11 @@ from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask
-from base.utils import func_desc, ip_address
+from base import func_desc, ip_address, base62
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
-from .config import options
+from .config import options, ctx
 from .rpc_service import UserService, GateService, TimerService
 
 executor = Executor(name='shared')
@@ -45,12 +45,12 @@ if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_background = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
 else:
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_background = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -130,9 +130,8 @@ def _cleanup():
 
 
 def spawn_worker(f, *args, **kwargs):
-    desc = func_desc(f)
-
     def worker():
+        ctx.trace = trace
         start = time.time()
         with LogSuppress():
             f(*args, **kwargs)
@@ -140,8 +139,10 @@ def spawn_worker(f, *args, **kwargs):
         if t > const.SLOW_WORKER:
             logging.warning(f'slow worker {t} {desc} {args = } {kwargs = }')
 
+    trace = base62.encode(id_generator.gen())
+    desc = func_desc(f)
     g = gevent.spawn(worker)
-    _workers[g] = desc
+    _workers[g] = f'{desc} trace: {trace}'
 
 
 def run_in_worker(f):
@@ -158,7 +159,7 @@ def _sig_handler(sig, frame):
         _cleanup()
         if sig == signal.SIGUSR1 or not status.sysexit:
             return
-        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)
+        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 3}.get(options.env, 30)
         gevent.sleep(seconds)  # wait for requests & messages
         sys.exit(0)
 

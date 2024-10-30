@@ -5,7 +5,7 @@ from enum import Enum, auto
 from typing import Callable, Optional
 from dataclasses import dataclass
 from contextlib import suppress, ExitStack
-from redis import Redis
+from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
@@ -31,7 +31,7 @@ class PollStatus(Enum):
 
 
 class Poller:
-    def __init__(self, redis: Redis, async_task: AsyncTask, timeout=timedelta(minutes=1)):
+    def __init__(self, redis: Redis | RedisCluster, async_task: AsyncTask, timeout=timedelta(minutes=1)):
         self.configs = {}  # type: dict[str, Config]
         self.redis = redis
         self.async_task = async_task

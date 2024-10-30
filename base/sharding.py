@@ -97,6 +97,8 @@ class ShardingReceiver(Receiver):
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
     def start(self):
+        logging.info(f'start {self._group} {self._consumer}')
+        self._stopped = False
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             for stream in streams:
@@ -108,7 +110,9 @@ class ShardingReceiver(Receiver):
                 zip(*[self._sharding_key.all_sharded_keys(stream) for stream in streams])]
 
     def stop(self):
-        logging.info(f'stop {self._waker}')
+        if self._stopped:
+            return
+        logging.info(f'stop {self._group} {self._consumer}')
         self._stopped = True
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
@@ -384,12 +388,16 @@ class ShardingHeavyTask(HeavyTask):
         logging.info(f'+task {task} total {total}')
 
     def start(self, exec_func=None):
+        logging.info(f'start {self._key}')
+        self._stopped = False
         return [gevent.spawn(self._run, exec_func or self.exec, key, waker)
                 for key, waker in zip(self._sharding_key.all_sharded_keys(self._key),
                                       self._sharding_key.all_sharded_keys(self._waker))]
 
     def stop(self):
-        logging.info(f'stop {self._waker}')
+        if self._stopped:
+            return
+        logging.info(f'stop {self._key}')
         self._stopped = True
         with self.redis.pipeline(transaction=False) as pipe:
             for waker in self._sharding_key.all_sharded_keys(self._waker):

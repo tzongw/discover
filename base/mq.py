@@ -56,7 +56,7 @@ class Receiver:
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
-        self._stopped = False
+        self._stopped = True
         self._workers = workers
         self._dispatcher = dispatcher(executor=Executor(max_workers=workers, queue_size=1, name='receiver'))
 
@@ -68,6 +68,8 @@ class Receiver:
         return self._dispatcher(key_or_cls, stream=stream)
 
     def start(self):
+        logging.info(f'start {self._group} {self._consumer}')
+        self._stopped = False
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             for stream in streams:
@@ -77,7 +79,9 @@ class Receiver:
         return [gevent.spawn(self._run, streams)]
 
     def stop(self):
-        logging.info(f'stop {self._waker}')
+        if self._stopped:
+            return
+        logging.info(f'stop {self._group} {self._consumer}')
         self._stopped = True
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:

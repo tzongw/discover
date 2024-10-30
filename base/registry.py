@@ -19,7 +19,7 @@ class Registry:
         self._redis = redis
         self._services = services
         self._registered = {}  # type: dict[str, str]
-        self._stopped = False
+        self._stopped = True
         self._addresses = {}  # type: dict[str, frozenset[str]]
         self._callbacks = []
 
@@ -28,15 +28,19 @@ class Registry:
 
     def start(self):
         logging.info(f'start')
+        self._stopped = False
         self._refresh()
         return [gevent.spawn(self._run)]
 
     def stop(self):
+        if self._stopped:
+            return
         logging.info(f'stop {self._registered}')
         self._stopped = True
         self._unregister()
 
     def register(self, services):
+        assert not self._stopped, 'MUST start first'
         logging.info(f'register {services}')
         self._registered.update(services)
         self._unregister()  # remove first & wake up

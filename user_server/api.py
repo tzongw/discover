@@ -24,7 +24,7 @@ from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
 from dao import Account, Session, collections
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, run_in_process, script, scheduler
+from shared import session_key, async_task, run_in_background, script, scheduler
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -47,7 +47,7 @@ def init_trace():
 
 
 @async_task
-@run_in_process
+@run_in_background
 @run_exclusively('lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
