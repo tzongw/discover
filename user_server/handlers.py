@@ -6,29 +6,28 @@ from datetime import timedelta, datetime
 from base import ip_address, LogSuppress
 from base.scheduler import PeriodicCallback
 from common.messages import Login, Logout, Alarm
-from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, tick, \
-    run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler
+from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
+    time_dispatcher, \
+    run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout
 from models import Runtime
 from dao import Account
 from config import options
-from rpc import Handler
 
 
-@dispatcher('welcome')
+@time_dispatcher('welcome')
 def on_welcome(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-@dispatcher('notice')
+@time_dispatcher('notice')
 def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
 
 
 def poll_timeout():
-    handler = Handler()
     for full_key, data in ztimer.poll().items():
         with LogSuppress():
-            handler.timeout(full_key, data)
+            dispatch_timeout(full_key, data)
 
 
 @dispatcher(Account)
@@ -66,7 +65,7 @@ def runtime_invalidate(key):
     logging.getLogger().setLevel(runtime.log_level)
 
 
-@tick.periodic(timedelta(seconds=10))
+@time_dispatcher.periodic(timedelta(seconds=10))
 def on_10s(dt: datetime):
     logging.info(f'tick {dt}')
 
@@ -78,7 +77,7 @@ def task(hello: str, repeat: int, interval: timedelta):
     async_task.cancel('task:hello')
 
 
-@tick.crontab(second=range(0, 60, 15))
+@time_dispatcher.crontab(second=range(0, 60, 15))
 def on_quarter(dt: datetime):
     logging.info(f'quarter {dt}')
 

@@ -26,7 +26,7 @@ from .rpc_service import UserService, GateService, TimerService
 executor = Executor(name='shared')
 scheduler = Scheduler()
 dispatcher = Dispatcher()
-tick = TimeDispatcher()
+time_dispatcher = TimeDispatcher()
 
 app_name = options.app_name
 redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
@@ -70,7 +70,7 @@ if options.env is const.Environment.DEV:
 @receiver(const.TICK_STREAM)
 def _on_tick(_, sid):
     ts = int(sid[:-2])
-    tick.dispatch(ts)
+    time_dispatcher.dispatch_tick(ts)
 
 
 @dataclass

@@ -15,7 +15,7 @@ WEEKEND = [SATURDAY, SUNDAY]
 class Dispatcher:
     def __init__(self, executor=None):
         self._handlers = defaultdict(list)
-        self._executor = executor or Executor(name='dispatch')
+        self._executor = executor or Executor(name='dispatcher')
 
     def keys(self):
         return self._handlers.keys()
@@ -52,13 +52,13 @@ class _Crontab:
                    value, pattern in zip(cron.__dict__.values(), self.__dict__.values()))
 
 
-class TimeDispatcher:
+class TimeDispatcher(Dispatcher):
     def __init__(self, executor=None):
-        self._executor = executor or Executor(name='time_dispatch')
+        super().__init__(executor or Executor(name='time_dispatcher'))
         self._periodic_handlers = []
         self._crontab_handlers = []
 
-    def dispatch(self, ts: int):
+    def dispatch_tick(self, ts: int):
         dt = datetime.fromtimestamp(ts)
         for period, remain, handle in self._periodic_handlers:
             if ts % period == remain:

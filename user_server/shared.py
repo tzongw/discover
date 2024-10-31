@@ -67,3 +67,15 @@ def user_limiter(cooldown):
         return wrapper
 
     return decorator
+
+
+def dispatch_timeout(full_key, data):
+    if full_key == const.TICK_TIMER:
+        now = int(time.time())
+        increment = script.limited_incrby('timestamp:tick', amount=now, limit=now)
+        offset = min(increment, 10)
+        for ts in range(now - offset + 1, now + 1):
+            time_dispatcher.dispatch_tick(ts)
+    else:
+        group, key = full_key.split(':', maxsplit=1)
+        time_dispatcher.dispatch(group, key, data)
