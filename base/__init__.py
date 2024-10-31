@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
-from functools import lru_cache
 from redis import Redis, RedisCluster
 from redis.connection import Encoder
 from redis._parsers.commands import CommandsParser
@@ -61,22 +60,15 @@ def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
         return _orig_pipeline(self, transaction=transaction, shard_hint=shard_hint)
 
 
-@lru_cache()
-def _cached_get_moveable_keys(self: CommandsParser, redis_conn, *args):
-    return _orig_get_moveable_keys(self, redis_conn, *args)
-
-
-def _get_moveable_keys(self: CommandsParser, redis_conn, *args):
+def _get_moveable_keys(self, redis_conn, *args):
     if args[0] == 'FCALL':
-        args = args[:3 + args[2]]
-    return _cached_get_moveable_keys(self, redis_conn, *args)
-
-
-RedisCluster.transaction = _transaction
-_orig_pipeline = RedisCluster.pipeline
-RedisCluster.pipeline = _pipeline
-_orig_get_moveable_keys = CommandsParser._get_moveable_keys
-CommandsParser._get_moveable_keys = _get_moveable_keys
+        keys_count = int(args[2])
+        return args[3:3 + keys_count]
+    elif args[0] == 'XREADGROUP':
+        streams_index = args.index(b'STREAMS', 4) + 1
+        streams_count = (len(args) - streams_index) // 2
+        return args[streams_index:streams_index + streams_count]
+    raise NotImplementedError(f'unrecognized command {args[0]}')
 
 
 def _encode(self: Encoder, value):
@@ -85,5 +77,9 @@ def _encode(self: Encoder, value):
     return _orig_encode(self, value)
 
 
+RedisCluster.transaction = _transaction
+_orig_pipeline = RedisCluster.pipeline
+RedisCluster.pipeline = _pipeline
+CommandsParser._get_moveable_keys = _get_moveable_keys
 _orig_encode = Encoder.encode
 Encoder.encode = _encode
