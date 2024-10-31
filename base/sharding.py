@@ -404,3 +404,17 @@ class ShardingHeavyTask(HeavyTask):
                 pipe.rpush(waker, 'wake up')
                 pipe.expire(waker, 10)
             pipe.execute()
+
+
+class MigratingHeavyTask(ShardingHeavyTask):
+    def __init__(self, redis: RedisCluster, key: str, *, old_heavy_task: HeavyTask):
+        assert old_heavy_task.redis is not redis, 'same redis, use ShardingHeavyTask instead'
+        super().__init__(redis, key)
+        self.old_heavy_task = old_heavy_task
+
+    def start(self, exec_func=None):
+        return self.old_heavy_task.start(exec_func) + super().start(exec_func)
+
+    def stop(self):
+        self.old_heavy_task.stop()
+        super().stop()
