@@ -9,13 +9,16 @@ define('concurrency', 10, int, 'number of workers')
 define('slow_time', 600, int, 'time threshold for slow task')
 
 
-def exec_func(task):
+def handle_task(task):
     ctx.trace = base62.encode(shared.id_generator.gen())
-    shared.heavy_task.exec(task)
+    if shared.status.exiting:  # return back, to exit asap
+        shared.heavy_task.push(task, front=True)
+    else:
+        shared.heavy_task.exec(task)
 
 
 def main():
     wg = WaitGroup(max_workers=options.concurrency, slow_time=options.slow_time)
-    workers = shared.heavy_task.start(exec_func=lambda task: wg.submit(exec_func, task))
+    workers = shared.heavy_task.start(exec_func=lambda task: wg.submit(handle_task, task))
     gevent.joinall(workers, raise_error=True)
     wg.join()

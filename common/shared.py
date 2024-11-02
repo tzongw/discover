@@ -63,8 +63,8 @@ _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
 if options.env is const.Environment.DEV:
-    # in dev, run in worker to debug
-    HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
+    # in dev, run in thread to debug
+    ShardingHeavyTask.push = HeavyTask.push = lambda self, task, front=False: spawn_worker(self.exec, task)
 
 
 @receiver(const.TICK_STREAM)
