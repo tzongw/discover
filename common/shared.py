@@ -45,12 +45,12 @@ if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    run_in_background = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
 else:
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    run_in_background = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -63,7 +63,7 @@ _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
 if options.env is const.Environment.DEV:
-    # in dev, run in thread to debug
+    # if dev, run in thread to debug
     ShardingHeavyTask.push = HeavyTask.push = lambda self, task, front=False: spawn_worker(self.exec, task)
 
 

@@ -36,13 +36,13 @@ TASK_THRESHOLD = 16384
 
 class _BaseTask:
     def __init__(self):
-        self.paths = set()
+        self.paths = {}
 
-    def path(self, f):
+    def add_path(self, f):
         path = func_desc(f)
         assert '<' not in path, 'CAN NOT be lambda or local function'
         assert path not in self.paths, 'duplicated path'
-        self.paths.add(path)
+        self.paths[path] = var_args(f)
         return path
 
 
@@ -66,7 +66,7 @@ class AsyncTask(_BaseTask):
         return f'{stream_name(task)}:{task.path}'
 
     def __call__(self, f: F) -> F:
-        path = self.path(f)
+        path = self.add_path(f)
         stream = self.stream_name(Task(path=path))
         vf = var_args(f)
 
@@ -83,7 +83,7 @@ class AsyncTask(_BaseTask):
                 logging.warning(f'task parameters too big {task}')
             return task
 
-        wrapper.wrapped = f
+        wrapper.__task_wrapped__ = f
         return wrapper
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
@@ -118,7 +118,7 @@ class HeavyTask(_BaseTask):
         self._stopped = True
 
     def __call__(self, f: F) -> F:
-        path = self.path(f)
+        path = self.add_path(f)
         assert not path.startswith('__main__'), '__main__ is different in another process'
 
         @functools.wraps(f)
@@ -128,7 +128,7 @@ class HeavyTask(_BaseTask):
                 logging.warning(f'task parameters too big {task}')
             self.push(task)
 
-        wrapper.wrapped = f
+        wrapper.__task_wrapped__ = f
         return wrapper
 
     def push(self, task: Task, front=False):
@@ -166,14 +166,16 @@ class HeavyTask(_BaseTask):
                 logging.exception(f'')
                 gevent.sleep(1)
 
-    @staticmethod
-    def exec(task: Task):
+    def exec(self, task: Task):
         logging.info(f'doing task {task}')
-        module_name, func_name = task.path.rsplit('.', maxsplit=1)
-        module = import_module(module_name)
-        func = getattr(module, func_name)
-        while hasattr(func, 'wrapped'):
-            func = func.wrapped
+        func = self.paths.get(task.path)
+        if func is None:
+            logging.info(f'adding path {task.path}')
+            module_name, func_name = task.path.rsplit('.', maxsplit=1)
+            module = import_module(module_name)  # will auto add_path
+            func = getattr(module, func_name)
+            while hasattr(func, '__task_wrapped__'):
+                func = func.__task_wrapped__
         args = loads(task.args)  # type: list
         kwargs = loads(task.kwargs)  # type: dict
         start = time.time()
