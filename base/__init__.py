@@ -61,14 +61,17 @@ def _pipeline(self: RedisCluster, transaction=None, shard_hint=None):
 
 
 def _get_moveable_keys(self, redis_conn, *args):
-    if args[0] == 'FCALL':
+    cmd = args[0]
+    if cmd == 'FCALL':
         keys_count = int(args[2])
         return args[3:3 + keys_count]
-    elif args[0] == 'XREADGROUP':
+    elif cmd == 'XREADGROUP':
         streams_index = args.index(b'STREAMS', 4) + 1
         streams_count = (len(args) - streams_index) // 2
         return args[streams_index:streams_index + streams_count]
-    raise NotImplementedError(f'unrecognized command {args[0]}')
+    elif cmd == 'MIGRATE':
+        return redis_conn.execute_command("COMMAND GETKEYS", *args)
+    raise NotImplementedError(f'unrecognized command {cmd}')
 
 
 def _encode(self: Encoder, value):
