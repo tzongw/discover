@@ -2,11 +2,11 @@ import functools
 import signal
 import logging
 import time
+import sys
 import atexit
 from dataclasses import dataclass
 from typing import Union
-from weakref import WeakKeyDictionary
-import sys
+from weakref import WeakSet
 import gevent
 from redis import Redis, RedisCluster
 from base import Registry, LogSuppress, Exclusion
@@ -81,7 +81,7 @@ class Status:
 
 
 status = Status()
-_workers = WeakKeyDictionary()  # task workers, try to join all before exiting
+_workers = WeakSet()  # thread workers
 
 
 def at_main(fun):
@@ -103,15 +103,8 @@ def init_main():
     executor.gather(_mains)
 
 
-atexit.register(unique_id.stop)  # after cleanup
-
-
-@atexit.register
-def _wait_workers():
-    gevent.joinall(_workers, timeout=const.SLOW_WORKER)  # try to finish all tasks
-    for worker, desc in _workers.items():
-        if worker:  # still active
-            logging.error(f'worker {desc} not finish')
+atexit.register(unique_id.stop)  # at last
+atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 
 
 @atexit.register
@@ -130,18 +123,16 @@ def _cleanup():
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = trace
+        ctx.trace = base62.encode(id_generator.gen())
         start = time.time()
         with LogSuppress():
             f(*args, **kwargs)
         t = time.time() - start
         if t > const.SLOW_WORKER:
-            logging.warning(f'slow worker {t} {desc} {args = } {kwargs = }')
+            logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
 
-    trace = base62.encode(id_generator.gen())
-    desc = func_desc(f)
     g = gevent.spawn(worker)
-    _workers[g] = f'{desc} trace: {trace}'
+    _workers.add(g)
 
 
 def run_in_worker(f):
