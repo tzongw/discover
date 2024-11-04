@@ -172,10 +172,8 @@ class HeavyTask(_BaseTask):
         if func is None:
             logging.info(f'adding path {task.path}')
             module_name, func_name = task.path.rsplit('.', maxsplit=1)
-            module = import_module(module_name)  # will auto add_path
-            func = getattr(module, func_name)
-            while hasattr(func, '__task_wrapped__'):
-                func = func.__task_wrapped__
+            import_module(module_name)  # will auto add_path
+            func = self.paths[task.path]
         args = loads(task.args)  # type: list
         kwargs = loads(task.kwargs)  # type: dict
         start = time.time()
