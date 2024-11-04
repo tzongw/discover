@@ -16,7 +16,7 @@ from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask
-from base import func_desc, ip_address, base62
+from base import func_desc, ip_address, base62, singleflight
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
@@ -77,7 +77,6 @@ def _on_tick(_, sid):
 class Status:
     inited: bool = False
     exiting: bool = False
-    exited: bool = False
     sysexit: bool = True
 
 
@@ -116,6 +115,7 @@ def _wait_workers():
 
 
 @atexit.register
+@singleflight
 def _cleanup():
     if status.exiting:
         return
@@ -126,7 +126,6 @@ def _cleanup():
                 fn()
         else:
             executor.gather(_exits)
-    status.exited = True
 
 
 def spawn_worker(f, *args, **kwargs):
