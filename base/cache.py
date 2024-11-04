@@ -45,10 +45,6 @@ class Cache(Singleflight[T]):
         return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids} ' \
                f'size: {len(self.lru)} maxsize: {self.maxsize}'
 
-    def get(self, key, *args, **kwargs) -> T:
-        value, = self.mget([key], *args, **kwargs)
-        return value
-
     def _set_value(self, key, value):
         exists = key in self.lru
         self.lru[key] = value
@@ -64,7 +60,7 @@ class Cache(Singleflight[T]):
         made_keys = []
         indexes = []
         for index, key in enumerate(keys):
-            made_key = self.make_key(key, *args, **kwargs)
+            made_key = self._make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, self.placeholder)
             if value is not self.placeholder:
                 self.hits += 1
@@ -97,7 +93,7 @@ class Cache(Singleflight[T]):
                 key_or_keys = convert(key)
                 made_keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
             else:
-                made_keys = [self.make_key(key)]
+                made_keys = [self._make_key(key)]
             for made_key in made_keys:
                 self.lru.pop(made_key, None)
 
@@ -112,7 +108,7 @@ class TtlCache(Cache[T]):
         indexes = []
         now = time.time()
         for index, key in enumerate(keys):
-            made_key = self.make_key(key, *args, **kwargs)
+            made_key = self._make_key(key, *args, **kwargs)
             pair = self.lru.get(made_key, self.placeholder)
             if pair is not self.placeholder and pair.expire_at > now:
                 self.hits += 1
@@ -219,10 +215,10 @@ def ttl_cache(expire, *, maxsize=128):
 
 
 class RedisCache(Singleflight[T]):
-    def __init__(self, redis: Redis | RedisCluster, *, get=None, mget=None, serialize, deserialize, expire: timedelta,
-                 make_key=utils.make_key, prefix='PLACEHOLDER', timeout=timedelta(milliseconds=50), try_times=5):
+    def __init__(self, redis, *, get=None, mget=None, expire: timedelta, make_key, serialize, deserialize,
+                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=50), try_times=5):
         super().__init__(mget=self._cached_mget, make_key=make_key)
-        self.redis = redis
+        self.redis = redis  # type: Redis | RedisCluster
         self.mget_nonatomic = redis.mget_nonatomic if isinstance(redis, RedisCluster) else redis.mget
         self.raw_mget = utils.make_mget(get, mget)
         self.serialize = serialize
@@ -240,7 +236,7 @@ class RedisCache(Singleflight[T]):
         with self.redis.pipeline(transaction=False) as pipe:
             lock_time = self.timeout * (self.try_times + 1)
             for key in keys:
-                made_key = self.make_key(key, *args, **kwargs)
+                made_key = self._make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
                 pipe.set(made_key, placeholder, nx=True, px=lock_time, get=True)
             values = pipe.execute()

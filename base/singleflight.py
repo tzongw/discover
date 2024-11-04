@@ -9,7 +9,7 @@ T = TypeVar('T')
 
 class Singleflight(Generic[T]):
     def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
-        self.make_key = make_key
+        self._make_key = make_key
         self._mget = utils.make_mget(get, mget)
         self._futures = {}  # type: dict[any, Future]
 
@@ -22,7 +22,7 @@ class Singleflight(Generic[T]):
         missing_keys = []
         made_keys = []
         for key in keys:
-            made_key = self.make_key(key, *args, **kwargs)
+            made_key = self._make_key(key, *args, **kwargs)
             if made_key in self._futures:
                 futures.append(self._futures[made_key])
             else:
