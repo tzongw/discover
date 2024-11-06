@@ -23,8 +23,8 @@ class Singleflight(Generic[T]):
         made_keys = []
         for key in keys:
             made_key = self._make_key(key, *args, **kwargs)
-            if made_key in self._futures:
-                futures.append(self._futures[made_key])
+            if fut := self._futures.get(made_key):
+                futures.append(fut)
             else:
                 fut = Future()
                 self._futures[made_key] = fut
