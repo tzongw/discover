@@ -2,6 +2,7 @@
 from common.shared import *
 from types import MappingProxyType
 from werkzeug.exceptions import TooManyRequests
+from werkzeug.debug import DebuggedApplication
 from flasgger import Swagger
 from flask import Flask, g
 from base import ZTimer
@@ -17,8 +18,10 @@ app.secret_key = b'\xc8\x04\x12\xc7zJ\x9cO\x99\xb7\xb3eb\xd6\xa4\x87'
 app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
 app.json.ensure_ascii = False
-app.debug = options.env is const.Environment.DEV
 app.make_response = functools.partial(make_response, app)
+if options.env is const.Environment.DEV:
+    app.debug = True
+    app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
 
 ztimer = ShardingZTimer(redis, 'user', sharding_key=ShardingKey(shards=3)) if isinstance(redis, RedisCluster) \
