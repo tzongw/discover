@@ -124,7 +124,7 @@ class ShardingReceiver(Receiver):
                     continue
                 for sharded_stream in self._sharding_key.all_sharded_keys(stream):
                     pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
-            pipe.execute(raise_on_error=False)  # stop but no start
+            pipe.execute()
 
 
 class ShardingTimer(Timer):

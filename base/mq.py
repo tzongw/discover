@@ -89,7 +89,7 @@ class Receiver:
             for stream in streams:
                 pipe.xgroup_delconsumer(stream, self._group, self._consumer)
             pipe.delete(self._waker)
-            pipe.execute(raise_on_error=False)  # stop but no start
+            pipe.execute()
 
     def _run(self, streams):
         streams = {stream: '>' for stream in streams}
