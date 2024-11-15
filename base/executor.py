@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-from concurrent.futures import Future
-from weakref import WeakSet
-from gevent import queue
-import gevent
 from typing import Callable
 from functools import partial
+from concurrent.futures import Future
+from gevent import queue
+from gevent.event import Event
+import gevent
 from .utils import func_desc
 
 
@@ -41,6 +41,8 @@ class Executor:
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
+        self._done = Event()
+        self._done.set()
         assert queue_size is None or queue_size > 0
         self._items = queue.Queue(queue_size)
         self._idle = idle
@@ -51,6 +53,7 @@ class Executor:
     def submit(self, fn: Callable, *args, **kwargs) -> Future:
         assert callable(fn)
         self._unfinished += 1
+        self._done.clear()
         self._adjust_workers()
         fut = Future()
         item = _WorkItem(fut, fn, *args, **kwargs)
@@ -59,6 +62,9 @@ class Executor:
             self._overload = True
             logging.warning(f'+ overload {self} {item}')
         return fut
+
+    def join(self, timeout=None):
+        return self._done.wait(timeout=timeout)
 
     def gather(self, fns):
         futures = [self.submit(fn) for fn in fns]
@@ -90,6 +96,8 @@ class Executor:
                 if t > self._slow_time:
                     logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
+                if self._unfinished == 0:
+                    self._done.set()
                 if self._overload and self._unfinished <= self._max_workers:
                     self._overload = False
                     logging.warning(f'- overload {self} {item}')
@@ -104,14 +112,3 @@ class Executor:
 class WaitGroup(Executor):
     def __init__(self, max_workers=10, queue_size=1, idle=5, slow_time=20, name='wait_group'):
         super().__init__(max_workers, queue_size, idle, slow_time, name)
-        self._futures = WeakSet()
-
-    def submit(self, fn: Callable, *args, **kwargs) -> Future:
-        fut = super().submit(fn, *args, **kwargs)
-        self._futures.add(fut)
-        return fut
-
-    def join(self, raise_error=False):
-        while self._futures:
-            fut = self._futures.pop()
-            fut.result() if raise_error else fut.exception()

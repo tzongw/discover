@@ -12,7 +12,6 @@ from typing import Callable, Type, Union
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from yaml import safe_dump
-from .singleflight import singleflight
 
 
 class LogSuppress(contextlib.suppress):
@@ -173,7 +172,3 @@ def flock(path):
     f.write(str(os.getpid()))
     f.flush()
     return f
-
-
-def once(f):
-    return lru_cache(maxsize=None)(singleflight(f))

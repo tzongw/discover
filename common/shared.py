@@ -84,26 +84,26 @@ status = Status()
 _workers = WeakSet()  # thread workers
 
 
-def at_main(fun):
-    assert callable(fun) and not status.inited
-    _mains.append(fun)
-    return fun
+def at_main(func):
+    assert callable(func) and not status.inited
+    _mains.append(func)
+    return func
 
 
-def at_exit(fun):
-    assert callable(fun) and not status.exiting
-    _exits.append(fun)
-    return fun
+def at_exit(func):
+    assert callable(func) and not status.exiting
+    _exits.append(func)
+    return func
 
 
 def init_main():
-    if status.inited:
-        return
+    assert not status.inited
     status.inited = True
     executor.gather(_mains)
 
 
 atexit.register(unique_id.stop)  # at last
+atexit.register(executor.join)  # wait all task done
 atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 
 
