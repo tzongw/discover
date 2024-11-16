@@ -42,17 +42,12 @@ class Cache(Singleflight[T]):
         self.invalids = 0
 
     def __str__(self):
-        return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids} ' \
-               f'size: {len(self.lru)} maxsize: {self.maxsize}'
+        return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids}'
 
-    def _set_value(self, key, value):
-        exists = key in self.lru
-        self.lru[key] = value
-        if self.maxsize is not None:
-            if exists:  # size not changed
-                self.lru.move_to_end(key)
-            elif len(self.lru) > self.maxsize:
-                self.lru.popitem(last=False)
+    def _holding(self, key):
+        self.lru[key] = self.placeholder
+        if self.maxsize is not None and len(self.lru) > self.maxsize:
+            self.lru.popitem(last=False)
 
     def _cached_mget(self, keys, *args, **kwargs) -> Sequence[T]:
         results = [self.placeholder] * len(keys)
@@ -72,7 +67,7 @@ class Cache(Singleflight[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._set_value(made_key, self.placeholder)
+                self._holding(made_key)
         if missing_keys:
             values = self.raw_mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
@@ -120,7 +115,7 @@ class TtlCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._set_value(made_key, self.placeholder)
+                self._holding(made_key)
         if missing_keys:
             tuples = self.raw_mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
@@ -216,7 +211,7 @@ def ttl_cache(expire, *, maxsize=128):
 
 class RedisCache(Singleflight[T]):
     def __init__(self, redis, *, get=None, mget=None, expire: timedelta, make_key, serialize, deserialize,
-                 prefix='PLACEHOLDER', timeout=timedelta(milliseconds=50), try_times=5):
+                 prefix='PLACEHOLDER', try_interval=timedelta(milliseconds=50), try_times=10):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis  # type: Redis | RedisCluster
         self.mget_nonatomic = redis.mget_nonatomic if isinstance(redis, RedisCluster) else redis.mget
@@ -225,7 +220,7 @@ class RedisCache(Singleflight[T]):
         self.deserialize = deserialize
         self.expire = expire
         self.prefix = prefix
-        self.timeout = timeout
+        self.try_interval = try_interval
         self.try_times = try_times
 
     def _cached_mget(self, keys, *args, **kwargs):
@@ -234,7 +229,7 @@ class RedisCache(Singleflight[T]):
         todo_indexes = []
         wait_indexes = []
         with self.redis.pipeline(transaction=False) as pipe:
-            lock_time = self.timeout * (self.try_times + 1)
+            lock_time = self.try_interval * self.try_times
             for key in keys:
                 made_key = self._make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
@@ -258,7 +253,7 @@ class RedisCache(Singleflight[T]):
         try_times = 0
         while wait_indexes:
             try_times += 1
-            gevent.sleep(self.timeout.total_seconds())
+            gevent.sleep(self.try_interval.total_seconds())
             new_values = self.mget_nonatomic(*[made_keys[index] for index in wait_indexes])
             fail_indexes = []
             for index, value in zip(wait_indexes, new_values):
