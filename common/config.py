@@ -32,8 +32,7 @@ def parse_callback():
 options.log_to_stderr = False
 options.add_parse_callback(parse_callback)
 
-define('config', type=str, help='path to config file',
-       callback=lambda path: parse_config_file(path, final=False))
+define('config', type=str, help='path to config file', callback=lambda path: parse_config_file(path, final=False))
 define('app_name', 'app', str, 'app name')
 define('env', Environment.DEV, Environment, 'environment')
 define('redis', 'redis://', str, 'biz redis url')

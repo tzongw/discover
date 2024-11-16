@@ -132,8 +132,7 @@ def get_all_profiles():
     return lazy, None
 
 
-full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key,
-                                           get_values=get_all_profiles)
+full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key, get_values=get_all_profiles)
 full_cache.listen(invalidator, Profile.__name__)
 Profile.mget = full_cache.mget
 
