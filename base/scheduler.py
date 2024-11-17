@@ -2,11 +2,11 @@
 from __future__ import annotations
 import time
 import heapq
-import threading
 import functools
 from datetime import timedelta, datetime
 from typing import List, Union, Optional, Callable
 import gevent
+from gevent.event import Event
 from .utils import LogSuppress, func_desc
 from .executor import Executor
 
@@ -38,9 +38,9 @@ class Handle:
 
 
 class Scheduler:
-    def __init__(self, executor=None):
-        self._cond = threading.Condition()
-        self._executor = executor or Executor(name='scheduler')
+    def __init__(self):
+        self._event = Event()
+        self._executor = Executor(name='scheduler')
         self._handles = []  # type: List[Handle]
         gevent.spawn(self._run)
 
@@ -53,23 +53,22 @@ class Scheduler:
         assert callable(callback)
         if isinstance(when, datetime):
             when = when.timestamp()
-        with self._cond:
-            handle = Handle(callback, when)
-            heapq.heappush(self._handles, handle)
-            if self._handles[0] is handle:  # wakeup
-                self._cond.notify()
-            return handle
+        handle = Handle(callback, when)
+        heapq.heappush(self._handles, handle)
+        if self._handles[0] is handle:  # wakeup
+            self._event.set()
+        return handle
 
     def _run(self):
-        with self._cond:
-            while True:
-                now = time.time()
-                while self._handles and self._handles[0].when <= now:
-                    handle = heapq.heappop(self._handles)  # type: Handle
-                    if not handle.cancelled:
-                        self._executor.submit(handle)
-                timeout = self._handles[0].when - now if self._handles else None
-                self._cond.wait(timeout)
+        while True:
+            now = time.time()
+            while self._handles and self._handles[0].when <= now:
+                handle = heapq.heappop(self._handles)  # type: Handle
+                if not handle.cancelled:
+                    self._executor.submit(handle)
+            timeout = self._handles[0].when - now if self._handles else None
+            self._event.clear()
+            self._event.wait(timeout)
 
     def __call__(self, period: Union[float, timedelta]):
         def decorator(f):
