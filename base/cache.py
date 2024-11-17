@@ -14,6 +14,8 @@ from .chunk import LazySequence
 from .redis_script import Script
 
 T = TypeVar('T')
+_NONE = object()
+_Pair = namedtuple('_Pair', ['value', 'expire_at'])
 
 
 def expire_at(expire):
@@ -29,12 +31,10 @@ def expire_at(expire):
 
 
 class Cache(Singleflight[T]):
-    # https://redis.io/docs/manual/client-side-caching/#avoiding-race-conditions
-    placeholder = object()
+    # https://redis.io/docs/latest/develop/reference/client-side-caching/#avoiding-race-conditions
 
     def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
-        super().__init__(mget=self._cached_mget, make_key=make_key)
-        self.raw_mget = utils.make_mget(get, mget)
+        super().__init__(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.maxsize = maxsize
         self.hits = 0
@@ -44,20 +44,21 @@ class Cache(Singleflight[T]):
     def __str__(self):
         return f'hits: {self.hits} misses: {self.misses} invalids: {self.invalids}'
 
-    def _holding(self, key):
-        self.lru[key] = self.placeholder
+    def _set_value(self, key, value):
+        self.lru[key] = value
         if self.maxsize is not None and len(self.lru) > self.maxsize:
             self.lru.popitem(last=False)
 
-    def _cached_mget(self, keys, *args, **kwargs) -> Sequence[T]:
-        results = [self.placeholder] * len(keys)
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+        results = [None] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
+        in_flight = set()
         for index, key in enumerate(keys):
             made_key = self._make_key(key, *args, **kwargs)
-            value = self.lru.get(made_key, self.placeholder)
-            if value is not self.placeholder:
+            value = self.lru.get(made_key, _NONE)
+            if value is not _NONE:
                 self.hits += 1
                 results[index] = value
                 if self.maxsize is not None:
@@ -67,14 +68,16 @@ class Cache(Singleflight[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._holding(made_key)
+                if made_key in self._futures:
+                    in_flight.add(index)
         if missing_keys:
-            values = self.raw_mget(missing_keys, *args, **kwargs)
+            version = self.invalids
+            values = super().mget(missing_keys, *args, **kwargs)
             for index, made_key, value in zip(indexes, made_keys, values):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if made_key in self.lru:
-                    self.lru[made_key] = value
+                if version == self.invalids and index not in in_flight:
+                    self._set_value(made_key, value)
         return results
 
     def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
@@ -94,36 +97,39 @@ class Cache(Singleflight[T]):
 
 
 class TtlCache(Cache[T]):
-    Pair = namedtuple('Pair', ['value', 'expire_at'])
-
-    def _cached_mget(self, keys, *args, **kwargs) -> Sequence[T]:
-        results = [self.placeholder] * len(keys)
+    def mget(self, keys, *args, **kwargs) -> Sequence[T]:
+        results = [None] * len(keys)
         missing_keys = []
         made_keys = []
         indexes = []
+        in_flight = set()
         now = time.time()
         for index, key in enumerate(keys):
             made_key = self._make_key(key, *args, **kwargs)
-            pair = self.lru.get(made_key, self.placeholder)
-            if pair is not self.placeholder and pair.expire_at > now:
+            pair = self.lru.get(made_key, _NONE)
+            if pair is not _NONE and pair.expire_at > now:
                 self.hits += 1
                 results[index] = pair.value
                 if self.maxsize is not None:
                     self.lru.move_to_end(made_key)
             else:
+                if pair is not _NONE:  # remove expired key
+                    self.lru.pop(made_key)
                 self.misses += 1
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                self._holding(made_key)
+                if made_key in self._futures:
+                    in_flight.add(index)
         if missing_keys:
-            tuples = self.raw_mget(missing_keys, *args, **kwargs)
+            version = self.invalids
+            tuples = super().mget(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if made_key in self.lru:
-                    pair = TtlCache.Pair(value, expire_at(expire))
-                    self.lru[made_key] = pair
+                if version == self.invalids and index not in in_flight:
+                    pair = _Pair(value, expire_at(expire))
+                    self._set_value(made_key, pair)
         return results
 
 
@@ -142,11 +148,11 @@ class FullMixin(Generic[T]):
     def values(self) -> Sequence[T] | LazySequence[T]:
         if self._version == self.invalids and self._expire_at > time.time():
             return self._values
-        invalids = self.invalids
+        version = self.invalids
         values, expire = self._get_values()  # invalidate events may happen simultaneously
         self._values = values
         self._expire_at = expire_at(expire)
-        self._version = invalids
+        self._version = version
         return values
 
     def cached(self, maxsize=128, typed=False, get_expire=None):
