@@ -80,7 +80,7 @@ class Scheduler:
 
 
 class PeriodicCallback:
-    __slots__ = ['_scheduler', '_callback', '_period', '_handle', '_run']
+    __slots__ = ['_scheduler', '_period', '_handle', '_run']
 
     def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
         if isinstance(period, timedelta):
@@ -89,14 +89,13 @@ class PeriodicCallback:
 
         @functools.wraps(callback)
         def run():
-            if cb := self._callback:
+            if self._handle:
                 with LogSuppress():
-                    cb()
+                    callback()
             if self._handle:
                 self._schedule_next()
 
         self._scheduler = scheduler
-        self._callback = callback
         self._period = period
         self._run = run
         self._handle = None  # type: Optional[Handle]
@@ -109,5 +108,4 @@ class PeriodicCallback:
         if self._handle:
             self._handle.cancel()
             self._handle = None
-            self._callback = None
             self._run = None
