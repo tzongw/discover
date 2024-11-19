@@ -83,10 +83,6 @@ class PeriodicCallback:
     __slots__ = ['_scheduler', '_period', '_handle', '_run']
 
     def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
-        if isinstance(period, timedelta):
-            period = period.total_seconds()
-        assert callable(callback) and period > 0
-
         @functools.wraps(callback)
         def run():
             if self._handle:
