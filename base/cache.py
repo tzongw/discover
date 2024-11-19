@@ -54,7 +54,6 @@ class Cache(Singleflight[T]):
         missing_keys = []
         made_keys = []
         indexes = []
-        in_flight = set()
         for index, key in enumerate(keys):
             made_key = self._make_key(key, *args, **kwargs)
             value = self.lru.get(made_key, _NONE)
@@ -68,15 +67,13 @@ class Cache(Singleflight[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                if made_key in self._futures:
-                    in_flight.add(index)
         if missing_keys:
             version = self.invalids
-            values = super().mget(missing_keys, *args, **kwargs)
-            for index, made_key, value in zip(indexes, made_keys, values):
+            values, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            for index, made_key, value, real_get in zip(indexes, made_keys, values, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if version == self.invalids and index not in in_flight:
+                if version == self.invalids and real_get:
                     self._set_value(made_key, value)
         return results
 
@@ -102,7 +99,6 @@ class TtlCache(Cache[T]):
         missing_keys = []
         made_keys = []
         indexes = []
-        in_flight = set()
         now = time.time()
         for index, key in enumerate(keys):
             made_key = self._make_key(key, *args, **kwargs)
@@ -119,15 +115,13 @@ class TtlCache(Cache[T]):
                 missing_keys.append(key)
                 made_keys.append(made_key)
                 indexes.append(index)
-                if made_key in self._futures:
-                    in_flight.add(index)
         if missing_keys:
             version = self.invalids
-            tuples = super().mget(missing_keys, *args, **kwargs)
-            for index, made_key, (value, expire) in zip(indexes, made_keys, tuples):
+            tuples, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            for index, made_key, (value, expire), real_get in zip(indexes, made_keys, tuples, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
-                if version == self.invalids and index not in in_flight:
+                if version == self.invalids and real_get:
                     pair = _Pair(value, expire_at(expire))
                     self._set_value(made_key, pair)
         return results
