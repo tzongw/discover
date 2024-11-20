@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import heapq
 import functools
+from concurrent.futures import Future
 from datetime import timedelta, datetime
 from typing import List, Union, Optional, Callable
 import gevent
@@ -12,12 +13,13 @@ from .executor import Executor
 
 
 class Handle:
-    __slots__ = ['when', 'callback']
+    __slots__ = ['when', 'callback', 'interval']
 
-    def __init__(self, callback: Callable, when):
-        assert callback is not None
+    def __init__(self, callback: Callable, when, interval=None):
+        assert callable(callback)
         self.callback = callback
         self.when = when
+        self.interval = interval
 
     def cancel(self):
         self.callback = None
@@ -25,6 +27,13 @@ class Handle:
     @property
     def cancelled(self):
         return self.callback is None
+
+    @property
+    def repeated(self):
+        return self.interval is not None
+
+    def update_next(self):
+        self.when += self.interval
 
     def __lt__(self, other: Handle):
         return self.when < other.when
@@ -54,18 +63,38 @@ class Scheduler:
         if isinstance(when, datetime):
             when = when.timestamp()
         handle = Handle(callback, when)
+        self._schedule(handle)
+        return handle
+
+    def call_repeat(self, callback: Callable, interval: Union[float, timedelta]):
+        if isinstance(interval, timedelta):
+            interval = interval.total_seconds()
+        when = time.time() + interval
+        handle = Handle(callback, when, interval)
+        self._schedule(handle)
+
+    def _schedule(self, handle: Handle):
         heapq.heappush(self._handles, handle)
         if self._handles[0] is handle:  # wakeup
             self._event.set()
-        return handle
+
+    def _schedule_next(self, fut: Future):
+        handle = fut.handle
+        if not handle.cancelled:
+            handle.update_next()
+            self._schedule(handle)
 
     def _run(self):
         while True:
             now = time.time()
             while self._handles and self._handles[0].when <= now:
                 handle = heapq.heappop(self._handles)  # type: Handle
-                if not handle.cancelled:
-                    self._executor.submit(handle)
+                if handle.cancelled:
+                    continue
+                fut = self._executor.submit(handle)
+                if handle.repeated:
+                    fut.handle = handle
+                    fut.add_done_callback(self._schedule_next)
             timeout = self._handles[0].when - now if self._handles else None
             self._event.clear()
             self._event.wait(timeout)
