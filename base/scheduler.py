@@ -80,28 +80,24 @@ class Scheduler:
 
 
 class PeriodicCallback:
-    __slots__ = ['_scheduler', '_period', '_handle', '_run']
+    __slots__ = ['_handle']
 
     def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
         @functools.wraps(callback)
         def run():
-            if self._handle:
+            if not self.stopped:
                 with LogSuppress():
                     callback()
-            if self._handle:
-                self._schedule_next()
+            if not self.stopped:
+                self._handle = scheduler.call_later(run, period)
 
-        self._scheduler = scheduler
-        self._period = period
-        self._run = run
-        self._handle = None  # type: Optional[Handle]
-        self._schedule_next()
+        self._handle = scheduler.call_later(run, period)
 
-    def _schedule_next(self):
-        self._handle = self._scheduler.call_later(self._run, self._period)
+    @property
+    def stopped(self):
+        return self._handle is None
 
     def stop(self):
         if self._handle:
             self._handle.cancel()
             self._handle = None
-            self._run = None
