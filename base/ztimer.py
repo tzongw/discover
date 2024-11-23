@@ -23,21 +23,21 @@ end
 
 local function ztimer_poll(keys, args)
     local ts = timestamp()
-    local timeout = redis.call('ZRANGE', keys[1], '-inf', ts, 'BYSCORE', 'LIMIT', 0, args[1])
+    local timeouts = redis.call('ZRANGE', keys[1], '-inf', ts, 'BYSCORE', 'LIMIT', 0, args[1])
     local result = {}
-    if #timeout == 0 then
+    if #timeouts == 0 then
         return result
     end
-    local meta = redis.call('HMGET', keys[2], unpack(timeout))
+    local metas = redis.call('HMGET', keys[2], unpack(timeouts))
     local loop = {}
     local oneshot = {}
-    for i, s in ipairs(meta) do
-        local key = timeout[i]
-        local j = string.find(s, '|', 3)
+    for i, meta in ipairs(metas) do
+        local key = timeouts[i]
+        local j = string.find(meta, '|', 3)
         table.insert(result, key)
-        table.insert(result, s.sub(s, j + 1))
-        if string.sub(s, 1, 1) == '1' then
-            table.insert(loop, ts + string.sub(s, 3, j - 1))
+        table.insert(result, string.sub(meta, j + 1))
+        if string.sub(meta, 1, 1) == '1' then
+            table.insert(loop, ts + string.sub(meta, 3, j - 1))
             table.insert(loop, key)
         else
             table.insert(oneshot, key)

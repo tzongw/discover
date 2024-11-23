@@ -21,9 +21,9 @@ class Singleflight(Generic[T]):
 
     def _mget_stats(self, keys, *args, **kwargs):
         futures = []
+        real_gets = []
         missing_keys = []
         made_keys = []
-        real_gets = []
         for key in keys:
             made_key = self._make_key(key, *args, **kwargs)
             if fut := self._futures.get(made_key):
@@ -33,9 +33,9 @@ class Singleflight(Generic[T]):
                 fut = Future()
                 self._futures[made_key] = fut
                 futures.append(fut)
+                real_gets.append(True)
                 missing_keys.append(key)
                 made_keys.append(made_key)
-                real_gets.append(True)
         if missing_keys:
             try:
                 values = self._mget(missing_keys, *args, **kwargs)
