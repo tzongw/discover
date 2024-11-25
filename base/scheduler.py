@@ -4,7 +4,7 @@ import time
 import heapq
 import functools
 from datetime import timedelta, datetime
-from typing import List, Union, Optional, Callable
+from typing import List, Union, Callable
 import gevent
 from gevent.event import Event
 from .utils import LogSuppress, func_desc

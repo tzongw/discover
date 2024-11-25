@@ -3,9 +3,9 @@ import logging
 import time
 from typing import Callable
 from functools import partial
-from concurrent.futures import Future
 from gevent import queue
 from gevent.event import Event
+from gevent.event import AsyncResult as Future
 import gevent
 from .utils import func_desc
 

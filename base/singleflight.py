@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import functools
-from concurrent.futures import Future
 from typing import TypeVar, Generic, Sequence
+from gevent.event import AsyncResult as Future
 from . import utils
 
 T = TypeVar('T')

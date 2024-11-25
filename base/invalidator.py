@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-from typing import Union
 import uuid
-from weakref import WeakValueDictionary
-from concurrent.futures import Future
-from redis import Redis, RedisCluster
-import gevent
 import logging
+from typing import Union
+from weakref import WeakValueDictionary
+from gevent.event import AsyncResult as Future
+import gevent
+from redis import Redis, RedisCluster
 from .executor import Executor
 from .dispatcher import Dispatcher
 
