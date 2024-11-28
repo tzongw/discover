@@ -102,8 +102,11 @@ class Receiver:
                     total += len(messages)
                     for message in messages:
                         self._dispatcher.dispatch(stream, *message[::-1])
-                if total > self._workers:
-                    count = count // 2 or 1
+                ratio = total // self._workers
+                if ratio >= 2:
+                    count = count // ratio or 1
+                elif ratio == 1:
+                    count = count - 1 or 1
                 elif count < self._workers:
                     count += 1
             except Exception:
