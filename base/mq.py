@@ -97,18 +97,9 @@ class Receiver:
         while not self._stopped:
             try:
                 result = self.redis.xreadgroup(self._group, self._consumer, streams, count=count, block=0, noack=True)
-                total = 0
                 for stream, messages in result:
-                    total += len(messages)
                     for message in messages:
                         self._dispatcher.dispatch(stream, *message[::-1])
-                ratio = total // self._workers
-                if ratio >= 2:
-                    count = count // ratio or 1
-                elif ratio == 1:
-                    count = count - 1 or 1
-                elif count < self._workers:
-                    count += 1
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
