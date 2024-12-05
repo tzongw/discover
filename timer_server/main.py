@@ -3,26 +3,26 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
+import time
 import const
+import atexit
 import shared
 import logging
+from typing import Dict, Callable
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
+from setproctitle import setproctitle
 import gevent
 from service.timer import Processor
 from service.timeout import Client
-from typing import Dict, Callable
 from base.scheduler import PeriodicCallback
 from base.service import Service
-from setproctitle import setproctitle
 from base import LogSuppress, batched
 from base.utils import DefaultDict
-import time
 from pydantic import BaseModel
 from dataclasses import dataclass
-from common.shared import spawn_worker
 
 
 class Info(BaseModel):
@@ -154,7 +154,7 @@ class Handler:
             logging.error(f'CAN NOT retreat timers: {len(self._timers)}')
             return
         logging.info(f'retreat timers: {len(self._timers)}')
-        workers = [spawn_worker(self._do_retreat, addr) for addr in addresses]
+        workers = [gevent.spawn(self._do_retreat, addr) for addr in addresses]
         gevent.joinall(workers)
 
 
@@ -182,6 +182,7 @@ def main():
     shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
     handler.load_timers()
     shared.at_exit(handler.retreat_timers)
+    atexit.register(handler.retreat_timers)  # double check
     gevent.joinall(workers, raise_error=True)
 
 
