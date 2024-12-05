@@ -1,9 +1,9 @@
-import functools
-import signal
-import logging
-import time
 import sys
+import time
+import signal
 import atexit
+import logging
+from functools import lru_cache, wraps
 from dataclasses import dataclass
 from typing import Union
 from weakref import WeakSet
@@ -108,11 +108,10 @@ atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 
 
 @atexit.register
+@lru_cache(maxsize=None)
 @singleflight
-def _cleanup():
-    if status.exiting:
-        return
-    status.exiting = True
+def _cleanup():  # call once
+    logging.info(f'cleanup')
     with LogSuppress():
         if options.env is const.Environment.DEV:  # ptpython compatible
             for fn in _exits:
@@ -136,7 +135,7 @@ def spawn_worker(f, *args, **kwargs):
 
 
 def run_in_worker(f):
-    @functools.wraps(f)
+    @wraps(f)
     def wrapper(*args, **kwargs):
         spawn_worker(f, *args, **kwargs)
 
@@ -153,7 +152,9 @@ def _sig_handler(sig, frame):
         gevent.sleep(seconds)  # wait for requests & messages
         sys.exit(0)
 
-    gevent.spawn(graceful_exit)
+    if not status.exiting:
+        status.exiting = True
+        gevent.spawn(graceful_exit)
 
 
 signal.signal(signal.SIGTERM, _sig_handler)
