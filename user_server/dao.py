@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import os
+import time
 import logging
+from enum import StrEnum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import StrEnum
 from typing import Union, Type, Self
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
@@ -20,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
-from base.utils import PascalCaseDict
+from base.utils import PascalCaseDict, log_if_slow
 from base.misc import CacheMixin, TimeDeltaField
 from config import options
 from shared import invalidator, id_generator
@@ -28,16 +29,19 @@ from shared import invalidator, id_generator
 
 class SessionMaker(sessionmaker):
     @contextmanager
-    def begin(self):
-        with tx_lock, self() as session, session.begin():
+    def transaction(self):
+        with tx_lock, ExitStack() as stack, self() as session, session.begin():
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+            start_time = time.time()
+            stack.callback(log_if_slow, start_time, tx_timeout, 'slow transaction')
             yield session
 
 
-echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
-engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
-Session = SessionMaker(engine, expire_on_commit=False)
+tx_timeout = 0.1
 tx_lock = threading.RLock()
+echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
+engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': tx_timeout})
+Session = SessionMaker(engine, expire_on_commit=False)
 Base = declarative_base()
 
 if not os.path.exists('db.sqlite3'):

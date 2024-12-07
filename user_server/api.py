@@ -253,7 +253,7 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    with Session.begin() as session:
+    with Session.transaction() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
             uid = id_generator.gen()

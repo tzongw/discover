@@ -1,9 +1,11 @@
 import os
 import fcntl
-import contextlib
 import logging
 import socket
 import string
+import time
+import traceback
+import contextlib
 from binascii import crc32
 from collections import defaultdict
 from functools import lru_cache, wraps
@@ -27,6 +29,12 @@ class LogSuppress(contextlib.suppress):
         if suppress:
             self.log(f'suppressed: {excinst}', exc_info=True)
         return suppress
+
+
+def log_if_slow(start_time, threshold, message):
+    elapsed = time.time() - start_time
+    if elapsed > threshold:
+        logging.warning(f'{message} elapsed: {elapsed}\n' + ''.join(traceback.format_stack()[:-1]))
 
 
 class Addr:
