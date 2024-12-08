@@ -2,11 +2,11 @@
 from pydantic import BaseModel
 
 
-class Login(BaseModel):
+class Connect(BaseModel):
     uid: int
 
 
-class Logout(BaseModel):
+class Disconnect(BaseModel):
     uid: int
 
 

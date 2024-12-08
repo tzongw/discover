@@ -9,7 +9,7 @@ from thrift.server import TServer
 import shared
 import const
 from base import create_parser
-from common.messages import Login, Logout
+from common.messages import Connect, Disconnect
 from models import Online
 from service import user
 from shared import app, online_key, redis, dispatch_timeout
@@ -52,7 +52,7 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            shared.publisher.publish(Login(uid=uid))
+            shared.publisher.publish(Connect(uid=uid))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success')
@@ -79,7 +79,7 @@ class Handler:
         key = online_key(uid)
         if redis.hdel(key, conn_id):
             logging.info(f'logout {uid} {conn_id}')
-            shared.publisher.publish(Logout(uid=uid))
+            shared.publisher.publish(Disconnect(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

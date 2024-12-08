@@ -5,7 +5,7 @@ import const
 from datetime import timedelta, datetime
 from base import ip_address, LogSuppress
 from base.scheduler import PeriodicCallback
-from common.messages import Login, Logout, Alarm
+from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
     time_dispatcher, \
     run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout
@@ -35,13 +35,13 @@ def on_register(account: Account):
     logging.info(f'{account}')
 
 
-@receiver(Login)
-def on_login(data: Login):
+@receiver(Connect)
+def on_connect(data: Connect):
     logging.info(f'{data}')
 
 
-@receiver(Logout)
-def on_logout(data: Logout):
+@receiver(Disconnect)
+def on_disconnect(data: Disconnect):
     logging.info(f'{data}')
 
 
