@@ -43,8 +43,6 @@ WebSocket.handle_ping = handle_ping
 
 
 class Client:
-    CLIENT_TTL = 3 * const.PING_INTERVAL
-
     __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
 
     def __init__(self, ws: WebSocket, conn_id):
@@ -67,7 +65,7 @@ class Client:
         gevent.spawn(self._writer)
 
     def serve(self):
-        self.ws.handler.socket.settimeout(self.CLIENT_TTL)
+        self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
             with shared.user_service.client(addr) as client:

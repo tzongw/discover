@@ -18,8 +18,6 @@ import push
 
 
 class Handler:
-    ONLINE_TTL = 3 * const.PING_INTERVAL * const.RPC_PING_STEP
-
     def login(self, address: str, conn_id: str, params: Dict[str, str]):
         logging.info(f'{address} {conn_id} {params}')
         try:
@@ -36,7 +34,7 @@ class Handler:
             with redis.pipeline(transaction=True, shard_hint=key) as pipe:
                 create_parser(pipe).hgetall(key, Online)
                 pipe.hset(key, conn_id, Online(token=token, address=address))
-                pipe.hexpire(key, self.ONLINE_TTL, token)
+                pipe.hexpire(key, const.ONLINE_TTL, token)
                 conns = pipe.execute()[0]
             for _conn_id, online in conns.items():
                 if online.token != token:
@@ -64,7 +62,7 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            values = redis.hexpire(key, self.ONLINE_TTL, conn_id)
+            values = redis.hexpire(key, const.ONLINE_TTL, conn_id)
             if not values or values[0] != 1:
                 raise ValueError(f'invalid {conn_id}')
         except (KeyError, ValueError) as e:
