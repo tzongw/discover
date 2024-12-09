@@ -33,11 +33,12 @@ class SessionMaker(sessionmaker):
         with tx_lock, ExitStack() as stack, self() as session, session.begin():
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
             start_time = time.time()
-            stack.callback(log_if_slow, start_time, tx_timeout, 'slow transaction')
+            stack.callback(log_if_slow, start_time, tx_slow, 'slow transaction')
             yield session
 
 
-tx_timeout = 0.1
+tx_slow = 0.1
+tx_timeout = 1.0
 tx_lock = threading.RLock()
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': tx_timeout})
