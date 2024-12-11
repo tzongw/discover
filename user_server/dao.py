@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import os
 import time
 import logging
 from enum import StrEnum
@@ -16,6 +15,7 @@ from sqlalchemy import Integer
 from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
+from sqlalchemy import event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import const
@@ -45,9 +45,13 @@ engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolati
 Session = SessionMaker(engine, expire_on_commit=False)
 Base = declarative_base()
 
-if not os.path.exists('db.sqlite3'):
-    with Session() as s:
-        s.connection().exec_driver_sql('PRAGMA journal_mode=wal')
+
+@event.listens_for(engine, 'connect')
+def sqlite_connect(conn, rec):
+    cur = conn.cursor()
+    cur.execute('PRAGMA journal_mode = WAL')
+    cur.execute('PRAGMA synchronous = NORMAL')
+    cur.close()
 
 
 @dataclass
