@@ -163,10 +163,10 @@ class FullMixin(Generic[T]):
                 nonlocal cache_version
                 nonlocal cache_expire_at
                 values = self.values
-                assert not isinstance(values, LazySequence)
                 if cache_version != self._version or cache_expire_at < time.time():
                     inner.cache_clear()
                     cache_version = self._version
+                    assert not get_expire or not isinstance(values, LazySequence), 'DO NOT get expire of lazy sequence'
                     expire = get_expire(values) if get_expire else None
                     cache_expire_at = expire_at(expire)
                 return inner(*args, **kwargs)
