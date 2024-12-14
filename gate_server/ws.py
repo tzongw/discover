@@ -76,17 +76,7 @@ class Client:
                     client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
 
     def handle_ping(self):
-        if self.writing:
-            self.messages.append(self.PONG_MESSAGE)
-        else:
-            self.writing = True
-            try:
-                self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
-            finally:
-                if self.messages:
-                    gevent.spawn(self._writer)
-                else:
-                    self.writing = False
+        self.send(self.PONG_MESSAGE)
         self.step += 1
         if self.step < const.RPC_PING_STEP:
             return

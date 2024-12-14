@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 import logging
-import gevent
 from typing import Dict
+import gevent
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
-import shared
-import const
 from base import create_parser
-from common.messages import Connect, Disconnect
+from base import LogSuppress
+import const
+from config import options
 from models import Online
 from service import user
+from common.messages import Connect, Disconnect
+import shared
 from shared import app, online_key, redis, dispatch_timeout
-from config import options
 import push
 
 
@@ -40,7 +41,7 @@ class Handler:
                 if online.token != token:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
-                with shared.gate_service.client(online.address) as client:
+                with LogSuppress(), shared.gate_service.client(online.address) as client:
                     client.send_text(_conn_id, f'login again')
                     client.remove_conn(_conn_id)
         except Exception as e:
