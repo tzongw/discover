@@ -2,6 +2,7 @@
 from base import create_parser
 from shared import online_key, gate_service, redis, parser
 from models import Online
+from base import LogSuppress
 
 
 def send(uid_or_uids, message):
@@ -12,7 +13,7 @@ def send(uid_or_uids, message):
             parser.hgetall(online_key(uid), Online)
         for user_conns in pipe.execute():
             for conn_id, online in user_conns.items():
-                with gate_service.client(online.address) as client:
+                with LogSuppress(), gate_service.client(online.address) as client:
                     if isinstance(message, str):
                         client.send_text(conn_id, message)
                     else:
@@ -24,7 +25,7 @@ def kick(uid, message=None, *, token=None):
     for conn_id, online in conns.items():
         if token and online.token != token:
             continue
-        with gate_service.client(online.address) as client:
+        with LogSuppress(), gate_service.client(online.address) as client:
             if isinstance(message, str):
                 client.send_text(conn_id, message)
             elif isinstance(message, bytes):
@@ -37,7 +38,7 @@ def join(uid, group, *, token=None):
     for conn_id, online in conns.items():
         if token and online.token != token:
             continue
-        with gate_service.client(online.address) as client:
+        with LogSuppress(), gate_service.client(online.address) as client:
             client.join_group(conn_id, group)
 
 
@@ -46,7 +47,7 @@ def leave(uid, group, *, token=None):
     for conn_id, online in conns.items():
         if token and online.token != token:
             continue
-        with gate_service.client(online.address) as client:
+        with LogSuppress(), gate_service.client(online.address) as client:
             client.leave_group(conn_id, group)
 
 

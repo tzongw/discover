@@ -40,8 +40,7 @@ class UniqueId:
     def _run(self):
         while True:
             gevent.sleep(self._INTERVAL)
-            with LogSuppress():
-                with self._redis.pipeline(transaction=False) as pipe:
-                    for key in self._keys:
-                        pipe.set(key, '', ex=self._TTL)
-                    pipe.execute()
+            with LogSuppress(), self._redis.pipeline(transaction=False) as pipe:
+                for key in self._keys:
+                    pipe.set(key, '', ex=self._TTL)
+                pipe.execute()

@@ -3,15 +3,14 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
+from setproctitle import setproctitle
 import const
 import shared
 import rpc
 import ws
 from shared import app_name, app_id
-from setproctitle import setproctitle
 import gevent
 import logging
-from base import LogSuppress
 
 
 def main():
@@ -25,5 +24,8 @@ def main():
 
 
 if __name__ == '__main__':
-    with LogSuppress():
+    try:
         main()
+    except Exception:
+        logging.exception('')
+        exit(1)

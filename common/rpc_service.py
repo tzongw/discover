@@ -29,9 +29,8 @@ class Selector:
     @staticmethod
     def _traverse(client_factory, addresses, name, *args, **kwargs):
         for address in addresses:
-            with LogSuppress():
-                with client_factory(address) as client:
-                    getattr(client, name)(*args, **kwargs)
+            with LogSuppress(), client_factory(address) as client:
+                getattr(client, name)(*args, **kwargs)
 
 
 class UserService(Service, Selector):

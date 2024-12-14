@@ -187,5 +187,8 @@ def main():
 
 
 if __name__ == '__main__':
-    with LogSuppress():
+    try:
         main()
+    except Exception:
+        logging.exception('')
+        exit(1)

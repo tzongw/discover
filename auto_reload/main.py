@@ -7,7 +7,7 @@ import gevent
 import os
 from common import shared
 import logging
-from base import LogSuppress, ip_address, Addr
+from base import ip_address, Addr
 from setproctitle import setproctitle
 
 addr_map = {}
@@ -63,5 +63,8 @@ def main():
 
 
 if __name__ == '__main__':
-    with LogSuppress():
+    try:
         main()
+    except Exception:
+        logging.exception('')
+        exit(1)

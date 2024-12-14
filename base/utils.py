@@ -17,17 +17,15 @@ from yaml import safe_dump
 
 
 class LogSuppress(contextlib.suppress):
-    def __init__(self, *exceptions, log_level=logging.ERROR):
+    def __init__(self, *exceptions):
         if not exceptions:
             exceptions = [Exception]
         super().__init__(*exceptions)
-        self.log = {logging.INFO: logging.info, logging.WARNING: logging.warning, logging.ERROR: logging.error}.get(
-            log_level)
 
     def __exit__(self, exctype, excinst, exctb):
         suppress = super().__exit__(exctype, excinst, exctb)
         if suppress:
-            self.log(f'suppressed: {excinst}', exc_info=True)
+            logging.exception('suppressed')
         return suppress
 
 
