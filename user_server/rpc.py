@@ -55,7 +55,7 @@ class Handler:
             shared.publisher.publish(Connect(uid=uid))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
-                client.send_text(conn_id, f'login success')
+                client.send_text(conn_id, f'login success: ping interval: {const.PING_INTERVAL}')
 
     def ping(self, address: str, conn_id: str, context: Dict[str, str]):
         try:
