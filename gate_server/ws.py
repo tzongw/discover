@@ -36,7 +36,7 @@ def serve():
 
 def handle_ping(self: WebSocket, header, payload):
     client: Client = self.environ['WS_CLIENT']
-    client.rpc_ping()
+    client.handle_ping()
 
 
 WebSocket.handle_ping = handle_ping
@@ -44,6 +44,7 @@ WebSocket.handle_ping = handle_ping
 
 class Client:
     __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
+    PONG_MESSAGE = object()
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -74,7 +75,18 @@ class Client:
                 else:
                     client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
 
-    def rpc_ping(self):
+    def handle_ping(self):
+        if self.writing:
+            self.messages.append(self.PONG_MESSAGE)
+        else:
+            self.writing = True
+            try:
+                self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
+            finally:
+                if self.messages:
+                    gevent.spawn(self._writer)
+                else:
+                    self.writing = False
         self.step += 1
         if self.step < const.RPC_PING_STEP:
             return
@@ -84,6 +96,7 @@ class Client:
             client.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
+        assert self.writing
         try:
             while self.messages:
                 messages = self.messages
@@ -91,7 +104,10 @@ class Client:
                 for message in messages:
                     if message is None:
                         raise StopIteration
-                    self.ws.send(message)
+                    elif message is self.PONG_MESSAGE:
+                        self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
+                    else:
+                        self.ws.send(message)
             else:
                 self.writing = False
         except Exception:
