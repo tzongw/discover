@@ -3,12 +3,12 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
-import gevent
 import os
-from common import shared
 import logging
-from base import ip_address, Addr
+import gevent
 from setproctitle import setproctitle
+from common import shared
+from base import ip_address, Addr
 
 addr_map = {}
 changed = set()

@@ -3,14 +3,14 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
+import logging
+import gevent
 from setproctitle import setproctitle
 import const
 import shared
 import rpc
 import ws
 from shared import app_name, app_id
-import gevent
-import logging
 
 
 def main():

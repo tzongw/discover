@@ -3,6 +3,9 @@ from gevent import monkey
 
 monkey.patch_all()
 from config import options
+import logging
+import gevent
+from setproctitle import setproctitle
 import shared
 import const
 import rpc
@@ -10,9 +13,6 @@ import rpc
 import handlers
 import api
 from shared import app_name, app_id, init_main
-from setproctitle import setproctitle
-import logging
-import gevent
 
 
 def main():

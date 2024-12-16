@@ -6,9 +6,9 @@ from config import options, remaining
 import time
 import logging
 from importlib import import_module
+from setproctitle import setproctitle
 import shared
 from shared import app_name, app_id, init_main
-from setproctitle import setproctitle
 
 
 def main():

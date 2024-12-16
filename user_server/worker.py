@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-import gevent
 from config import define, options, ctx
+import gevent
 from base import base62
 from base import WaitGroup
 import shared

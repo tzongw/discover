@@ -4,25 +4,25 @@ from gevent import monkey
 monkey.patch_all()
 from config import options
 import time
-import const
 import atexit
-import shared
 import logging
 from typing import Dict, Callable
+from dataclasses import dataclass
+import gevent
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from setproctitle import setproctitle
-import gevent
+from pydantic import BaseModel
 from service.timer import Processor
 from service.timeout import Client
 from base.scheduler import PeriodicCallback
 from base.service import Service
 from base import LogSuppress, batched
 from base.utils import DefaultDict
-from pydantic import BaseModel
-from dataclasses import dataclass
+import const
+import shared
 
 
 class Info(BaseModel):
