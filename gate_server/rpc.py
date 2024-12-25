@@ -48,7 +48,8 @@ class Handler:
 
     def _broadcast_message(self, group, exclude, message):
         logging.debug(f'{group} {exclude} {message}')
-        for client in groups.get(group) or set():  # type: Client
+        members = groups.get(group, []) if group else clients.values()
+        for client in members:  # type: Client
             if client.conn_id not in exclude:
                 client.send(message)
 
