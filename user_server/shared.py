@@ -44,7 +44,7 @@ def _get_tokens(uid: int):
     return MappingProxyType(tokens), ttl
 
 
-sessions: TtlCache[MappingProxyType[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
+sessions: TtlCache[dict[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
 sessions.listen(invalidator, 'session')
 
 
