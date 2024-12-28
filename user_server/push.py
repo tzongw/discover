@@ -5,13 +5,17 @@ from models import Online
 from base import LogSuppress
 
 
-def send(uid_or_uids, message):
-    uids = [uid_or_uids] if isinstance(uid_or_uids, (int, str)) else uid_or_uids
+def send(uid=None, message=None, mapping: dict = None):
+    assert uid is not None or mapping
+    if mapping is None:
+        mapping = {}
+    if uid is not None:
+        mapping[uid] = message
     with redis.pipeline(transaction=False) as pipe:
         parser = create_parser(pipe)
-        for uid in uids:
+        for uid in mapping.keys():
             parser.hgetall(online_key(uid), Online)
-        for user_conns in pipe.execute():
+        for user_conns, message in zip(pipe.execute(), mapping.values()):
             for conn_id, online in user_conns.items():
                 with LogSuppress(), gate_service.client(online.address) as client:
                     if isinstance(message, str):
