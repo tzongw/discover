@@ -103,11 +103,12 @@ class GetterMixin:
     def to_dict(self, include=(), exclude=None):
         if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
-            include = [field for field in self._fields if field not in exclude and not field.startswith('_')]
+            include = self.__include__ + tuple(field for field in self._fields if not field.startswith('_') and
+                                               field not in exclude and field not in self.__include__)
         elif not include:
             include = self.__include__
         d = {k: v for k, v in self._data.items() if k in include}
-        if 'create_time' in self.__include__ and 'create_time' not in d:
+        if 'create_time' in include and 'create_time' not in d:
             d['create_time'] = extract_datetime(self.id)
         return d
 
