@@ -138,8 +138,8 @@ def client_serve(ws: WebSocket):
             params[k] = v
         shared.user_service.login(options.rpc_address, conn_id, params)
         client.serve()
-    except Exception:
-        logging.exception(f'{client}')
+    except Exception as e:
+        logging.info(f'{client} {e}')
     finally:
         environ.pop('WS_CLIENT')
         for group in client.groups:

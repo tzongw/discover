@@ -196,13 +196,12 @@ def ttl_cache(expire, *, maxsize=128):
             args, *items = key
             return f(*args, **dict(items)), expire
 
-        cache = TtlCache(get=get, maxsize=maxsize)
-
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
             key = (args, *kwargs.items())
             return cache.get(key)
 
+        cache = TtlCache(get=get, maxsize=maxsize)
         wrapper.cache = cache
         return wrapper
 
