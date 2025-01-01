@@ -77,20 +77,14 @@ class Cache(Singleflight[T]):
                     self._set_value(made_key, value)
         return results
 
-    def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
+    def listen(self, invalidator: Invalidator, group: str):
         @invalidator(group)
         def invalidate(key: str):
             self.invalids += 1
-            if not key:
-                self.lru.clear()
-                return
-            if convert:
-                key_or_keys = convert(key)
-                made_keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
+            if key:
+                self.lru.pop(self._make_key(key), None)
             else:
-                made_keys = [self._make_key(key)]
-            for made_key in made_keys:
-                self.lru.pop(made_key, None)
+                self.lru.clear()
 
 
 class TtlCache(Cache[T]):
