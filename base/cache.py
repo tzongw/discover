@@ -16,11 +16,12 @@ from .redis_script import Script
 T = TypeVar('T')
 _NONE = object()
 _Pair = namedtuple('_Pair', ['value', 'expire_at'])
+_INF = float('inf')
 
 
 def expire_at(expire):
     if expire is None:
-        return float('inf')
+        return _INF
     if isinstance(expire, datetime):
         return expire.timestamp()
     if isinstance(expire, timedelta):
@@ -77,20 +78,14 @@ class Cache(Singleflight[T]):
                     self._set_value(made_key, value)
         return results
 
-    def listen(self, invalidator: Invalidator, group: str, convert: Callable = None):
+    def listen(self, invalidator: Invalidator, group: str):
         @invalidator(group)
         def invalidate(key: str):
             self.invalids += 1
-            if not key:
-                self.lru.clear()
-                return
-            if convert:
-                key_or_keys = convert(key)
-                made_keys = key_or_keys if isinstance(key_or_keys, (list, set)) else [key_or_keys]
+            if key:
+                self.lru.pop(self._make_key(key), None)
             else:
-                made_keys = [self._make_key(key)]
-            for made_key in made_keys:
-                self.lru.pop(made_key, None)
+                self.lru.clear()
 
 
 class TtlCache(Cache[T]):
@@ -133,17 +128,21 @@ class FullMixin(Generic[T]):
 
     def __init__(self, *, get_values):
         self._get_values = get_values
+        self._values = ()
         self._version = 0
-        self._values = []
         self._expire_at = float('-inf')
 
     @property
-    @singleflight
     def values(self) -> Sequence[T] | LazySequence[T]:
-        if self._version == self.invalids and self._expire_at > time.time():
+        if self._version == self.invalids and (self._expire_at == _INF or self._expire_at > time.time()):
             return self._values
+        return self._update_values()
+
+    @singleflight
+    def _update_values(self):
         version = self.invalids
         values, expire = self._get_values()  # invalidate events may happen simultaneously
+        assert isinstance(values, (tuple, LazySequence))
         self._values = values
         self._expire_at = expire_at(expire)
         self._version = version
@@ -163,7 +162,7 @@ class FullMixin(Generic[T]):
                 nonlocal cache_version
                 nonlocal cache_expire_at
                 values = self.values
-                if cache_version != self._version or cache_expire_at < time.time():
+                if cache_version != self._version or (cache_expire_at != _INF and cache_expire_at < time.time()):
                     inner.cache_clear()
                     cache_version = self._version
                     assert not get_expire or not isinstance(values, LazySequence), 'DO NOT get expire of lazy sequence'
