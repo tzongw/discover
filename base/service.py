@@ -19,7 +19,7 @@ class Service:
         self._cooldown = {}  # type: Dict[str, float]
         self._local_addresses = []
         self._good_addresses = []
-        registry.add_callback(self._clean_pools)
+        registry.add_callback(self._update_addresses)
         self._update_addresses()
         self._reaping = False
 
@@ -57,13 +57,13 @@ class Service:
     def _clean_pools(self):
         available = self.addresses()
         holding = set(self._pools.keys())
-        for removed in holding - available:
-            logging.info(f'clean {self._name} {removed}')
-            pool = self._pools.pop(removed)
+        for removing in holding - available:
+            logging.info(f'clean {self._name} {removing}')
+            pool = self._pools.pop(removing)
             pool.close_all()
-        self._update_addresses()
 
     def _update_addresses(self):
+        self._clean_pools()
         now = time.time()
         expired = [addr for addr, cd in self._cooldown.items() if cd <= now]
         if expired:
