@@ -64,7 +64,7 @@ class Handler:
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
             values = redis.hexpire(key, const.ONLINE_TTL, conn_id)
-            if not values or values[0] != 1:
+            if values[0] != 1:
                 raise ValueError(f'invalid {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
