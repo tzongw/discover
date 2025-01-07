@@ -76,7 +76,8 @@ class Client:
                     client.recv_binary(options.rpc_address, self.conn_id, self.context, message)
 
     def handle_ping(self):
-        self.send(self.PONG_MESSAGE)
+        # pong or no pong?
+        # self.send(self.PONG_MESSAGE)
         self.step += 1
         if self.step < const.RPC_PING_STEP:
             return
