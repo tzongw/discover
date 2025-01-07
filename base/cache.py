@@ -16,12 +16,11 @@ from .redis_script import Script
 T = TypeVar('T')
 _NONE = object()
 _Pair = namedtuple('_Pair', ['value', 'expire_at'])
-_INF = float('inf')
 
 
 def expire_at(expire):
     if expire is None:
-        return _INF
+        return float('inf')
     if isinstance(expire, datetime):
         return expire.timestamp()
     if isinstance(expire, timedelta):
@@ -134,7 +133,7 @@ class FullMixin(Generic[T]):
 
     @property
     def values(self) -> Sequence[T] | LazySequence[T]:
-        if self._version == self.invalids and (self._expire_at == _INF or self._expire_at > time.time()):
+        if self._version == self.invalids and self._expire_at > time.time():
             return self._values
         return self._update_values()
 
@@ -162,7 +161,7 @@ class FullMixin(Generic[T]):
                 nonlocal cache_version
                 nonlocal cache_expire_at
                 values = self.values
-                if cache_version != self._version or (cache_expire_at != _INF and cache_expire_at < time.time()):
+                if cache_version != self._version or cache_expire_at < time.time():
                     inner.cache_clear()
                     cache_version = self._version
                     assert not get_expire or not isinstance(values, LazySequence), 'DO NOT get expire of lazy sequence'
