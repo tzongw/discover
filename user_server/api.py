@@ -19,6 +19,7 @@ import models
 from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
+from base.misc import DoesNotExist
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
@@ -226,6 +227,11 @@ def eval_code():
 @app.errorhandler(UnprocessableEntity)
 def args_error(e: UnprocessableEntity):
     return e.data['messages']
+
+
+@app.errorhandler(DoesNotExist)
+def args_error(e: DoesNotExist):
+    return e.args[0]
 
 
 def hash_password(uid: int, password: str) -> str:

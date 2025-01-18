@@ -5,7 +5,7 @@ import logging
 from enum import StrEnum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Union, Type, Self
+from typing import Union, Type, Self, Optional
 from contextlib import contextmanager, ExitStack
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -16,13 +16,14 @@ from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
+from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, log_if_slow
-from base.misc import CacheMixin, TimeDeltaField
+from base.misc import CacheMixin, TimeDeltaField, DoesNotExist
 from config import options
 from shared import invalidator, id_generator
 
@@ -53,8 +54,35 @@ def sqlite_connect(conn, rec):
     cur.close()
 
 
+class BaseModel(Base):
+    __abstract__ = True
+
+    @classmethod
+    def mget(cls, keys, only=()) -> list[Optional[Self]]:
+        if not keys:
+            return []
+        pk = inspect(cls).primary_key[0]
+        if not only:
+            only = [cls]
+        with Session() as session:
+            objects = session.query(*only).filter(pk.in_(keys)).all()
+            mapping = {getattr(o, pk.name): o for o in objects}
+            return [mapping.get(k) for k in keys]
+
+    @classmethod
+    def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
+        value = cls.mget([key], only=only)[0]
+        if value is None:
+            if default:
+                pk = inspect(cls).primary_key[0]
+                value = cls(**{pk.name: pk.type.python_type(key)})
+            elif ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
+        return value
+
+
 @dataclass
-class Account(Base):
+class Account(BaseModel):
     id: int
 
     __tablename__ = "accounts"

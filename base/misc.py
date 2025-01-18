@@ -12,7 +12,7 @@ from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
-from mongoengine import EmbeddedDocument, DoesNotExist, FloatField
+from mongoengine import EmbeddedDocument, FloatField
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -20,6 +20,10 @@ from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
+
+
+class DoesNotExist(Exception):
+    pass
 
 
 class ListConverter(BaseConverter):
