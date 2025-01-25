@@ -13,6 +13,7 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, FloatField
+from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -20,6 +21,8 @@ from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
+
+Base = declarative_base()
 
 
 class DoesNotExist(Exception):
@@ -41,7 +44,7 @@ class ListConverter(BaseConverter):
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, GetterMixin):
+        if isinstance(o, (GetterMixin, Base)):
             return o.to_dict()
         elif isinstance(o, BaseModel):
             return o.dict()
@@ -70,7 +73,7 @@ class JSONProvider(DefaultJSONProvider):
 def make_response(app, rv):
     if rv is None:
         rv = {}
-    elif isinstance(rv, GetterMixin):
+    elif isinstance(rv, (GetterMixin, Base)):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
         rv = rv.dict()

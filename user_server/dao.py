@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 import logging
 from enum import StrEnum
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Union, Type, Self, Optional
 from contextlib import contextmanager, ExitStack
@@ -17,13 +16,12 @@ from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy.inspection import inspect
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import const
-from base import FullCache, Cache
+from base import FullCache, Cache, extract_datetime
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, log_if_slow
-from base.misc import CacheMixin, TimeDeltaField, DoesNotExist
+from base.misc import CacheMixin, TimeDeltaField, DoesNotExist, Base
 from config import options
 from shared import invalidator, id_generator
 
@@ -43,7 +41,6 @@ tx_lock = threading.RLock()
 echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': tx_timeout})
 Session = SessionMaker(engine, expire_on_commit=False)
-Base = declarative_base()
 
 
 @event.listens_for(engine, 'connect')
@@ -56,22 +53,21 @@ def sqlite_connect(conn, rec):
 
 class BaseModel(Base):
     __abstract__ = True
+    __include__ = ()
 
     @classmethod
-    def mget(cls, keys, only=()) -> list[Optional[Self]]:
+    def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
         pk = inspect(cls).primary_key[0]
-        if not only:
-            only = [cls]
         with Session() as session:
-            objects = session.query(*only).filter(pk.in_(keys)).all()
+            objects = session.query(cls).filter(pk.in_(keys)).all()
             mapping = {getattr(o, pk.name): o for o in objects}
             return [mapping.get(k) for k in keys]
 
     @classmethod
-    def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
-        value = cls.mget([key], only=only)[0]
+    def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
+        value = cls.mget([key])[0]
         if value is None:
             if default:
                 pk = inspect(cls).primary_key[0]
@@ -80,11 +76,21 @@ class BaseModel(Base):
                 raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
         return value
 
+    def to_dict(self, include=(), exclude=None):
+        columns = inspect(self.__class__).columns
+        if exclude is not None:
+            assert not include, '`include`, `exclude` are mutually exclusive'
+            include = self.__include__ + tuple(
+                c.name for c in columns if c.name not in exclude and c.name not in self.__include__)
+        elif not include:
+            include = self.__include__
+        d = {k: v for k, v in self.__dict__.items() if k in include}
+        if 'create_time' in include and 'create_time' not in d:
+            d['create_time'] = extract_datetime(self.id)
+        return d
 
-@dataclass
+
 class Account(BaseModel):
-    id: int
-
     __tablename__ = "accounts"
     id = Column(Integer, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
