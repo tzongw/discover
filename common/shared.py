@@ -3,7 +3,7 @@ import time
 import signal
 import atexit
 import logging
-from functools import lru_cache, wraps
+from functools import wraps
 from dataclasses import dataclass
 from typing import Union
 from weakref import WeakSet
@@ -16,7 +16,7 @@ from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask
-from base import func_desc, ip_address, base62, singleflight
+from base import func_desc, ip_address, base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
@@ -108,8 +108,7 @@ atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 
 
 @atexit.register
-@lru_cache(maxsize=None)
-@singleflight
+@once
 def _cleanup():  # call once
     logging.info(f'cleanup')
     with LogSuppress():

@@ -65,3 +65,8 @@ def singleflight(f):
         return sf.get(key)
 
     return wrapper
+
+
+def once(f):
+    sf = singleflight(f)
+    return functools.lru_cache(maxsize=None)(sf)
