@@ -90,16 +90,16 @@ class GetterMixin:
     __include__ = ()
 
     @classmethod
-    def mget(cls, keys, *, only=()) -> list[Optional[Self]]:
+    def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
         query = {f'{cls.id.name}__in': keys}
-        mapping = {o.id: o for o in cls.objects(**query).only(*only)}
+        mapping = {o.id: o for o in cls.objects(**query)}
         return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
-    def get(cls, key, *, ensure=False, default=False, only=()) -> Optional[Self]:
-        value = cls.mget([key], only=only)[0]
+    def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
+        value = cls.mget([key])[0]
         if value is None:
             if default:
                 value = cls(**{cls.id.name: cls.id.to_python(key)})
@@ -122,12 +122,8 @@ class GetterMixin:
 
 class CacheMixin(GetterMixin):
     @classmethod
-    def make_key(cls, key, *_, **__):
-        return cls.id.to_python(key)  # ignore only
-
-    @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
-        return super().mget(keys)  # ignore only
+    def make_key(cls, key):
+        return cls.id.to_python(key)
 
     def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)

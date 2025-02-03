@@ -92,6 +92,8 @@ class BaseModel(Base):
 
 class Account(BaseModel):
     __tablename__ = "accounts"
+    __include__ = ('id',)
+
     id = Column(Integer, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
@@ -192,9 +194,9 @@ class Setting(Document, CacheMixin):
     id = StringField(primary_key=True)
 
     @classmethod
-    def get(cls, key=None, *, ensure=False, default=True, only=()) -> Self:
+    def get(cls, key=None, *, ensure=False, default=True) -> Self:
         assert key is None or key == cls.__name__, 'key is NOT support'
-        return super().get(cls.__name__, ensure=ensure, default=default, only=only)
+        return super().get(cls.__name__, ensure=ensure, default=default)
 
 
 cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
@@ -209,6 +211,7 @@ class Status(StrEnum):
 
 @collection
 class TokenSetting(Setting):
+    __include__ = ('expire', 'status')
     expire = TimeDeltaField(default=timedelta(hours=1), max_value=timedelta(days=1))
     status = EnumField(Status, default=Status.OK)
 
