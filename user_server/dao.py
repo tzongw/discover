@@ -4,7 +4,7 @@ import time
 import logging
 from enum import StrEnum
 from datetime import datetime, timedelta
-from typing import Union, Type, Self, Optional
+from typing import Union, Type, Self, Optional, Any
 from contextlib import contextmanager, ExitStack
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -15,7 +15,6 @@ from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
-from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache, extract_datetime
@@ -51,15 +50,16 @@ def sqlite_connect(conn, rec):
     cur.close()
 
 
-class BaseModel(Base):
-    __abstract__ = True
+class GetterMixin:
+    id: Any
+    __table__: Any
     __include__ = ()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
-        pk = inspect(cls).primary_key[0]
+        pk = cls.__table__.primary_key.columns[0]
         with Session() as session:
             objects = session.query(cls).filter(pk.in_(keys)).all()
             mapping = {getattr(o, pk.name): o for o in objects}
@@ -70,14 +70,14 @@ class BaseModel(Base):
         value = cls.mget([key])[0]
         if value is None:
             if default:
-                pk = inspect(cls).primary_key[0]
+                pk = cls.__table__.primary_key.columns[0]
                 value = cls(**{pk.name: pk.type.python_type(key)})
             elif ensure:
                 raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
         return value
 
     def to_dict(self, include=(), exclude=None):
-        columns = inspect(self.__class__).columns
+        columns = self.__table__.columns
         if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
             include = self.__include__ + tuple(
@@ -90,7 +90,7 @@ class BaseModel(Base):
         return d
 
 
-class Account(BaseModel):
+class Account(Base, GetterMixin):
     __tablename__ = "accounts"
     __include__ = ('id',)
 
