@@ -86,13 +86,14 @@ class GetterMixin:
             include = self.__include__
         d = {k: v for k, v in self.__dict__.items() if k in include}
         if 'create_time' in include and 'create_time' not in d:
-            d['create_time'] = extract_datetime(self.id)
+            pk = self.__table__.primary_key.columns[0]
+            d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
 
 
 class Account(Base, GetterMixin):
     __tablename__ = "accounts"
-    __include__ = ('id',)
+    __include__ = ('id', 'create_time')
 
     id = Column(Integer, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)
