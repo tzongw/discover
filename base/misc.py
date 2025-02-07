@@ -13,7 +13,6 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, FloatField
-from sqlalchemy.ext.declarative import declarative_base
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -21,8 +20,6 @@ from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
-
-Base = declarative_base()
 
 
 class DoesNotExist(Exception):
@@ -44,7 +41,7 @@ class ListConverter(BaseConverter):
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, (GetterMixin, Base)):
+        if isinstance(o, (GetterMixin, SqlGetterMixin)):
             return o.to_dict()
         elif isinstance(o, BaseModel):
             return o.dict()
@@ -73,7 +70,7 @@ class JSONProvider(DefaultJSONProvider):
 def make_response(app, rv):
     if rv is None:
         rv = {}
-    elif isinstance(rv, (GetterMixin, Base)):
+    elif isinstance(rv, (GetterMixin, SqlGetterMixin)):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
         rv = rv.dict()
@@ -278,3 +275,45 @@ class Exclusion:
             return wrapper
 
         return decorator
+
+
+class SqlGetterMixin:
+    Session: Callable
+    id: Any
+    __table__: Any
+    __include__ = ()
+
+    @classmethod
+    def mget(cls, keys) -> list[Optional[Self]]:
+        if not keys:
+            return []
+        pk = cls.__table__.primary_key.columns[0]
+        with cls.Session() as session:
+            objects = session.query(cls).filter(pk.in_(keys)).all()
+            mapping = {getattr(o, pk.name): o for o in objects}
+            return [mapping.get(k) for k in keys]
+
+    @classmethod
+    def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
+        value = cls.mget([key])[0]
+        if value is None:
+            if default:
+                pk = cls.__table__.primary_key.columns[0]
+                value = cls(**{pk.name: pk.type.python_type(key)})
+            elif ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
+        return value
+
+    def to_dict(self, include=(), exclude=None):
+        columns = self.__table__.columns
+        if exclude is not None:
+            assert not include, '`include`, `exclude` are mutually exclusive'
+            include = self.__include__ + tuple(
+                c.name for c in columns if c.name not in exclude and c.name not in self.__include__)
+        elif not include:
+            include = self.__include__
+        d = {k: v for k, v in self.__dict__.items() if k in include}
+        if 'create_time' in include and 'create_time' not in d:
+            pk = self.__table__.primary_key.columns[0]
+            d['create_time'] = extract_datetime(getattr(self, pk.name))
+        return d

@@ -4,7 +4,7 @@ import time
 import logging
 from enum import StrEnum
 from datetime import datetime, timedelta
-from typing import Union, Type, Self, Optional, Any
+from typing import Union, Type, Self
 from contextlib import contextmanager, ExitStack
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -15,12 +15,13 @@ from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import const
-from base import FullCache, Cache, extract_datetime
+from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, log_if_slow
-from base.misc import CacheMixin, TimeDeltaField, DoesNotExist, Base
+from base.misc import CacheMixin, TimeDeltaField, SqlGetterMixin
 from config import options
 from shared import invalidator, id_generator
 
@@ -50,48 +51,15 @@ def sqlite_connect(conn, rec):
     cur.close()
 
 
-class GetterMixin:
-    id: Any
-    __table__: Any
-    __include__ = ()
-
-    @classmethod
-    def mget(cls, keys) -> list[Optional[Self]]:
-        if not keys:
-            return []
-        pk = cls.__table__.primary_key.columns[0]
-        with Session() as session:
-            objects = session.query(cls).filter(pk.in_(keys)).all()
-            mapping = {getattr(o, pk.name): o for o in objects}
-            return [mapping.get(k) for k in keys]
-
-    @classmethod
-    def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
-        value = cls.mget([key])[0]
-        if value is None:
-            if default:
-                pk = cls.__table__.primary_key.columns[0]
-                value = cls(**{pk.name: pk.type.python_type(key)})
-            elif ensure:
-                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
-        return value
-
-    def to_dict(self, include=(), exclude=None):
-        columns = self.__table__.columns
-        if exclude is not None:
-            assert not include, '`include`, `exclude` are mutually exclusive'
-            include = self.__include__ + tuple(
-                c.name for c in columns if c.name not in exclude and c.name not in self.__include__)
-        elif not include:
-            include = self.__include__
-        d = {k: v for k, v in self.__dict__.items() if k in include}
-        if 'create_time' in include and 'create_time' not in d:
-            pk = self.__table__.primary_key.columns[0]
-            d['create_time'] = extract_datetime(getattr(self, pk.name))
-        return d
+Base = declarative_base()
 
 
-class Account(Base, GetterMixin):
+class BaseModel(Base):
+    __abstract__ = True
+    Session = Session
+
+
+class Account(BaseModel, SqlGetterMixin):
     __tablename__ = "accounts"
     __include__ = ('id', 'create_time')
 
