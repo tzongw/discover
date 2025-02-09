@@ -70,6 +70,14 @@ class BaseModel(Base):
     __abstract__ = True
     Session = Session
 
+    def __init__(self, **kwargs):
+        for column in self.__table__.columns:
+            if column.name in kwargs or column.default is None:
+                continue
+            arg = column.default.arg
+            kwargs[column.name] = arg(self) if callable(arg) else arg
+        super().__init__(**kwargs)
+
 
 tables: dict[str, Union[Type[BaseModel], Type[SqlGetterMixin]]] = {}
 
@@ -83,10 +91,10 @@ def table(tb):
 @table
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = "accounts"
-    __include__ = ('id', 'create_time')
+    __include__ = ('id', 'create_time', 'last_active')
     __exclude__ = ('hashed',)
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, default=id_generator.gen)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
     last_active = Column(DateTime, nullable=False, default=datetime.now)

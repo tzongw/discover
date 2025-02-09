@@ -334,9 +334,8 @@ def login(username: str, password: str):
     with Session.transaction() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
-            uid = id_generator.gen()
-            hashed = hash_password(uid, password)
-            account = Account(id=uid, username=username, hashed=hashed)
+            account = Account(username=username)
+            account.hashed = hash_password(account.id, password)
             session.add(account)
             dispatcher.signal(account)
         elif account.hashed != hash_password(account.id, password):
