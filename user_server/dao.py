@@ -21,7 +21,7 @@ import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, log_if_slow
-from base.misc import CacheMixin, TimeDeltaField, SqlGetterMixin
+from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin
 from config import options
 from shared import invalidator, id_generator
 
@@ -94,7 +94,7 @@ class Account(BaseModel, SqlGetterMixin):
     Index('idx_last_active', last_active)
 
 
-collections: dict[str, Union[Type[Document], Type[CacheMixin]]] = PascalCaseDict()
+collections: dict[str, Union[Type[Document], Type[GetterMixin]]] = PascalCaseDict()
 
 
 def collection(coll):
@@ -139,7 +139,7 @@ Role.mget = cache.mget
 
 @collection
 class Profile(Document, CacheMixin):
-    __include__ = ['name', 'addr', 'create_time']
+    __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
     id = IntField(primary_key=True, default=id_generator.gen)

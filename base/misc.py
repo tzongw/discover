@@ -358,6 +358,12 @@ def build_condition(tb, params: dict):
             conditions.append(column <= value)
         elif op == 'in':
             conditions.append(column.in_(value.split(',')))
+        elif op == 'nin':
+            conditions.append(column.not_in(value.split(',')))
+        elif op == 'null':
+            conditions.append(column.is_(None))
+        elif op == 'not_null':
+            conditions.append(column.is_not(None))
         else:
             raise ValueError(f'`{op}` unrecognized operator')
     return and_(*conditions)

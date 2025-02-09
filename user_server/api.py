@@ -19,7 +19,7 @@ import models
 from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
-from base.misc import DoesNotExist, build_order_by, build_condition
+from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
@@ -179,7 +179,8 @@ def create_document(collection: str, **kwargs):
     if doc_id is not None and coll.get(doc_id):
         raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
-    doc.invalidate(invalidator)  # notify full cache new document created
+    if issubclass(coll, CacheMixin):
+        doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
 
 
@@ -198,7 +199,8 @@ def update_document(collection: str, doc_id, **kwargs):
     if not doc.modify(**kwargs):  # not exists, when doc is default
         kwargs[coll.id.name] = doc_id
         doc = coll(**kwargs).save()
-    doc.invalidate(invalidator)
+    if issubclass(coll, CacheMixin):
+        doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
 
@@ -208,7 +210,8 @@ def delete_document(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.delete()
-    doc.invalidate(invalidator)
+    if issubclass(coll, CacheMixin):
+        doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
 
@@ -229,8 +232,9 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
     if docs:
         doc_ids = [doc.id for doc in docs]
         coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
-        for doc in docs:
-            doc.invalidate(invalidator)
+        if issubclass(coll, CacheMixin):
+            for doc in docs:
+                doc.invalidate(invalidator)
 
 
 @app.route('/eval', methods=['POST'])
