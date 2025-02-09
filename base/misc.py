@@ -294,7 +294,7 @@ class SqlGetterMixin:
         with cls.Session() as session:
             objects = session.query(cls).filter(pk.in_(keys)).all()
             mapping = {getattr(o, pk.name): o for o in objects}
-            return [mapping.get(k) for k in keys]
+            return [mapping.get(pk.type.python_type(k)) for k in keys]
 
     @classmethod
     def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:

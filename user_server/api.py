@@ -11,6 +11,7 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
+from sqlalchemy import DateTime
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -153,6 +154,56 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
     }
 
 
+@app.route('/tables/<table>/rows', methods=['POST'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def create_row(table: str, **kwargs):
+    tb = tables[table]
+    pk = tb.__table__.primary_key.columns[0]
+    row_id = kwargs.get(pk.name)
+    if row_id is not None and tb.get(row_id):
+        raise Conflict(f'row `{row_id}` already exists')
+    with Session() as session:
+        row = tb(**kwargs)
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+    return row.to_dict(exclude=[])
+
+
+@app.route('/tables/<table>/rows/<row_id>')
+def get_row(table: str, row_id):
+    tb = tables[table]
+    row = tb.get(row_id, ensure=True)
+    return row.to_dict(exclude=[])
+
+
+@app.route('/tables/<table>/rows/<row_id>', methods=['PATCH'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def update_row(table: str, row_id, **kwargs):
+    tb = tables[table]
+    pk = tb.__table__.primary_key.columns[0]
+    for key, value in kwargs.items():
+        if key == pk.name or key in tb.__exclude__:
+            raise Forbidden(key)
+        column = getattr(tb, key)
+        if isinstance(column.type, DateTime):
+            kwargs[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+    with Session() as session:
+        session.query(tb).filter(pk == row_id).update(kwargs)
+    row = tb.get(row_id, ensure=True)
+    return row.to_dict(exclude=[])
+
+
+@app.route('/tables/<table>/rows/<row_id>', methods=['DELETE'])
+def delete_row(table: str, row_id):
+    tb = tables[table]
+    pk = tb.__table__.primary_key.columns[0]
+    row = tb.get(row_id, ensure=True)
+    with Session() as session:
+        session.query(tb).filter(pk == row_id).delete()
+    return row.to_dict(exclude=[])
+
+
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
              'count': fields.Int(validate=Range(min=1, max=50)),
@@ -205,7 +256,6 @@ def update_document(collection: str, doc_id, **kwargs):
 
 
 @app.route('/collections/<collection>/documents/<doc_id>', methods=['DELETE'])
-@use_kwargs({}, location='json_or_form')
 def delete_document(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
