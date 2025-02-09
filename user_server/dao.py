@@ -84,6 +84,7 @@ def table(tb):
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = "accounts"
     __include__ = ('id', 'create_time')
+    __exclude__ = ('hashed',)
 
     id = Column(Integer, primary_key=True)
     username = Column(String(40), unique=True, nullable=False)

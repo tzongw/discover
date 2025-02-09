@@ -86,6 +86,7 @@ class GetterMixin:
     _fields: dict
     _data: dict
     __include__ = ()
+    __exclude__ = ()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
@@ -112,7 +113,7 @@ class GetterMixin:
                                                field not in exclude and field not in self.__include__)
         elif not include:
             include = self.__include__
-        d = {k: v for k, v in self._data.items() if k in include}
+        d = {k: v for k, v in self._data.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
             d['create_time'] = extract_datetime(self.id)
         return d
@@ -283,6 +284,7 @@ class SqlGetterMixin:
     id: Any
     __table__: Any
     __include__ = ()
+    __exclude__ = ()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
@@ -313,7 +315,7 @@ class SqlGetterMixin:
                 c.name for c in columns if c.name not in exclude and c.name not in self.__include__)
         elif not include:
             include = self.__include__
-        d = {k: v for k, v in self.__dict__.items() if k in include}
+        d = {k: v for k, v in self.__dict__.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
             pk = self.__table__.primary_key.columns[0]
             d['create_time'] = extract_datetime(getattr(self, pk.name))
