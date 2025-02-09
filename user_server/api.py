@@ -19,11 +19,11 @@ import models
 from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
-from base.misc import DoesNotExist
+from base.misc import DoesNotExist, build_order_by, build_condition
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
-from dao import Account, Session, collections
+from dao import Account, Session, collections, tables
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
 from shared import session_key, async_task, run_in_process, script, scheduler
 import push
@@ -135,12 +135,30 @@ def streaming_response():
     return app.response_class(stream_with_context(generate()))
 
 
+@app.route('/tables/<table>/rows')
+@use_kwargs({'cursor': cursor_filed,
+             'count': fields.Int(validate=Range(min=1, max=50)),
+             'order_by': fields.DelimitedList(fields.Str())},
+            location='query', unknown='include')
+def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
+    tb = tables[table]
+    with Session() as session:
+        order_by = build_order_by(tb, order_by)
+        cond = build_condition(tb, kwargs)
+        query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
+        rows = [row.to_dict(exclude=[]) for row in query]
+    return {
+        'rows': rows,
+        'cursor': '' if len(rows) < count else str(cursor + count),
+    }
+
+
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
              'count': fields.Int(validate=Range(min=1, max=50)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
-def get_documents(collection: str, cursor=0, count=10, order_by=None, **kwargs):
+def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
     coll = collections[collection]
     order_by = order_by or [f'-{coll.id.name}']
     for key, value in kwargs.items():

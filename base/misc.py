@@ -13,6 +13,7 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, FloatField
+from sqlalchemy import and_
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -317,3 +318,44 @@ class SqlGetterMixin:
             pk = self.__table__.primary_key.columns[0]
             d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
+
+
+def build_order_by(tb, keys):
+    if not keys:
+        pk = tb.__table__.primary_key.columns[0]
+        return [pk.desc()]
+    order_by = []
+    for key in keys:
+        asc = True
+        if key[0] == '-':
+            asc = False
+            key = key[1:]
+        column = getattr(tb, key)
+        order_by.append(column.asc() if asc else column.desc())
+    return order_by
+
+
+def build_condition(tb, params: dict):
+    conditions = []
+    for key, value in params.items():
+        segments = key.split('__', maxsplit=1)
+        key = segments[0]
+        op = segments[1] if len(segments) > 1 else 'eq'
+        column = getattr(tb, key)
+        if op == 'eq':
+            conditions.append(column == value)
+        elif op == 'ne':
+            conditions.append(column != value)
+        elif op == 'gt':
+            conditions.append(column > value)
+        elif op == 'gte':
+            conditions.append(column >= value)
+        elif op == 'lt':
+            conditions.append(column < value)
+        elif op == 'lte':
+            conditions.append(column <= value)
+        elif op == 'in':
+            conditions.append(column.in_(value.split(',')))
+        else:
+            raise ValueError(f'`{op}` unrecognized operator')
+    return and_(*conditions)

@@ -71,6 +71,16 @@ class BaseModel(Base):
     Session = Session
 
 
+tables: dict[str, Union[Type[BaseModel], Type[SqlGetterMixin]]] = {}
+
+
+def table(tb):
+    assert tb.__tablename__ not in tables
+    tables[tb.__tablename__] = tb
+    return tb
+
+
+@table
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = "accounts"
     __include__ = ('id', 'create_time')
