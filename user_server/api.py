@@ -204,6 +204,29 @@ def delete_row(table: str, row_id):
     return row.to_dict(exclude=[])
 
 
+@app.route('/tables/<table>/rows/<row_id>/columns/<column>', methods=['PATCH'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def move_rows(table: str, row_id, column, **kwargs):
+    tb = tables[table]
+    pk = tb.__table__.primary_key.columns[0]
+    col = getattr(tb, column)
+    row = tb.get(row_id, ensure=True)
+    rank = getattr(row, column)
+    kwargs[f'{column}__gte'] = rank
+    kwargs[f'{pk.name}__ne'] = row_id
+    rows = []
+    with Session() as session:
+        cond = build_condition(tb, kwargs)
+        for row in session.query(tb).filter(cond).order_by(col.asc()):
+            if getattr(row, column) != rank:
+                break
+            rows.append(row)
+            rank += 1
+        if rows:
+            row_ids = [getattr(row, pk.name) for row in rows]
+            session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
+
+
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
              'count': fields.Int(validate=Range(min=1, max=50)),
@@ -269,16 +292,16 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    target = coll.get(doc_id, ensure=True)
-    value = target[field]
-    kwargs[f'{field}__gte'] = value
+    doc = coll.get(doc_id, ensure=True)
+    rank = doc[field]
+    kwargs[f'{field}__gte'] = rank
     kwargs[f'{coll.id.name}__ne'] = doc_id
     docs = []
     for doc in coll.objects(**kwargs).only(field).order_by(field):
-        if doc[field] != value:
+        if doc[field] != rank:
             break
         docs.append(doc)
-        value += 1
+        rank += 1
     if docs:
         doc_ids = [doc.id for doc in docs]
         coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
