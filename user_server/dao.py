@@ -38,7 +38,7 @@ class SessionMaker(sessionmaker):
 
 tx_timeout = 0.1
 tx_lock = threading.RLock()
-echo = {'debug': 'debug', 'info': True}.get(options.logging, False)
+echo = options.env is const.Environment.DEV
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': tx_timeout})
 Session = SessionMaker(engine, expire_on_commit=False)
 
@@ -49,6 +49,18 @@ def sqlite_connect(conn, rec):
     cur.execute('PRAGMA journal_mode = WAL')
     cur.execute('PRAGMA synchronous = NORMAL')
     cur.close()
+
+
+@event.listens_for(engine, 'before_cursor_execute')
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    context.query_start_time = time.time()
+
+
+@event.listens_for(engine, 'after_cursor_execute')
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total_time = time.time() - context.query_start_time
+    if total_time > tx_timeout:
+        logging.info(f'slow query: {statement} parameters: {parameters} time: {total_time:.2f}s')
 
 
 Base = declarative_base()
@@ -191,9 +203,9 @@ cache.listen(invalidator, TokenSetting.__name__)
 class CommandLogger(monitoring.CommandListener):
     def started(self, event):
         if event.command:
-            logging.debug('Command {0.command} with request id '
-                          '{0.request_id} started on server '
-                          '{0.connection_id}'.format(event))
+            logging.info('Command {0.command} with request id '
+                         '{0.request_id} started on server '
+                         '{0.connection_id}'.format(event))
 
     def succeeded(self, event):
         pass
