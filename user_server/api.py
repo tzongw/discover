@@ -158,10 +158,10 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def create_row(table: str, **kwargs):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
-    row_id = kwargs.get(pk.name)
-    if row_id is not None and tb.get(row_id):
-        raise Conflict(f'row `{row_id}` already exists')
+    for key, value in kwargs.items():
+        column = getattr(tb, key)
+        if isinstance(column.type, DateTime):
+            kwargs[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
     with Session() as session:
         row = tb(**kwargs)
         session.add(row)
@@ -209,6 +209,8 @@ def delete_row(table: str, row_id):
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
     pk = tb.__table__.primary_key.columns[0]
+    if column == pk.name or column in tb.__exclude__:
+        raise Forbidden(column)
     col = getattr(tb, column)
     row = tb.get(row_id, ensure=True)
     rank = getattr(row, column)
@@ -250,7 +252,7 @@ def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
 def create_document(collection: str, **kwargs):
     coll = collections[collection]
     doc_id = kwargs.get(coll.id.name)
-    if doc_id is not None and coll.get(doc_id):
+    if doc_id is not None and coll.get(doc_id):  # save will update doc unexpectedly if doc_id already exists
         raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
     if issubclass(coll, CacheMixin):
@@ -269,6 +271,9 @@ def get_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
+    for key in kwargs:
+        if key in coll.__exclude__:
+            raise Forbidden(key)
     doc = coll.get(doc_id, ensure=True)
     if not doc.modify(**kwargs):  # not exists, when doc is default
         kwargs[coll.id.name] = doc_id
@@ -292,6 +297,8 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
+    if field in coll.__exclude__:
+        raise Forbidden(field)
     doc = coll.get(doc_id, ensure=True)
     rank = doc[field]
     kwargs[f'{field}__gte'] = rank
