@@ -91,12 +91,13 @@ def table(tb):
 @table
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = "accounts"
-    __include__ = ('id', 'create_time', 'last_active')
+    __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = ('hashed',)
 
     id = Column(Integer, primary_key=True, default=id_generator.gen)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
+    age = Column(Integer, nullable=False, default=20, server_default='20')
     last_active = Column(DateTime, nullable=False, default=datetime.now)
 
     Index('idx_last_active', last_active)
