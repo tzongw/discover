@@ -13,7 +13,7 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, FloatField
-from sqlalchemy import and_
+from sqlalchemy import and_, DateTime
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -367,3 +367,30 @@ def build_condition(tb, params: dict):
         else:
             raise ValueError(f'`{op}` unrecognized operator')
     return and_(*conditions)
+
+
+def convert_type(tb, params: dict):
+    for key, value in params.items():
+        column = getattr(tb, key)
+        if isinstance(column.type, DateTime):
+            params[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+
+
+def build_operation(tb, params: dict):
+    operation = {}
+    for key, value in params.items():
+        segments = key.split('__', maxsplit=1)
+        key = segments[-1]
+        op = segments[0] if len(segments) > 1 else 'set'
+        column = getattr(tb, key)
+        if op == 'set':
+            operation[key] = value
+        elif op == 'unset':
+            operation[key] = None
+        elif op == 'inc':
+            operation[key] = column + value
+        elif op == 'dec':
+            operation[key] = column - value
+        else:
+            raise ValueError(f'`{op}` unrecognized operator')
+    return operation

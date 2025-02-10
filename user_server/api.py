@@ -11,7 +11,6 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
-from sqlalchemy import DateTime
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -20,7 +19,7 @@ import models
 from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
-from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition
+from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
@@ -158,10 +157,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def create_row(table: str, **kwargs):
     tb = tables[table]
-    for key, value in kwargs.items():
-        column = getattr(tb, key)
-        if isinstance(column.type, DateTime):
-            kwargs[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+    convert_type(tb, kwargs)
     with Session() as session:
         row = tb(**kwargs)
         session.add(row)
@@ -182,12 +178,11 @@ def get_row(table: str, row_id):
 def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
     pk = tb.__table__.primary_key.columns[0]
+    kwargs = build_operation(tb, kwargs)
     for key, value in kwargs.items():
         if key == pk.name or key in tb.__exclude__:
             raise Forbidden(key)
-        column = getattr(tb, key)
-        if isinstance(column.type, DateTime):
-            kwargs[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+    convert_type(tb, kwargs)
     with Session() as session:
         session.query(tb).filter(pk == row_id).update(kwargs)
     row = tb.get(row_id, ensure=True)
