@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import Table
 
 from alembic import context
 
@@ -28,7 +29,7 @@ target_metadata = Base.metadata
 
 
 def include_object(object, name: str, type_, reflected, compare_to):
-    if '_fts_' in name or '_litestream_' in name or name.endswith('_fts'):
+    if isinstance(object, Table) and '_fts_' in name or '_litestream_' in name or name.endswith('_fts'):
         return False
     return True
 
