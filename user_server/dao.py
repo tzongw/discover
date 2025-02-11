@@ -5,7 +5,7 @@ import logging
 from enum import StrEnum
 from datetime import datetime, timedelta
 from typing import Union, Type, Self
-from contextlib import contextmanager, ExitStack
+from contextlib import contextmanager
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
@@ -29,11 +29,11 @@ from shared import invalidator, id_generator
 class SessionMaker(sessionmaker):
     @contextmanager
     def transaction(self):
-        with tx_lock, ExitStack() as stack, self() as session, session.begin():
+        with tx_lock, self() as session, session.begin():
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
             start_time = time.time()
-            stack.callback(log_if_slow, start_time, tx_timeout, 'slow transaction')
             yield session
+            log_if_slow(start_time, tx_timeout, 'slow transaction')
 
 
 tx_timeout = 0.1
@@ -58,9 +58,9 @@ def before_cursor_execute(conn, cursor, statement, parameters, context, executem
 
 @event.listens_for(engine, 'after_cursor_execute')
 def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-    total_time = time.time() - context.query_start_time
-    if total_time > tx_timeout:
-        logging.info(f'slow query: {statement} parameters: {parameters} time: {total_time:.2f}s')
+    start_time = context.query_start_time
+    message = f'slow query: {statement} parameters: {parameters}'
+    log_if_slow(start_time, tx_timeout, message)
 
 
 Base = declarative_base()

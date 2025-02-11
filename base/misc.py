@@ -13,7 +13,7 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.local import local
 from mongoengine import EmbeddedDocument, FloatField
-from sqlalchemy import and_, DateTime
+from sqlalchemy import and_, DateTime, Date
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -374,6 +374,8 @@ def convert_type(tb, params: dict):
         column = getattr(tb, key)
         if isinstance(column.type, DateTime):
             params[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+        elif isinstance(column.type, Date):
+            params[key] = datetime.strptime(value, '%Y-%m-%d').date()
 
 
 def build_operation(tb, params: dict):
