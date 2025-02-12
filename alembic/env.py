@@ -29,7 +29,7 @@ target_metadata = Base.metadata
 
 
 def include_object(object, name: str, type_, reflected, compare_to):
-    if isinstance(object, Table) and '_fts_' in name or '_litestream_' in name or name.endswith('_fts'):
+    if isinstance(object, Table) and ('_fts_' in name or '_litestream_' in name or name.endswith('_fts')):
         return False
     return True
 
