@@ -56,12 +56,12 @@ class Poller:
                 stack.callback(lambda: status is PollStatus.ASAP and async_task.publish(task))  # without lock
                 if status is not PollStatus.DONE:
                     return
-                logging.debug(f'no jobs, stop {queue}')
+                logging.debug(f'no jobs, stop {group} {queue}')
                 task_id = self._task_id(group, queue)
                 async_task.cancel(task_id)
                 status = PollStatus(config.poll(queue))
                 if status is not PollStatus.DONE:  # race
-                    logging.info(f'new jobs, restart {queue}')
+                    logging.info(f'new jobs, restart {group} {queue}')
                     async_task.post(task_id, task, config.interval, loop=True)
 
         self.poll_task = poll_task
