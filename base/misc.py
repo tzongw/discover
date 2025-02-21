@@ -19,6 +19,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
+from .utils import base62
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -146,28 +147,18 @@ class TtlCacheMixin(CacheMixin):
 
 
 class RedisCacheMixin(CacheMixin):
-    __fields_version__: int
+    __fields_version__: str = None
 
     @classmethod
     def make_key(cls, key):
-        if '__fields_version__' not in cls.__dict__:
-            cls.__fields_version__ = crc32(' '.join(cls._fields).encode())
-        return f'{cls.__name__}.{cls.__fields_version__}:{cls.id.to_python(key)}'
+        v = cls.__fields_version__
+        if v is None:
+            v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
+        return f'{cls.__name__}.{v}:{cls.id.to_python(key)}'
 
     def invalidate(self, invalidator: Invalidator):
         key = self.make_key(self.id)
         invalidator.redis.delete(key)
-
-
-class MakeKeyMixin:
-    __fields__: dict
-    __fields_version__: int
-
-    @classmethod
-    def make_key(cls, key):
-        if '__fields_version__' not in cls.__dict__:
-            cls.__fields_version__ = crc32(' '.join(cls.__fields__).encode())
-        return f'{cls.__name__}.{cls.__fields_version__}:{key}'
 
 
 class Semaphore:
