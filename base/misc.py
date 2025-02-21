@@ -141,7 +141,7 @@ class TtlCacheMixin(CacheMixin):
     __cache_ttl__ = timedelta(seconds=1)
 
     @classmethod
-    def mget(cls, keys, *_, **__) -> list[Optional[Self]]:
+    def mget(cls, keys) -> list[Optional[Self]]:
         return [(value, cls.__cache_ttl__) for value in super().mget(keys)]
 
 
@@ -149,10 +149,14 @@ class RedisCacheMixin(CacheMixin):
     __fields_version__: int
 
     @classmethod
-    def make_key(cls, key, *_, **__):
+    def make_key(cls, key):
         if '__fields_version__' not in cls.__dict__:
             cls.__fields_version__ = crc32(' '.join(cls._fields).encode())
         return f'{cls.__name__}.{cls.__fields_version__}:{cls.id.to_python(key)}'
+
+    def invalidate(self, invalidator: Invalidator):
+        key = self.make_key(self.id)
+        invalidator.redis.delete(key)
 
 
 class MakeKeyMixin:
@@ -160,7 +164,7 @@ class MakeKeyMixin:
     __fields_version__: int
 
     @classmethod
-    def make_key(cls, key, *_, **__):
+    def make_key(cls, key):
         if '__fields_version__' not in cls.__dict__:
             cls.__fields_version__ = crc32(' '.join(cls.__fields__).encode())
         return f'{cls.__name__}.{cls.__fields_version__}:{key}'
