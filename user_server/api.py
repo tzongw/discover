@@ -23,7 +23,7 @@ from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition,
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
-from dao import Account, Session, collections, tables
+from dao import Account, Session, collections, tables, Config, config_models
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
 from shared import session_key, async_task, run_in_process, script, scheduler
 import push
@@ -221,6 +221,32 @@ def move_rows(table: str, row_id, column, **kwargs):
             rank += 1
         if row_ids:
             session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
+
+
+@app.route('/tables/configs/rows/<int:row_id>')
+def get_config(row_id):
+    config = Config.get(row_id)
+    model = config_models[row_id]
+    return model.parse_obj(config.value) if config else model()
+
+
+@app.route('/tables/configs/rows/<int:row_id>', methods=['PATCH'])
+@use_kwargs({}, location='json_or_form', unknown='include')
+def update_config(row_id, **kwargs):
+    model = config_models[row_id]
+    now = datetime.now()
+    with Session.transaction() as session:
+        config = session.query(Config).filter(Config.id == row_id).first()
+        if config:
+            obj = config.value | kwargs
+            value = model.parse_obj(obj)
+            config.value = value.dict()
+            config.update_time = now
+        else:
+            value = model(**kwargs)
+            config = Config(id=row_id, value=value.dict(), update_time=now)
+            session.add(config)
+    return value
 
 
 @app.route('/collections/<collection>/documents')

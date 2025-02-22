@@ -2,7 +2,7 @@
 from __future__ import annotations
 import time
 import logging
-from enum import StrEnum
+from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
 from typing import Union, Type, Self
 from contextlib import contextmanager
@@ -10,7 +10,7 @@ from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
 from pymongo import monitoring
-from sqlalchemy import Integer
+from sqlalchemy import Integer, JSON
 from sqlalchemy import Column, Index
 from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
@@ -24,6 +24,7 @@ from base.utils import PascalCaseDict, log_if_slow
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin
 from config import options
 from shared import invalidator, id_generator
+from models import QueueConfig
 
 
 class SessionMaker(sessionmaker):
@@ -90,7 +91,7 @@ def table(tb):
 
 @table
 class Account(BaseModel, SqlGetterMixin):
-    __tablename__ = "accounts"
+    __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = ('hashed',)
 
@@ -101,6 +102,23 @@ class Account(BaseModel, SqlGetterMixin):
     last_active = Column(DateTime, nullable=False, default=datetime.now)
 
     Index('idx_last_active', last_active)
+
+
+class ConfigKey(IntEnum):
+    QUEUE = 1
+
+
+config_models = {
+    ConfigKey.QUEUE: QueueConfig
+}
+
+
+class Config(BaseModel, SqlGetterMixin):
+    __tablename__ = 'configs'
+
+    id = Column(Integer, primary_key=True)
+    value = Column(JSON, nullable=False)
+    update_time = Column(DateTime, nullable=False, default=datetime.now)
 
 
 collections: dict[str, Union[Type[Document], Type[GetterMixin]]] = PascalCaseDict()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 
@@ -16,3 +16,8 @@ class Runtime(BaseModel):
     address: str
     pid: int
     log_level: str
+
+
+class QueueConfig(BaseModel):
+    limit = 1024
+    regions = 10
