@@ -21,3 +21,7 @@ class Runtime(BaseModel):
 class QueueConfig(BaseModel):
     limit = 1024
     regions = 10
+
+
+class SmsConfig(BaseModel):
+    cooldown = timedelta(minutes=1)

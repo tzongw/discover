@@ -225,9 +225,7 @@ def move_rows(table: str, row_id, column, **kwargs):
 
 @app.route('/tables/configs/rows/<int:row_id>')
 def get_config(row_id):
-    config = Config.get(row_id)
-    model = config_models[row_id]
-    return model.parse_obj(config.value) if config else model()
+    return Config.get(row_id)
 
 
 @app.route('/tables/configs/rows/<int:row_id>', methods=['PATCH'])
@@ -240,11 +238,11 @@ def update_config(row_id, **kwargs):
         if config:
             obj = config.value | kwargs
             value = model.parse_obj(obj)
-            config.value = value.dict()
+            config.value = json.loads(value.json())
             config.update_time = now
         else:
             value = model(**kwargs)
-            config = Config(id=row_id, value=value.dict(), update_time=now)
+            config = Config(id=row_id, value=json.loads(value.json()), update_time=now)
             session.add(config)
     return value
 

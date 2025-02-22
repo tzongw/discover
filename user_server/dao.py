@@ -24,7 +24,7 @@ from base.utils import PascalCaseDict, log_if_slow
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin
 from config import options
 from shared import invalidator, id_generator
-from models import QueueConfig
+from models import QueueConfig, SmsConfig
 
 
 class SessionMaker(sessionmaker):
@@ -106,11 +106,15 @@ class Account(BaseModel, SqlGetterMixin):
 
 class ConfigKey(IntEnum):
     QUEUE = 1
+    SMS = 2
 
 
 config_models = {
-    ConfigKey.QUEUE: QueueConfig
+    ConfigKey.QUEUE: QueueConfig,
+    ConfigKey.SMS: SmsConfig,
 }
+
+ConfigModels = QueueConfig | SmsConfig
 
 
 class Config(BaseModel, SqlGetterMixin):
@@ -119,6 +123,19 @@ class Config(BaseModel, SqlGetterMixin):
     id = Column(Integer, primary_key=True)
     value = Column(JSON, nullable=False)
     update_time = Column(DateTime, nullable=False, default=datetime.now)
+
+    @classmethod
+    def mget(cls, keys) -> list[ConfigModels]:
+        values = []
+        for key, config in zip(keys, super().mget(keys)):
+            model = config_models[key]
+            value = model.parse_obj(config.value) if config else model()
+            values.append(value)
+        return values
+
+    @classmethod
+    def get(cls, key, *, ensure=False, default=True) -> ConfigModels:
+        return super().get(key, ensure=ensure, default=default)
 
 
 collections: dict[str, Union[Type[Document], Type[GetterMixin]]] = PascalCaseDict()
