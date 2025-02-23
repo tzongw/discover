@@ -61,7 +61,7 @@ def before_cursor_execute(conn, cursor, statement, parameters, context, executem
 def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     start_time = context.query_start_time
     message = f'slow query: {statement} parameters: {parameters}'
-    log_if_slow(start_time, tx_timeout, message)
+    log_if_slow(start_time, options.slow_log, message)
 
 
 Base = declarative_base()

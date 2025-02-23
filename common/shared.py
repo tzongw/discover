@@ -75,9 +75,9 @@ def _on_tick(_, sid):
 
 @dataclass
 class Status:
-    inited: bool = False
-    exiting: bool = False
-    sysexit: bool = True
+    inited = False
+    exiting = False
+    sysexit = True
 
 
 status = Status()

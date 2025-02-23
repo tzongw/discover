@@ -32,7 +32,7 @@ class LogSuppress(contextlib.suppress):
 def log_if_slow(start_time, threshold, message):
     elapsed = time.time() - start_time
     if elapsed > threshold:
-        logging.warning(f'{message} elapsed: {elapsed:.2f}s\n' + ''.join(traceback.format_stack()[:-1]))
+        logging.warning(f'elapsed: {elapsed:.2f}s {message}\n' + ''.join(traceback.format_stack()[:-1]))
 
 
 class Addr:
