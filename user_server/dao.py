@@ -4,7 +4,7 @@ import time
 import logging
 from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
-from typing import Union, Type, Self
+from typing import Type, Self
 from contextlib import contextmanager
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -80,7 +80,7 @@ class BaseModel(Base):
         super().__init__(**kwargs)
 
 
-tables: dict[str, Union[Type[BaseModel], Type[SqlGetterMixin]]] = {}
+tables: dict[str, Type[BaseModel | SqlGetterMixin]] = {}
 
 
 def table(tb):
@@ -138,7 +138,7 @@ class Config(BaseModel, SqlGetterMixin):
         return super().get(key, ensure=ensure, default=default)
 
 
-collections: dict[str, Union[Type[Document], Type[GetterMixin]]] = PascalCaseDict()
+collections: dict[str, Type[Document | GetterMixin]] = PascalCaseDict()
 
 
 def collection(coll):
