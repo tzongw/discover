@@ -13,22 +13,18 @@ from config import options
 class Handler:
     def set_context(self, conn_id, key, value):
         if client := clients.get(conn_id):
-            logging.debug(f'{client} {key} {value}')
             client.set_context(key, value)
 
     def unset_context(self, conn_id, key, value):
         if client := clients.get(conn_id):
-            logging.debug(f'{client} {key} {value}')
             client.unset_context(key, value)
 
     def remove_conn(self, conn_id):
         if client := clients.get(conn_id):
-            logging.debug(f'{client}')
             client.stop()
 
     def _send_message(self, conn_id, message):
         if client := clients.get(conn_id):
-            logging.debug(f'{client} {message}')
             client.send(message)
 
     send_text = _send_message
@@ -36,18 +32,15 @@ class Handler:
 
     def join_group(self, conn_id, group):
         if client := clients.get(conn_id):
-            logging.debug(f'{client} {group}')
             client.groups.add(group)
             groups[group].add(client)
 
     def leave_group(self, conn_id, group):
         if client := clients.get(conn_id):
-            logging.debug(f'{client} {group}')
             client.groups.discard(group)
             remove_from_group(client, group)
 
     def _broadcast_message(self, group, exclude, message):
-        logging.debug(f'{group} {exclude} {message}')
         members = groups.get(group, []) if group else clients.values()
         for client in members:  # type: Client
             if client.conn_id not in exclude:
