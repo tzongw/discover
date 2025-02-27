@@ -52,17 +52,17 @@ def sqlite_connect(conn, rec):
     cur.close()
 
 
-@event.listens_for(engine, 'before_cursor_execute')
-def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-    context.query_start_time = time.time()
+if slow_log := options.slow_log:
+    @event.listens_for(engine, 'before_cursor_execute')
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        context.query_start_time = time.time()
 
 
-@event.listens_for(engine, 'after_cursor_execute')
-def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-    start_time = context.query_start_time
-    message = f'slow query: {statement} parameters: {parameters}'
-    log_if_slow(start_time, options.slow_log, message)
-
+    @event.listens_for(engine, 'after_cursor_execute')
+    def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        start_time = context.query_start_time
+        message = f'slow query: {statement} parameters: {parameters}'
+        log_if_slow(start_time, slow_log, message)
 
 Base = declarative_base()
 
@@ -135,6 +135,7 @@ class Config(BaseModel, SqlGetterMixin):
 
     @classmethod
     def get(cls, key, *, ensure=False, default=True) -> ConfigModels:
+        assert default
         return super().get(key, ensure=ensure, default=default)
 
 
