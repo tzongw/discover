@@ -11,16 +11,6 @@ local function timestamp()
     return result[1] + result[2] / 1000000
 end
 
-local function ztimer_add(keys, args)
-    redis.call('ZADD', keys[1], timestamp() + args[3], args[1])
-    local loop = '0'
-    if args[4] then
-        loop = '1'
-    end
-    local meta = loop .. '|' .. args[3] .. '|' .. args[2]
-    return redis.call('HSET', keys[2], args[1], meta)
-end
-
 local function ztimer_poll(keys, args)
     local ts = timestamp()
     local timeouts = redis.call('ZRANGE', keys[1], '-inf', ts, 'BYSCORE', 'LIMIT', 0, args[1])
@@ -52,7 +42,6 @@ local function ztimer_poll(keys, args)
     end
     return result
 end
-redis.register_function('ztimer_add', ztimer_add)
 redis.register_function('ztimer_poll', ztimer_poll)
 """
 
@@ -70,10 +59,12 @@ class ZTimer:
         self._meta_key = f'ztimer.meta:{{{service}}}'
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
-        keys_and_args = [self._timeout_key, self._meta_key, key, data, interval.total_seconds()]
-        if loop:
-            keys_and_args.append('LOOP')
-        return self.redis.fcall('ztimer_add', 2, *keys_and_args)
+        interval = interval.total_seconds()
+        meta = f'{1 if loop else 0}|{interval}|{data}'
+        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
+            pipe.zadd(self._timeout_key, {key: time.time() + interval})
+            pipe.hset(self._meta_key, key, meta)
+            return pipe.execute()[0]
 
     def kill(self, key: str):
         with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
