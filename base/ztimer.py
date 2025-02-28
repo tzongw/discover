@@ -6,14 +6,9 @@ from redis import Redis, RedisCluster
 from .utils import redis_name
 
 _SCRIPT = """#!lua name=ztimer
-local function timestamp()
-    local result = redis.call('TIME')
-    return result[1] + result[2] / 1000000
-end
-
 local function ztimer_poll(keys, args)
-    local ts = timestamp()
-    local timeouts = redis.call('ZRANGE', keys[1], '-inf', ts, 'BYSCORE', 'LIMIT', 0, args[1])
+    local ts = args[1]
+    local timeouts = redis.call('ZRANGE', keys[1], '-inf', ts, 'BYSCORE', 'LIMIT', 0, args[2])
     local result = {}
     if #timeouts == 0 then
         return result
@@ -91,6 +86,6 @@ class ZTimer:
         }
 
     def poll(self, limit=100):
-        keys_and_args = [self._timeout_key, self._meta_key, limit]
+        keys_and_args = [self._timeout_key, self._meta_key, time.time(), limit]
         res = self.redis.fcall('ztimer_poll', 2, *keys_and_args)
         return dict(zip(res[::2], res[1::2]))

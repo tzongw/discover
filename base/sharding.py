@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import random
 import bisect
+import time
 from datetime import timedelta, datetime
 from binascii import crc32
 from random import shuffle
@@ -313,9 +314,10 @@ class ShardingZTimer(ZTimer):
 
     def poll(self, limit=100):
         with self.redis.pipeline(transaction=False) as pipe:
+            now = time.time()
             for timeout_key, meta_key in zip(self._sharding_key.all_sharded_keys(self._orig_timeout_key),
                                              self._sharding_key.all_sharded_keys(self._orig_meta_key)):
-                keys_and_args = [timeout_key, meta_key, limit]
+                keys_and_args = [timeout_key, meta_key, now, limit]
                 pipe.fcall('ztimer_poll', 2, *keys_and_args)
             res = sum(pipe.execute(), [])
         return dict(zip(res[::2], res[1::2]))
