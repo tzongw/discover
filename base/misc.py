@@ -78,6 +78,8 @@ def make_response(app, rv):
         rv = rv.dict()
     elif dataclasses.is_dataclass(rv):
         rv = dataclasses.asdict(rv)
+    elif isinstance(rv, list):
+        raise ValueError('return dict instead')
     return Flask.make_response(app, rv)
 
 
