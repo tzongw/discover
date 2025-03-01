@@ -28,19 +28,22 @@ from models import QueueConfig, SmsConfig
 
 
 class SessionMaker(sessionmaker):
+    def __init__(self, bind, *, tx_slow=0.1, **kwargs):
+        super().__init__(bind, **kwargs)
+        self.tx_slow = tx_slow
+        self.tx_lock = threading.RLock()
+
     @contextmanager
     def transaction(self):
-        with tx_lock, self() as session, session.begin():
+        with self.tx_lock, self() as session, session.begin():
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
             start_time = time.time()
             yield session
-            log_if_slow(start_time, tx_timeout, 'slow transaction')
+            log_if_slow(start_time, self.tx_slow, 'slow transaction')
 
 
-tx_timeout = 0.1
-tx_lock = threading.RLock()
 echo = options.env is const.Environment.DEV
-engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': tx_timeout})
+engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
 Session = SessionMaker(engine, expire_on_commit=False)
 
 
