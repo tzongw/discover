@@ -286,8 +286,8 @@ class ShardingInventory(Inventory):
 
 
 class ShardingZTimer(ZTimer):
-    def __init__(self, redis: RedisCluster, service, *, sharding_key: ShardingKey):
-        super().__init__(redis, service)
+    def __init__(self, redis: RedisCluster, biz, *, sharding_key: ShardingKey):
+        super().__init__(redis, biz)
         self._sharding_key = sharding_key
         self._orig_timeout_key = self._timeout_key
         self._orig_meta_key = self._meta_key
@@ -324,8 +324,8 @@ class ShardingZTimer(ZTimer):
 
 
 class MigratingZTimer(ShardingZTimer):
-    def __init__(self, redis, service, *, sharding_key: ShardingKey, old_timer: ZTimer, start_time: datetime):
-        super().__init__(redis, service, sharding_key=sharding_key)
+    def __init__(self, redis, biz, *, sharding_key: ShardingKey, old_timer: ZTimer, start_time: datetime):
+        super().__init__(redis, biz, sharding_key=sharding_key)
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 

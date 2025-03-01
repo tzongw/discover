@@ -25,8 +25,8 @@ if options.env is const.Environment.DEV:
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
 
-ztimer = ShardingZTimer(redis, 'user', sharding_key=ShardingKey(shards=3)) if isinstance(redis, RedisCluster) \
-    else ZTimer(redis, 'user')
+ztimer = ShardingZTimer(redis, app_name, sharding_key=ShardingKey(shards=3)) if isinstance(redis, RedisCluster) \
+    else ZTimer(redis, app_name)
 
 
 def online_key(uid: int):

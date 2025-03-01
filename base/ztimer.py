@@ -44,14 +44,14 @@ redis.register_function('ztimer_poll', ztimer_poll)
 class ZTimer:
     loaded = set()
 
-    def __init__(self, redis: Union[Redis, RedisCluster], service):
+    def __init__(self, redis: Union[Redis, RedisCluster], biz):
         name = redis_name(redis)
         if name not in self.loaded:
             redis.function_load(_SCRIPT, replace=True)
             self.loaded.add(name)
         self.redis = redis
-        self._timeout_key = f'ztimer.timeout:{{{service}}}'
-        self._meta_key = f'ztimer.meta:{{{service}}}'
+        self._timeout_key = f'ztimer.timeout:{{{biz}}}'
+        self._meta_key = f'ztimer.meta:{{{biz}}}'
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         interval = interval.total_seconds()
