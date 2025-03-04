@@ -71,7 +71,7 @@ class Registry:
                     cb()
 
     def _run(self):
-        sub = None
+        pubsub = None
         while True:
             try:
                 if self._registered and not self._stopped:
@@ -87,17 +87,17 @@ class Registry:
                     elif any(added for added in values[::2]):
                         logging.info(f'publish {self._registered}')
                         self._redis.publish(self._PREFIX, 'register')
-                if not sub:
-                    sub = self._redis.pubsub()
-                    sub.subscribe(self._PREFIX)
-                    res = sub.parse_response()
+                if not pubsub:
+                    pubsub = self._redis.pubsub()
+                    pubsub.subscribe(self._PREFIX)
+                    res = pubsub.parse_response()
                     logging.info(res)
                 self._refresh()
                 timeout = self._INTERVAL
-                while msg := sub.get_message(timeout=timeout):
+                while msg := pubsub.get_message(timeout=timeout):
                     logging.debug(f'got {msg}')
-                    timeout = 0  # exhaust all msgs
+                    timeout = 0.01 if timeout == self._INTERVAL else 0  # exhaust all msgs
             except Exception:
                 logging.exception(f'')
-                sub = None
+                pubsub = None
                 gevent.sleep(self._INTERVAL)

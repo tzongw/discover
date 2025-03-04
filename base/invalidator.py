@@ -66,23 +66,23 @@ class Invalidator:
             self.dispatcher.dispatch(group, '')
 
     def _run(self, redis, subscribe=True):
-        sub = None
+        pubsub = None
         while True:
             try:
-                if not sub:
-                    sub = redis.pubsub()
-                    sub.execute_command('CLIENT ID')
-                    client_id = sub.parse_response()
+                if not pubsub:
+                    pubsub = redis.pubsub()
+                    pubsub.execute_command('CLIENT ID')
+                    client_id = pubsub.parse_response()
                     prefixes = ' '.join([f'PREFIX {group}{self.sep}' for group in self.groups])
                     command = f'CLIENT TRACKING ON {prefixes} BCAST REDIRECT {client_id}'
-                    sub.execute_command(command)
-                    res = sub.parse_response()
+                    pubsub.execute_command(command)
+                    res = pubsub.parse_response()
                     logging.info(f'{command} {res}')
-                    sub.subscribe('__redis__:invalidate' if subscribe else str(uuid.uuid4()))
-                    res = sub.parse_response()
+                    pubsub.subscribe('__redis__:invalidate' if subscribe else str(uuid.uuid4()))
+                    res = pubsub.parse_response()
                     logging.info(res)
                     self._invalidate_all()
-                msg = sub.get_message(timeout=None)
+                msg = pubsub.get_message(timeout=None)
                 if msg is None:
                     continue
                 logging.debug(f'got {msg}')
@@ -100,7 +100,7 @@ class Invalidator:
                         self.executor.submit(self._get_result, fut, full_key, group)
             except Exception:
                 logging.exception(f'')
-                sub = None
+                pubsub = None
                 gevent.sleep(1)
 
 
