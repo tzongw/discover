@@ -19,7 +19,8 @@ import models
 from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
-from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation
+from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
+    SqlCacheMixin
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
@@ -163,6 +164,8 @@ def create_row(table: str, **kwargs):
         session.add(row)
         session.commit()
         session.refresh(row)
+    if issubclass(row, SqlCacheMixin):
+        row.invalidate(invalidator)  # notify full cache new row created
     return row.to_dict(exclude=[])
 
 
@@ -186,6 +189,8 @@ def update_row(table: str, row_id, **kwargs):
     with Session() as session:
         session.query(tb).filter(pk == row_id).update(kwargs)
     row = tb.get(row_id, ensure=True)
+    if issubclass(row, SqlCacheMixin):
+        row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
 
@@ -196,6 +201,8 @@ def delete_row(table: str, row_id):
     row = tb.get(row_id, ensure=True)
     with Session() as session:
         session.query(tb).filter(pk == row_id).delete()
+    if issubclass(row, SqlCacheMixin):
+        row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
 
@@ -211,16 +218,20 @@ def move_rows(table: str, row_id, column, **kwargs):
     rank = getattr(row, column)
     kwargs[f'{column}__gte'] = rank
     kwargs[f'{pk.name}__ne'] = row_id
-    row_ids = []
+    rows = []
     with Session() as session:
         cond = build_condition(tb, kwargs)
         for row in session.query(tb).filter(cond).order_by(col.asc()):
             if getattr(row, column) != rank:
                 break
-            row_ids.append(getattr(row, pk.name))
+            rows.append(row)
             rank += 1
-        if row_ids:
+        if rows:
+            row_ids = [getattr(row, pk.name) for row in rows]
             session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
+            if issubclass(tb, SqlCacheMixin):
+                for row in rows:
+                    row.invalidate(invalidator)
 
 
 @app.route('/tables/configs/rows/<int:row_id>')
@@ -244,6 +255,7 @@ def update_config(row_id, **kwargs):
             value = model(**kwargs)
             config = Config(id=row_id, value=json.loads(value.json()), update_time=now)
             session.add(config)
+    config.invalidate(invalidator)
     return value
 
 

@@ -21,7 +21,7 @@ import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, log_if_slow
-from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin
+from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
 from config import options
 from shared import invalidator, id_generator
 from models import QueueConfig, SmsConfig
@@ -120,7 +120,7 @@ config_models = {
 ConfigModels = QueueConfig | SmsConfig
 
 
-class Config(BaseModel, SqlGetterMixin):
+class Config(BaseModel, SqlCacheMixin):
     __tablename__ = 'configs'
 
     id = Column(Integer, primary_key=True)
@@ -141,6 +141,15 @@ class Config(BaseModel, SqlGetterMixin):
         assert default
         return super().get(key, ensure=ensure, default=default)
 
+
+def get_all_configs():
+    return tuple(config_cache.mget(ConfigKey)), None
+
+
+config_cache = FullCache[ConfigModels](mget=Config.mget, maxsize=None, make_key=Config.make_key,
+                                       get_values=get_all_configs)
+config_cache.listen(invalidator, Config.__name__)
+Config.mget = config_cache.mget
 
 collections: dict[str, Type[Document | GetterMixin]] = PascalCaseDict()
 
@@ -180,9 +189,9 @@ class Role(Document, CacheMixin):
         return self.admin or any(permission.can_access(coll, op) for permission in self.permissions)
 
 
-cache: Cache[Role] = Cache(mget=Role.mget, make_key=Role.make_key, maxsize=None)
-cache.listen(invalidator, Role.__name__)
-Role.mget = cache.mget
+role_cache = Cache[Role](mget=Role.mget, make_key=Role.make_key, maxsize=None)
+role_cache.listen(invalidator, Role.__name__)
+Role.mget = role_cache.mget
 
 
 @collection
@@ -207,7 +216,7 @@ def get_all_profiles():
         ids = [p.id for p in Profile.objects(id__gt=last_id).only('id').order_by('id').limit(100)]
         if not ids:
             return
-        values = full_cache.mget(ids)
+        values = profile_cache.mget(ids)
         last_id = ids[-1]
         return values
 
@@ -216,15 +225,15 @@ def get_all_profiles():
     return lazy, None
 
 
-full_cache: FullCache[Profile] = FullCache(mget=Profile.mget, make_key=Profile.make_key, get_values=get_all_profiles)
-full_cache.listen(invalidator, Profile.__name__)
-Profile.mget = full_cache.mget
+profile_cache = FullCache[Profile](mget=Profile.mget, make_key=Profile.make_key, get_values=get_all_profiles)
+profile_cache.listen(invalidator, Profile.__name__)
+Profile.mget = profile_cache.mget
 
 
-@full_cache.cached()
+@profile_cache.cached()
 def valid_profiles():
     now = datetime.now()
-    return [profile for profile in full_cache.values if profile.expire > now]
+    return [profile for profile in profile_cache.values if profile.expire > now]
 
 
 @collection

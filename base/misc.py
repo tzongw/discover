@@ -319,6 +319,26 @@ class SqlGetterMixin:
         return d
 
 
+class SqlCacheMixin(SqlGetterMixin):
+    @classmethod
+    def make_key(cls, key):
+        pk = cls.__table__.primary_key.columns[0]
+        return pk.type.python_type(key)
+
+    def invalidate(self, invalidator: Invalidator):
+        pk = self.__table__.primary_key.columns[0]
+        invalidator.publish(self.__class__.__name__, getattr(self, pk.name))
+
+    @staticmethod
+    def columns_expire(*columns):
+        def get_expire(values):
+            now = datetime.now()
+            expires = [getattr(row, column) for row in values for column in columns if getattr(row, column) >= now]
+            return min(expires) if expires else None
+
+        return get_expire
+
+
 def build_order_by(tb, keys):
     if not keys:
         pk = tb.__table__.primary_key.columns[0]
