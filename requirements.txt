@@ -1,7 +1,7 @@
 concurrent-log-handler==0.9.20
 flasgger==0.9.7.1
 Flask==2.2.5
-gevent==23.9.1
+gevent==24.11.1
 gevent-websocket==0.10.1
 mongoengine==0.29.1
 pydantic==1.10.13
