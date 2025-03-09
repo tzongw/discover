@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
 import logging
+import socket
 from urllib import parse
 from collections import defaultdict
 import gevent
@@ -24,10 +26,22 @@ def app(environ, start_response):
 
 
 def serve():
-    server = pywsgi.WSGIServer(options.ws_port, app, handler_class=WebSocketHandler, log=logging.getLogger(),
+    if sock_path := options.unix_sock:
+        try:
+            os.unlink(sock_path)
+        except FileNotFoundError:
+            pass
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(sock_path)
+        os.chmod(sock_path, 0o777)
+        sock.listen()
+        listener = sock
+    else:
+        listener = options.ws_port
+    server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logging.getLogger(),
                                error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
-    if not options.ws_port:
+    if not options.unix_sock and not options.ws_port:
         gevent.sleep(0.01)
         options.ws_port = server.address[1]
     logging.info(f'Starting ws server {options.ws_address} ...')
