@@ -44,8 +44,9 @@ def update_upstreams():
         if not is_api(name):
             continue
         addrs = {addr for addr in addrs if is_valid(addr)}
-        if addrs and addrs != addr_map.get(name):
-            logging.info(f'changed: {name} {addr_map.get(name)} -> {addrs}')
+        exists = addr_map.get(name)
+        if addrs and addrs != exists:
+            logging.info(f'{name} changed: {exists} -> {addrs}')
             addr_map[name] = addrs
             changed.add(name)
     if empty and changed:
