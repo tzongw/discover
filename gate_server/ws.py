@@ -9,6 +9,7 @@ from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base.utils import base62
+from base.sharding import ShardingDict, ShardingSet
 import shared
 import const
 from config import options
@@ -129,8 +130,8 @@ class Client:
             self.context.pop(key, None)
 
 
-clients = {}  # type: dict[str, Client]
-groups = defaultdict(set)  # type: dict[str, set[Client]]
+clients = ShardingDict[str, Client](shards=32)
+groups = defaultdict(lambda: ShardingSet(shards=8))  # type: dict[str, ShardingSet[Client]]
 
 
 def remove_from_group(client: Client, group):

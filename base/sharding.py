@@ -5,6 +5,7 @@ import random
 import bisect
 import time
 from datetime import timedelta, datetime
+from typing import TypeVar, Generic, Generator
 from binascii import crc32
 from random import shuffle
 from typing import Union
@@ -424,3 +425,104 @@ class MigratingHeavyTask(ShardingHeavyTask):
     def stop(self):
         self.old_heavy_task.stop()
         super().stop()
+
+
+K = TypeVar('K')
+V = TypeVar('V')
+
+
+class ShardingDict(Generic[K, V]):
+    def __init__(self, shards):
+        self._dicts = [{} for _ in range(shards)]
+
+    def _get_shard(self, key) -> dict:
+        index = hash(key) % len(self._dicts)
+        return self._dicts[index]
+
+    def __getitem__(self, key) -> V:
+        d = self._get_shard(key)
+        return d[key]
+
+    def __setitem__(self, key, value):
+        d = self._get_shard(key)
+        d[key] = value
+
+    def __delitem__(self, key):
+        self.pop(key)
+
+    def __len__(self):
+        return sum(len(d) for d in self._dicts)
+
+    def __iter__(self):
+        return self.keys()
+
+    def pop(self, key, *args) -> V | None:
+        d = self._get_shard(key)
+        return d.pop(key, *args)
+
+    def get(self, key, *args) -> V | None:
+        d = self._get_shard(key)
+        return d.get(key, *args)
+
+    def clear(self):
+        for d in self._dicts:
+            d.clear()
+
+    def items(self) -> Generator[tuple[K, V], None, None]:
+        done = 0
+        for d in self._dicts:
+            if done >= 1024:
+                done = 0
+                gevent.sleep(0)
+            for item in d.items():
+                yield item
+            done += len(d)
+
+    def keys(self) -> Generator[K, None, None]:
+        for key, _ in self.items():
+            yield key
+
+    def values(self) -> Generator[V, None, None]:
+        for _, value in self.items():
+            yield value
+
+
+E = TypeVar('E')
+
+
+class ShardingSet(Generic[E]):
+    def __init__(self, shards):
+        self._sets = [set() for _ in range(shards)]
+
+    def _get_shard(self, elem) -> set:
+        index = hash(elem) % len(self._sets)
+        return self._sets[index]
+
+    def __len__(self):
+        return sum(len(s) for s in self._sets)
+
+    def __iter__(self) -> Generator[tuple[K, V], None, None]:
+        done = 0
+        for s in self._sets:
+            if done >= 1024:
+                done = 0
+                gevent.sleep(0)
+            for elem in s:
+                yield elem
+            done += len(s)
+
+    def clear(self):
+        for s in self._sets:
+            s.clear()
+
+    def add(self, elem):
+        s = self._get_shard(elem)
+        s.add(elem)
+
+    def remove(self, elem):
+        s = self._get_shard(elem)
+        s.remove(elem)
+
+    def discard(self, elem):
+        s = self._get_shard(elem)
+        s.discard(elem)
