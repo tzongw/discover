@@ -130,7 +130,6 @@ class GetterMixin:
             docs = list(cls.objects(**query).order_by(order_by).limit(batch))
             if not docs:
                 return
-            yield docs
             last = docs[-1][field]
             if asc and last != start:
                 seen_ids = []
@@ -142,6 +141,7 @@ class GetterMixin:
                 if doc[field] != last:
                     break
                 seen_ids.append(doc.id)
+            yield docs
 
 
 class CacheMixin(GetterMixin):
@@ -339,6 +339,31 @@ class SqlGetterMixin:
             pk = self.__table__.primary_key.columns[0]
             d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
+
+    @classmethod
+    def batch_range(cls, column, start, end, *, asc=True, batch=1000):
+        col = getattr(cls.__table__.columns, column)
+        pk = cls.__table__.primary_key.columns[0]
+        order_by = col.asc() if asc else col.desc()
+        seen_ids = []
+        while True:
+            with cls.Session() as session:
+                query = [col >= start, col <= end, pk.not_in(seen_ids)]
+                rows = session.query(cls).filter(*query).order_by(order_by).limit(batch).all()
+            if not rows:
+                return
+            last = getattr(rows[-1], column)
+            if asc and last != start:
+                seen_ids = []
+                start = last
+            elif not asc and last != end:
+                seen_ids = []
+                end = last
+            for row in reversed(rows):
+                if getattr(row, column) != last:
+                    break
+                seen_ids.append(getattr(row, pk.name))
+            yield rows
 
 
 class SqlCacheMixin(SqlGetterMixin):
