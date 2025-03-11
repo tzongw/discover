@@ -121,6 +121,28 @@ class GetterMixin:
             d['create_time'] = extract_datetime(self.id)
         return d
 
+    @classmethod
+    def batch_range(cls, field, start, end, *, asc=True, batch=1000):
+        order_by = field if asc else '-' + field
+        seen_ids = []
+        while True:
+            query = {f'{field}__gte': start, f'{field}__lte': end, f'{cls.id.name}__nin': seen_ids}
+            docs = list(cls.objects(**query).order_by(order_by).limit(batch))
+            if not docs:
+                return
+            yield docs
+            last = docs[-1][field]
+            if asc and last != start:
+                seen_ids = []
+                start = last
+            elif not asc and last != end:
+                seen_ids = []
+                end = last
+            for doc in reversed(docs):
+                if doc[field] != last:
+                    break
+                seen_ids.append(doc.id)
+
 
 class CacheMixin(GetterMixin):
     @classmethod
