@@ -7,11 +7,9 @@ from werkzeug.exceptions import TooManyRequests
 from werkzeug.debug import DebuggedApplication
 from flasgger import Swagger
 from flask import Flask, g
-from base import ZTimer
 from base import TtlCache
 from base import ListConverter
 from base.misc import JSONProvider, make_response
-from base.sharding import ShardingKey, ShardingZTimer
 import const
 from models import Session
 
@@ -25,9 +23,6 @@ if options.env is const.Environment.DEV:
     app.debug = True
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
-
-ztimer = ShardingZTimer(redis, app_name, sharding_key=ShardingKey(shards=3)) if isinstance(redis, RedisCluster) \
-    else ZTimer(redis, app_name)
 
 
 def online_key(uid: int):
