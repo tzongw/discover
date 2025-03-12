@@ -454,7 +454,7 @@ def authorize():
 
 
 @bp.route('/whoami')
-@user_limiter(cooldown=5)
+@user_limiter(cooldown=10, count=2)
 def whoami():
     """whoami
     ---
@@ -465,7 +465,8 @@ def whoami():
         description: account
     """
     logging.info(f'uid: {g.uid}')
-    account = Account(id=g.uid)
+    gevent.sleep(0.01)
+    account = Account.get(g.uid)
     return account
 
 

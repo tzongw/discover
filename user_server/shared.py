@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from common.shared import *
+from dataclasses import dataclass
 from types import MappingProxyType
 from functools import partial, wraps
 from werkzeug.exceptions import TooManyRequests
@@ -48,25 +49,35 @@ sessions: TtlCache[dict[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
 sessions.listen(invalidator, 'session')
 
 
-def user_limiter(cooldown):
-    users = {}
+@dataclass
+class Limiter:
+    expire: float
+    count: int
+
+
+def user_limiter(cooldown, count=1):
+    users = {}  # type: dict[int, Limiter]
+    barrier = Limiter(expire=float('inf'), count=sys.maxsize)
 
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             now = time.time()
-            if users.get(g.uid, 0) > now:
-                raise TooManyRequests
             while users:
-                uid, expire = next(iter(users.items()))
-                if expire > now:
+                uid, limiter = next(iter(users.items()))
+                if limiter.expire > now:
                     break
                 users.pop(uid)
+            uid = g.uid
+            limiter = users.get(uid) or Limiter(expire=now + cooldown, count=0)
+            if limiter.expire > now and limiter.count >= count:
+                raise TooManyRequests
             try:
-                users[g.uid] = float('inf')  # not reentrant
+                users[uid] = barrier  # not reentrant
                 return f(*args, **kwargs)
             finally:
-                users[g.uid] = now + cooldown
+                limiter.count += 1
+                users[uid] = limiter
 
         return wrapper
 
