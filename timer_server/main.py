@@ -6,6 +6,7 @@ from config import options
 import time
 import atexit
 import logging
+import socket
 from typing import Dict, Callable
 from dataclasses import dataclass
 import gevent
@@ -160,7 +161,7 @@ class Handler:
 
 def rpc_serve(handler):
     processor = Processor(handler)
-    transport = TSocket.TServerSocket(port=options.rpc_port)
+    transport = TSocket.TServerSocket(port=options.rpc_port, socket_family=socket.AF_INET)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)

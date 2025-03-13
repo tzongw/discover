@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import socket
 from typing import Dict
 import gevent
 from thrift.transport import TSocket
@@ -118,7 +119,7 @@ class Handler:
 def serve():
     handler = Handler()
     processor = user.Processor(handler)
-    transport = TSocket.TServerSocket(port=options.rpc_port)
+    transport = TSocket.TServerSocket(port=options.rpc_port, socket_family=socket.AF_INET)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)

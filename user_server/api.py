@@ -34,7 +34,7 @@ cursor_filed.num_type = lambda v: int(v or 0)
 
 
 def serve():
-    server = pywsgi.WSGIServer(options.http_port, app, log=logging.getLogger(), error_log=logging.getLogger())
+    server = pywsgi.WSGIServer(f'*:{options.http_port}', app, log=logging.getLogger(), error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.http_port:
         gevent.sleep(0.01)

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+import socket
 import gevent
 from service import gate
 from thrift.protocol import TBinaryProtocol
@@ -56,7 +57,7 @@ class Handler:
 def serve():
     handler = Handler()
     processor = gate.Processor(handler)
-    transport = TSocket.TServerSocket(port=options.rpc_port)
+    transport = TSocket.TServerSocket(port=options.rpc_port, socket_family=socket.AF_INET)
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
