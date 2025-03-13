@@ -147,7 +147,9 @@ def client_serve(ws: WebSocket):
     clients[conn_id] = client
     environ = ws.environ
     environ['WS_CLIENT'] = client
-    logging.info(f'++ {len(clients)} {client}')
+    c = len(clients)
+    if c % 100 == 0:
+        logging.info(f'++ {c} {client}')
     try:
         params = {k[5:].replace('_', '-'): v for k, v in environ.items() if k.startswith('HTTP_')}
         for k, v in parse.parse_qsl(environ['QUERY_STRING']):
@@ -162,5 +164,7 @@ def client_serve(ws: WebSocket):
             remove_from_group(client, group)
         clients.pop(conn_id)
         client.stop()
-        logging.info(f'-- {len(clients)} {client}')
+        c = len(clients)
+        if c % 100 == 0:
+            logging.info(f'-- {c} {client}')
         shared.user_service.disconnect(options.rpc_address, conn_id, client.context)

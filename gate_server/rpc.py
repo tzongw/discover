@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import time
 import gevent
 from service import gate
 from thrift.protocol import TBinaryProtocol
@@ -41,10 +42,12 @@ class Handler:
             remove_from_group(client, group)
 
     def _broadcast_message(self, group, exclude, message):
+        start = time.time()
         members = groups.get(group, []) if group else clients.values()
         for client in members:  # type: Client
             if client.conn_id not in exclude:
                 client.send(message)
+        logging.info(f'{time.time() - start} {group} {message}')
 
     broadcast_binary = _broadcast_message
     broadcast_text = _broadcast_message
