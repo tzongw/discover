@@ -56,28 +56,28 @@ class Limiter:
 
 
 def user_limiter(cooldown, count=1):
-    users = {}  # type: dict[int, Limiter]
+    limiters = {}  # type: dict[int, Limiter]
     barrier = Limiter(expire=float('inf'), count=sys.maxsize)
 
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             now = time.time()
-            while users:
-                uid, limiter = next(iter(users.items()))
+            while limiters:
+                uid, limiter = next(iter(limiters.items()))
                 if limiter.expire > now:
                     break
-                users.pop(uid)
+                limiters.pop(uid)
             uid = g.uid
-            limiter = users.get(uid) or Limiter(expire=now + cooldown, count=0)
+            limiter = limiters.get(uid) or Limiter(expire=now + cooldown, count=0)
             if limiter.expire > now and limiter.count >= count:
                 raise TooManyRequests
             try:
-                users[uid] = barrier  # not reentrant
+                limiters[uid] = barrier  # not reentrant
                 return f(*args, **kwargs)
             finally:
                 limiter.count += 1
-                users[uid] = limiter
+                limiters[uid] = limiter
 
         return wrapper
 

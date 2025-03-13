@@ -188,7 +188,7 @@ class RedisCacheMixin(CacheMixin):
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'{name}_{i}' for i in range(value)]
+        self.names = [f'semaphore:{name}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)

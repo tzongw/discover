@@ -120,6 +120,7 @@ config_models = {
 ConfigModels = QueueConfig | SmsConfig
 
 
+@table
 class Config(BaseModel, SqlCacheMixin):
     __tablename__ = 'configs'
 
@@ -269,16 +270,14 @@ cache.listen(invalidator, TokenSetting.__name__)
 
 
 class CommandLogger(monitoring.CommandListener):
-    def started(self, event):
-        if event.command:
-            logging.info('Command {0.command} with request id '
-                         '{0.request_id} started on server '
-                         '{0.connection_id}'.format(event))
+    def started(self, ev):
+        if ev.command:
+            logging.info(f'Command {ev.command} with request id {ev.request_id} started on server {ev.connection_id}')
 
-    def succeeded(self, event):
+    def succeeded(self, ev):
         pass
 
-    def failed(self, event):
+    def failed(self, ev):
         pass
 
 
