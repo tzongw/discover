@@ -33,7 +33,7 @@ def reload_nginx():
             f.write('\n'.join([f'server {addr};' for addr in addrs]))
             f.write('\n')
     changed.clear()
-    os.system("nginx -s reload")
+    os.system('nginx -s reload')
     logging.info('reload done')
 
 

@@ -70,7 +70,7 @@ def _get_moveable_keys(self, redis_conn, *args):
         streams_count = (len(args) - streams_index) // 2
         return args[streams_index:streams_index + streams_count]
     elif cmd == 'MIGRATE':
-        return redis_conn.execute_command("COMMAND GETKEYS", *args)
+        return redis_conn.execute_command('COMMAND GETKEYS', *args)
     raise NotImplementedError(f'unrecognized command {cmd}')
 
 
