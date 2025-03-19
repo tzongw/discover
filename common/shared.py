@@ -134,6 +134,7 @@ def spawn_worker(f, *args, **kwargs):
 
     g = gevent.spawn(worker)
     _workers.add(g)
+    return g
 
 
 def run_in_worker(f):
