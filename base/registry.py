@@ -33,6 +33,8 @@ class Registry:
         return [gevent.spawn(self._run)]
 
     def stop(self):
+        if self._stopped:
+            return
         logging.info(f'stop {self._registered}')
         self._stopped = True
         self._unregister()
