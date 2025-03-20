@@ -8,7 +8,7 @@ from typing import Type, Self
 from contextlib import contextmanager
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
-    EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
+    EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
 from sqlalchemy import Integer, JSON
 from sqlalchemy import Column, Index
@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
-from base.utils import PascalCaseDict, log_if_slow
+from base.utils import PascalCaseDict, log_if_slow, apply_diff
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
 from config import options
 from shared import invalidator, id_generator
@@ -159,6 +159,26 @@ def collection(coll):
     assert coll.__name__ not in collections
     collections[coll.__name__] = coll
     return coll
+
+
+class Change(Document):
+    meta = {
+        'strict': False,
+        'indexes': [
+            {'fields': ['doc_id', 'id']}
+        ]
+    }
+
+    id = IntField(primary_key=True, default=id_generator.gen)
+    doc_id = DynamicField()
+    diff = DictField()
+
+    @classmethod
+    def snapshot(cls, doc_id, change_id):
+        snapshot = {}
+        for change in cls.objects(doc_id=doc_id, id__lte=change_id).order_by('id'):
+            apply_diff(snapshot, change.diff)
+        return snapshot
 
 
 class CRUD(StrEnum):

@@ -19,7 +19,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import base62
+from .utils import base62, diff_dict
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -120,6 +120,11 @@ class GetterMixin:
         if 'create_time' in include and 'create_time' not in d:
             d['create_time'] = extract_datetime(self.id)
         return d
+
+    def diff(self, origin: Self = None):
+        after = self._data
+        before = origin._data if origin else {self.__class__.id.name: self.id}
+        return diff_dict(after, before)
 
     @classmethod
     def batch_range(cls, field, start, end, *, asc=True, batch=1000):
