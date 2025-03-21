@@ -305,7 +305,6 @@ class Exclusion:
 
 class SqlGetterMixin:
     Session: Callable
-    id: Any
     __table__: Any
     __include__ = ()
     __exclude__ = ()

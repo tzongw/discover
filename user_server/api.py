@@ -355,6 +355,8 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
     if docs:
         doc_ids = [doc.id for doc in docs]
         coll.objects(**{f'{coll.id.name}__in': doc_ids}).update(**{f'inc__{field}': 1})
+        changes = [Change(coll_name=coll.__name__, doc_id=doc.id, diff={field: doc[field] + 1}) for doc in docs]
+        Change.objects.insert(changes)
         if issubclass(coll, CacheMixin):
             for doc in docs:
                 doc.invalidate(invalidator)
