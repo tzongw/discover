@@ -165,18 +165,22 @@ class Change(Document):
     meta = {
         'strict': False,
         'indexes': [
-            {'fields': ['doc_id', 'id']}
+            {'fields': ['doc_id', 'id']},
+            {'fields': ['coll_name', 'id']},
         ]
     }
 
     id = IntField(primary_key=True, default=id_generator.gen)
-    doc_id = DynamicField()
-    diff = DictField()
+    coll_name = StringField(required=True)
+    doc_id = DynamicField(required=True)
+    diff = DictField(required=True)
 
     @classmethod
     def snapshot(cls, doc_id, change_id):
+        changes = list(cls.objects(doc_id=doc_id, id__lte=change_id).order_by('id'))
+        assert changes and changes[-1].id == change_id, 'CAN NOT find snapshot'
         snapshot = {}
-        for change in cls.objects(doc_id=doc_id, id__lte=change_id).order_by('id'):
+        for change in changes:
             apply_diff(snapshot, change.diff)
         return snapshot
 

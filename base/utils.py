@@ -200,7 +200,7 @@ def apply_diff(origin: dict, diff: dict):
             origin.pop(key, None)
             continue
         vo = origin.get(key)
-        if isinstance(value, dict) and isinstance(vo, dict):
+        if isinstance(vo, dict) and isinstance(value, dict):
             apply_diff(vo, value)
         else:
             origin[key] = value

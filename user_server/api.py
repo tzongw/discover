@@ -285,7 +285,7 @@ def create_document(collection: str, **kwargs):
     if doc_id is not None and coll.get(doc_id):  # save will update doc unexpectedly if doc_id already exists
         raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
-    Change(doc_id=doc_id, diff=doc.diff()).save()
+    Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff()).save()
     if issubclass(coll, CacheMixin):
         doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
@@ -301,6 +301,7 @@ def get_document(collection: str, doc_id):
 @app.route('/collections/<collection>/documents/<doc_id>/snapshots/<int:change_id>')
 def get_snapshot(collection: str, doc_id, change_id):
     coll = collections[collection]
+    doc_id = coll.id.to_python(doc_id)
     snapshot = Change.snapshot(doc_id, change_id)
     snapshot[coll.id.name] = doc_id
     doc = coll(**snapshot)
@@ -319,7 +320,7 @@ def update_document(collection: str, doc_id, **kwargs):
     if not doc.modify(**kwargs):  # not exists, when doc is default
         kwargs[coll.id.name] = doc_id
         doc = coll(**kwargs).save()
-    Change(doc_id=doc_id, diff=doc.diff(origin)).save()
+    Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff(origin)).save()
     if issubclass(coll, CacheMixin):
         doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
