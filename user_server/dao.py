@@ -92,6 +92,18 @@ def table(tb):
     return tb
 
 
+class RowChange(BaseModel):
+    __tablename__ = 'row_changes'
+
+    id = Column(Integer, primary_key=True, default=id_generator.gen)
+    table_name = Column(String, nullable=False)
+    row_id = Column(Integer, nullable=False)
+    diff = Column(JSON, nullable=False)
+
+    Index('idx_row_id', row_id)
+    Index('idx_table_name', table_name)
+
+
 @table
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = 'accounts'
