@@ -103,6 +103,16 @@ class RowChange(BaseModel):
     Index('idx_row_id', row_id)
     Index('idx_table_name', table_name)
 
+    @classmethod
+    def snapshot(cls, row_id, change_id):
+        with cls.Session() as session:
+            changes = session.query(cls).filter(cls.row_id == row_id, cls.id <= change_id).order_by(cls.id.asc()).all()
+        assert changes and changes[-1].id == change_id, 'CAN NOT find snapshot'
+        snapshot = {}
+        for change in changes:
+            apply_diff(snapshot, change.diff)
+        return snapshot
+
 
 @table
 class Account(BaseModel, SqlGetterMixin):

@@ -5,6 +5,7 @@ import time
 import uuid
 from datetime import timedelta, datetime
 from hashlib import sha1
+from copy import copy
 
 import flask
 import gevent
@@ -20,11 +21,11 @@ from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
-    SqlCacheMixin
+    SqlCacheMixin, JSONEncoder
 from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
-from dao import Account, Session, collections, tables, Config, config_models, Change
+from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
 from shared import session_key, async_task, run_in_process, script, scheduler
 import push
@@ -239,6 +240,12 @@ def get_config(row_id):
     return Config.get(row_id)
 
 
+@app.route('/tables/configs/rows/<int:row_id>/snapshots/<int:change_id>')
+def get_config_snapshot(row_id, change_id):
+    snapshot = RowChange.snapshot(row_id, change_id)
+    return snapshot['value']
+
+
 @app.route('/tables/configs/rows/<int:row_id>', methods=['PATCH'])
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_config(row_id, **kwargs):
@@ -247,14 +254,19 @@ def update_config(row_id, **kwargs):
     with Session.transaction() as session:
         config = session.query(Config).filter(Config.id == row_id).first()
         if config:
+            origin = copy(config)
             obj = config.value | kwargs
             value = model.parse_obj(obj)
             config.value = json.loads(value.json())
             config.update_time = now
         else:
+            origin = None
             value = model(**kwargs)
             config = Config(id=row_id, value=json.loads(value.json()), update_time=now)
             session.add(config)
+        diff = json.loads(json.dumps(config.diff(origin), cls=JSONEncoder))
+        change = RowChange(table_name=Config.__tablename__, row_id=config.id, diff=diff)
+        session.add(change)
     config.invalidate(invalidator)
     return value
 
@@ -320,6 +332,7 @@ def update_document(collection: str, doc_id, **kwargs):
     if not doc.modify(**kwargs):  # not exists, when doc is default
         kwargs[coll.id.name] = doc_id
         doc = coll(**kwargs).save()
+        origin = None
     Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff(origin)).save()
     if issubclass(coll, CacheMixin):
         doc.invalidate(invalidator)

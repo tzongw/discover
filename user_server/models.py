@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pydantic import BaseModel
 
 
@@ -25,3 +25,4 @@ class QueueConfig(BaseModel):
 
 class SmsConfig(BaseModel):
     cooldown = timedelta(minutes=1)
+    invalid_date = date(2000, 1, 1)

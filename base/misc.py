@@ -50,7 +50,7 @@ class JSONEncoder(json.JSONEncoder):
         elif dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
         elif isinstance(o, datetime):
-            return o.strftime('%Y-%m-%d %H:%M:%S')
+            return o.strftime('%Y-%m-%d %H:%M:%S.%f')
         elif isinstance(o, date):
             return o.strftime('%Y-%m-%d')
         elif isinstance(o, timedelta):
@@ -344,6 +344,12 @@ class SqlGetterMixin:
             d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
 
+    def diff(self, origin: Self = None):
+        after = self.__dict__
+        pk = self.__table__.primary_key.columns[0]
+        before = origin.__dict__ if origin else {pk.name: getattr(self, pk.name)}
+        return diff_dict(after, before)
+
     @classmethod
     def batch_range(cls, column, start, end, *, asc=True, batch=1000):
         col = getattr(cls.__table__.columns, column)
@@ -441,7 +447,8 @@ def convert_type(tb, params: dict):
     for key, value in params.items():
         column = getattr(tb, key)
         if isinstance(column.type, DateTime):
-            params[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+            format = '%Y-%m-%d %H:%M:%S.%f' if '.' in value else '%Y-%m-%d %H:%M:%S'
+            params[key] = datetime.strptime(value, format)
         elif isinstance(column.type, Date):
             params[key] = datetime.strptime(value, '%Y-%m-%d').date()
 
