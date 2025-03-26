@@ -42,7 +42,7 @@ class SessionMaker(sessionmaker):
             log_if_slow(start_time, self.tx_slow, 'slow transaction')
 
 
-echo = options.env is const.Environment.DEV
+echo = options.env == const.Environment.DEV
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
 Session = SessionMaker(engine, expire_on_commit=False)
 
@@ -328,6 +328,6 @@ class CommandLogger(monitoring.CommandListener):
 
 
 if host := options.mongo:
-    if options.env is const.Environment.DEV:
+    if options.env == const.Environment.DEV:
         monitoring.register(CommandLogger())
     connect(host=host)

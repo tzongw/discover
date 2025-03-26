@@ -19,7 +19,7 @@ app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
 app.json.ensure_ascii = False
 app.make_response = partial(make_response, app)
-if options.env is const.Environment.DEV:
+if options.env == const.Environment.DEV:
     app.debug = True
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
