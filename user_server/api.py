@@ -24,7 +24,7 @@ from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition,
     SqlCacheMixin, JSONEncoder
 from common.shared import run_exclusively
 from config import options, ctx
-from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
+from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
 from shared import session_key, async_task, run_in_process, script, scheduler
@@ -35,7 +35,8 @@ cursor_filed.num_type = lambda v: int(v or 0)
 
 
 def serve():
-    server = pywsgi.WSGIServer(options.http_port, app, log=logging.getLogger(), error_log=logging.getLogger())
+    logger = None if options.env == Environment.PROD else logging.getLogger()
+    server = pywsgi.WSGIServer(options.http_port, app, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.http_port:
         gevent.sleep(0.01)

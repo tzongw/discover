@@ -39,8 +39,8 @@ def serve():
         listener = sock
     else:
         listener = options.ws_port
-    server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logging.getLogger(),
-                               error_log=logging.getLogger())
+    logger = None if options.env == const.Environment.PROD else logging.getLogger()
+    server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.unix_sock and not options.ws_port:
         gevent.sleep(0.01)

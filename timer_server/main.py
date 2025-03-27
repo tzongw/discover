@@ -45,8 +45,7 @@ class Handler:
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
-        self._services = DefaultDict(
-            lambda name: Service(shared.registry, name))  # type: Dict[str, Service]
+        self._services = DefaultDict(lambda name: Service(shared.registry, name))  # type: Dict[str, Service]
 
     def load_timers(self):
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
