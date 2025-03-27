@@ -65,7 +65,7 @@ timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerServ
 _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
-if options.env is const.Environment.DEV:
+if options.env == const.Environment.DEV:
     # if dev, run in thread to debug
     ShardingHeavyTask.push = HeavyTask.push = lambda self, task, front=False: spawn_worker(self.exec, task)
 
@@ -115,7 +115,7 @@ atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 def _cleanup():  # call once
     logging.info(f'cleanup')
     with LogSuppress():
-        if options.env is const.Environment.DEV:  # ptpython compatible
+        if options.env == const.Environment.DEV:  # ptpython compatible
             for fn in _exits:
                 fn()
         else:
@@ -134,6 +134,7 @@ def spawn_worker(f, *args, **kwargs):
 
     g = gevent.spawn(worker)
     _workers.add(g)
+    return g
 
 
 def run_in_worker(f):

@@ -12,6 +12,22 @@ WEEKDAY = [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
 WEEKEND = [SATURDAY, SUNDAY]
 
 
+class Manager:
+    def __init__(self):
+        self._handlers = {}
+
+    def handle(self, key, *args, **kwargs):
+        return self._handlers[key](*args, **kwargs)
+
+    def __call__(self, key):
+        def decorator(f):
+            assert key not in self._handlers
+            self._handlers[key] = f
+            return f
+
+        return decorator
+
+
 class Dispatcher:
     def __init__(self, executor=None):
         self._handlers = defaultdict(list)

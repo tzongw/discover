@@ -19,7 +19,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import base62
+from .utils import base62, diff_dict
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -50,7 +50,7 @@ class JSONEncoder(json.JSONEncoder):
         elif dataclasses.is_dataclass(o):
             return dataclasses.asdict(o)
         elif isinstance(o, datetime):
-            return o.strftime('%Y-%m-%d %H:%M:%S')
+            return o.strftime('%Y-%m-%d %H:%M:%S.%f')
         elif isinstance(o, date):
             return o.strftime('%Y-%m-%d')
         elif isinstance(o, timedelta):
@@ -112,14 +112,19 @@ class GetterMixin:
     def to_dict(self, include=(), exclude=None):
         if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
-            include = self.__include__ + tuple(field for field in self._fields if not field.startswith('_') and
-                                               field not in exclude and field not in self.__include__)
+            include = self.__include__ + tuple(
+                field for field in self._fields if field not in exclude and field not in self.__include__)
         elif not include:
             include = self.__include__
         d = {k: v for k, v in self._data.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
             d['create_time'] = extract_datetime(self.id)
         return d
+
+    def diff(self, origin: Self = None):
+        after = self._data
+        before = origin._data if origin else {self.__class__.id.name: self.id}
+        return diff_dict(after, before)
 
     @classmethod
     def batch_range(cls, field, start, end, *, asc=True, batch=1000):
@@ -188,7 +193,7 @@ class RedisCacheMixin(CacheMixin):
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'{name}_{i}' for i in range(value)]
+        self.names = [f'semaphore:{name}_{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
@@ -300,7 +305,6 @@ class Exclusion:
 
 class SqlGetterMixin:
     Session: Callable
-    id: Any
     __table__: Any
     __include__ = ()
     __exclude__ = ()
@@ -327,9 +331,9 @@ class SqlGetterMixin:
         return value
 
     def to_dict(self, include=(), exclude=None):
-        columns = self.__table__.columns
         if exclude is not None:
             assert not include, '`include`, `exclude` are mutually exclusive'
+            columns = self.__table__.columns
             include = self.__include__ + tuple(
                 c.name for c in columns if c.name not in exclude and c.name not in self.__include__)
         elif not include:
@@ -339,6 +343,12 @@ class SqlGetterMixin:
             pk = self.__table__.primary_key.columns[0]
             d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
+
+    def diff(self, origin: Self = None):
+        after = self.__dict__
+        pk = self.__table__.primary_key.columns[0]
+        before = origin.__dict__ if origin else {pk.name: getattr(self, pk.name)}
+        return diff_dict(after, before)
 
     @classmethod
     def batch_range(cls, column, start, end, *, asc=True, batch=1000):
@@ -437,7 +447,8 @@ def convert_type(tb, params: dict):
     for key, value in params.items():
         column = getattr(tb, key)
         if isinstance(column.type, DateTime):
-            params[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+            format = '%Y-%m-%d %H:%M:%S.%f' if '.' in value else '%Y-%m-%d %H:%M:%S'
+            params[key] = datetime.strptime(value, format)
         elif isinstance(column.type, Date):
             params[key] = datetime.strptime(value, '%Y-%m-%d').date()
 

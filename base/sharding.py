@@ -448,7 +448,8 @@ class ShardingDict(Generic[K, V]):
         d[key] = value
 
     def __delitem__(self, key):
-        self.pop(key)
+        d = self._get_shard(key)
+        del d[key]
 
     def __len__(self):
         return sum(len(d) for d in self._dicts)

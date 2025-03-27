@@ -8,7 +8,7 @@ from typing import Type, Self
 from contextlib import contextmanager
 from gevent import threading
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
-    EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField
+    EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
 from sqlalchemy import Integer, JSON
 from sqlalchemy import Column, Index
@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
-from base.utils import PascalCaseDict, log_if_slow
+from base.utils import PascalCaseDict, log_if_slow, apply_diff
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
 from config import options
 from shared import invalidator, id_generator
@@ -42,7 +42,7 @@ class SessionMaker(sessionmaker):
             log_if_slow(start_time, self.tx_slow, 'slow transaction')
 
 
-echo = options.env is const.Environment.DEV
+echo = options.env == const.Environment.DEV
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
 Session = SessionMaker(engine, expire_on_commit=False)
 
@@ -92,6 +92,28 @@ def table(tb):
     return tb
 
 
+class RowChange(BaseModel):
+    __tablename__ = 'row_changes'
+
+    id = Column(Integer, primary_key=True, default=id_generator.gen)
+    table_name = Column(String, nullable=False)
+    row_id = Column(Integer, nullable=False)
+    diff = Column(JSON, nullable=False)
+
+    Index('idx_row_id', row_id)
+    Index('idx_table_name', table_name)
+
+    @classmethod
+    def snapshot(cls, row_id, change_id):
+        with cls.Session() as session:
+            changes = session.query(cls).filter(cls.row_id == row_id, cls.id <= change_id).order_by(cls.id.asc()).all()
+        assert changes and changes[-1].id == change_id, 'CAN NOT find snapshot'
+        snapshot = {}
+        for change in changes:
+            apply_diff(snapshot, change.diff)
+        return snapshot
+
+
 @table
 class Account(BaseModel, SqlGetterMixin):
     __tablename__ = 'accounts'
@@ -120,6 +142,7 @@ config_models = {
 ConfigModels = QueueConfig | SmsConfig
 
 
+@table
 class Config(BaseModel, SqlCacheMixin):
     __tablename__ = 'configs'
 
@@ -158,6 +181,30 @@ def collection(coll):
     assert coll.__name__ not in collections
     collections[coll.__name__] = coll
     return coll
+
+
+class Change(Document):
+    meta = {
+        'strict': False,
+        'indexes': [
+            {'fields': ['doc_id', 'id']},
+            {'fields': ['coll_name', 'id']},
+        ]
+    }
+
+    id = IntField(primary_key=True, default=id_generator.gen)
+    coll_name = StringField(required=True)
+    doc_id = DynamicField(required=True)
+    diff = DictField(required=True)
+
+    @classmethod
+    def snapshot(cls, doc_id, change_id):
+        changes = list(cls.objects(doc_id=doc_id, id__lte=change_id).order_by('id'))
+        assert changes and changes[-1].id == change_id, 'CAN NOT find snapshot'
+        snapshot = {}
+        for change in changes:
+            apply_diff(snapshot, change.diff)
+        return snapshot
 
 
 class CRUD(StrEnum):
@@ -269,20 +316,18 @@ cache.listen(invalidator, TokenSetting.__name__)
 
 
 class CommandLogger(monitoring.CommandListener):
-    def started(self, event):
-        if event.command:
-            logging.info('Command {0.command} with request id '
-                         '{0.request_id} started on server '
-                         '{0.connection_id}'.format(event))
+    def started(self, ev):
+        if ev.command:
+            logging.info(f'Command {ev.command} with request id {ev.request_id} started on server {ev.connection_id}')
 
-    def succeeded(self, event):
+    def succeeded(self, ev):
         pass
 
-    def failed(self, event):
+    def failed(self, ev):
         pass
 
 
 if host := options.mongo:
-    if options.env is const.Environment.DEV:
+    if options.env == const.Environment.DEV:
         monitoring.register(CommandLogger())
     connect(host=host)

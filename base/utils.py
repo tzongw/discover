@@ -178,3 +178,31 @@ def flock(path):
     f.write(str(os.getpid()))
     f.flush()
     return f
+
+
+def diff_dict(after: dict, before: dict):
+    diff = {}
+    for key in after.keys() | before.keys():
+        if key[0] == '_':  # ignore
+            continue
+        va = after.get(key)
+        vb = before.get(key)
+        if va == vb:
+            continue
+        if isinstance(va, dict) and isinstance(vb, dict):
+            diff[key] = diff_dict(va, vb)
+        else:
+            diff[key] = va
+    return diff
+
+
+def apply_diff(origin: dict, diff: dict):
+    for key, value in diff.items():
+        if value is None:
+            origin.pop(key, None)
+            continue
+        vo = origin.get(key)
+        if isinstance(vo, dict) and isinstance(value, dict):
+            apply_diff(vo, value)
+        else:
+            origin[key] = value

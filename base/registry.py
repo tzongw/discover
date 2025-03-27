@@ -33,6 +33,8 @@ class Registry:
         return [gevent.spawn(self._run)]
 
     def stop(self):
+        if self._stopped:
+            return
         logging.info(f'stop {self._registered}')
         self._stopped = True
         self._unregister()
@@ -96,7 +98,9 @@ class Registry:
                 timeout = self._INTERVAL
                 while msg := pubsub.get_message(timeout=timeout):
                     logging.debug(f'got {msg}')
-                    timeout = 0.01 if timeout == self._INTERVAL else 0  # exhaust all msgs
+                    if timeout == self._INTERVAL:
+                        gevent.sleep(0.01)  # exhaust all msgs
+                        timeout = 0.0
             except Exception:
                 logging.exception(f'')
                 pubsub = None
