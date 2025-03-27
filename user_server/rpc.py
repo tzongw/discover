@@ -30,7 +30,7 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            if token not in shared.sessions.get(uid) and options.env == not const.Environment.DEV:
+            if token not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
                 raise ValueError('token error')
             key = online_key(uid)
             with redis.pipeline(transaction=True, shard_hint=key) as pipe:
