@@ -36,7 +36,7 @@ registry = Registry(redis, const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
-hint = f'{options.env.value}:{ip_address()}:{app_id}'
+hint = f'{options.env}:{ip_address()}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
 script = Script(redis)
@@ -47,13 +47,13 @@ if options.redis_cluster:
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{options.env}')
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env.value}')
+    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{options.env}')
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
