@@ -38,7 +38,7 @@ def serve():
         sock.listen()
         listener = sock
     else:
-        listener = f'*:{options.ws_port}'
+        listener = f':{options.ws_port}'
     server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logging.getLogger(),
                                error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
