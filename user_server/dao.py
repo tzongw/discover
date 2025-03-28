@@ -24,7 +24,7 @@ from base.utils import PascalCaseDict, log_if_slow, apply_diff
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
 from config import options
 from shared import invalidator, id_generator
-from models import QueueConfig, SmsConfig
+from models import QueueConfig, SmsConfig, ConfigModels
 
 
 class SessionMaker(sessionmaker):
@@ -138,8 +138,6 @@ config_models = {
     ConfigKey.QUEUE: QueueConfig,
     ConfigKey.SMS: SmsConfig,
 }
-
-ConfigModels = QueueConfig | SmsConfig
 
 
 @table
