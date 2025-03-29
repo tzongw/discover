@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+import json
 from typing import Union, Type, Optional, List, TypeVar
 from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
 from redis.cluster import ClusterPipeline
 from redis.client import _RedisCallbacks, _RedisCallbacksRESP2
+from .misc import JSONEncoder
 
 M = TypeVar('M', bound=BaseModel)
 
@@ -93,13 +95,18 @@ class Parser:
             assert not exclude, '`include`, `exclude` are mutually exclusive'
 
         def convert(values):
-            mapping = {k: v for k, v in zip(include, values) if v is not None}
+            json_fields = getattr(cls, '__json_fields__', [])
+            mapping = {k: json.loads(v) if k in json_fields else v for k, v in zip(include, values) if v is not None}
             return cls.parse_obj(mapping) if mapping else None
 
         return self._redis.execute_command('HMGET', name, *include, convert=convert)
 
     def hset(self, name: str, model: M) -> int:
+        json_fields = getattr(model, '__json_fields__', [])
         mapping = model.dict(exclude_unset=True)
+        for k, v in mapping.items():
+            if k in json_fields:
+                mapping[k] = json.dumps(v, cls=JSONEncoder)
         return self._redis.hset(name, mapping=mapping)
 
     def hgetall(self, name, cls: Type[M]):
