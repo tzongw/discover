@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
+from datetime import timedelta, datetime, date
 from redis import Redis, RedisCluster
 from redis.connection import Encoder
 from redis._parsers.commands import CommandsParser
@@ -77,6 +77,12 @@ def _get_moveable_keys(self, redis_conn, *args):
 def _encode(self: Encoder, value):
     if isinstance(value, BaseModel):
         value = value.json(exclude_defaults=True)
+    elif isinstance(value, datetime):
+        value = value.strftime('%Y-%m-%d %H:%M:%S.%f')
+    elif isinstance(value, date):
+        value = value.strftime('%Y-%m-%d')
+    elif isinstance(value, timedelta):
+        value = value.total_seconds()
     return _orig_encode(self, value)
 
 
