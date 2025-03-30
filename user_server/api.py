@@ -468,7 +468,7 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token or token not in sessions.get(uid):
         raise Unauthorized
-    g.uid = uid
+    g.uid, g.token = uid, token
     if uid in user_actives:
         return
     # refresh last active & token ttl
