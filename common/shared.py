@@ -66,7 +66,7 @@ _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
 if options.env == const.Environment.DEV:
-    # if dev, run in thread to debug
+    # run in thread for debugging
     ShardingHeavyTask.push = HeavyTask.push = lambda self, task, front=False: spawn_worker(self.exec, task)
 
 

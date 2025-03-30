@@ -7,7 +7,7 @@ from base import ip_address, LogSuppress
 from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
-    time_dispatcher, run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout
+    time_dispatcher, run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
 from config import options
@@ -84,11 +84,11 @@ def on_quarter(dt: datetime):
 @at_main
 def init():
     if options.init_timer == 'rpc':
-        timer_service.call_later(const.RPC_USER, 'notice:1', 'one shot', delay=3)
-        timer_service.call_repeat(const.RPC_USER, 'welcome:2', 'repeat', interval=5)
-        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, 'welcome:2'))
-        timer_service.call_repeat(const.RPC_USER, const.TICK_TIMER, '', interval=1)
-        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, const.TICK_TIMER))
+        timer_service.call_later(rpc_service, 'notice:1', 'one shot', delay=3)
+        timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
+        at_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
+        timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
+        at_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
