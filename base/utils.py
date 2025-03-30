@@ -182,8 +182,8 @@ def flock(path):
 
 def diff_dict(after: dict, before: dict):
     diff = {}
-    for key in after.keys() | before.keys():
-        if key[0] == '_':  # ignore
+    for key in after.keys() | before.keys():  # type: str
+        if key.startswith('_'):  # ignore
             continue
         va = after.get(key)
         vb = before.get(key)

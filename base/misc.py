@@ -401,9 +401,9 @@ def build_order_by(tb, keys):
         pk = tb.__table__.primary_key.columns[0]
         return [pk.desc()]
     order_by = []
-    for key in keys:
+    for key in keys:  # type: str
         asc = True
-        if key[0] == '-':
+        if key.startswith('-'):
             asc = False
             key = key[1:]
         column = getattr(tb, key)
