@@ -131,12 +131,9 @@ class HeavyTask(_BaseTask):
         wrapper.__task_wrapped__ = f
         return wrapper
 
-    def push(self, task: Task, front=False):
+    def push(self, task: Task):
         value = task.json(exclude_defaults=True)
-        if front:
-            total = self.redis.lpush(self._key, value)
-        else:
-            total = self.redis.rpush(self._key, value)
+        total = self.redis.rpush(self._key, value)
         logging.info(f'+task {task} total {total}')
 
     def start(self, exec_func=None):

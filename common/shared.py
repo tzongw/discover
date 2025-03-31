@@ -67,7 +67,7 @@ _mains = []
 
 if options.env == const.Environment.DEV:
     # run in thread for debugging
-    ShardingHeavyTask.push = HeavyTask.push = lambda self, task, front=False: spawn_worker(self.exec, task)
+    ShardingHeavyTask.push = HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
 
 @receiver(const.TICK_STREAM)

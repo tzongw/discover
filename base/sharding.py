@@ -385,13 +385,10 @@ class ShardingHeavyTask(HeavyTask):
         super().__init__(redis, key)
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
-    def push(self, task, front=False):
+    def push(self, task):
         value = task.json(exclude_defaults=True)
         key = self._sharding_key.random_sharded_key(self._key)
-        if front:
-            total = self.redis.lpush(key, value)
-        else:
-            total = self.redis.rpush(key, value)
+        total = self.redis.rpush(key, value)
         logging.info(f'+task {task} total {total}')
 
     def start(self, exec_func=None):
