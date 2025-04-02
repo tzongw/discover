@@ -4,6 +4,7 @@ from tornado.log import LogFormatter
 from tornado.options import define, parse_config_file
 from tornado.options import options
 from concurrent_log_handler import ConcurrentRotatingFileHandler
+from base import utils
 from .const import Environment
 from gevent.local import local
 
@@ -21,9 +22,11 @@ LOG_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(l
 
 
 def parse_callback():
-    channel = ConcurrentRotatingFileHandler(filename=options.log_file, maxBytes=options.log_file_max_size,
-                                            backupCount=options.log_file_num_backups,
-                                            encoding='utf-8') if options.log_file else logging.StreamHandler()
+    if options.log_file:
+        channel = ConcurrentRotatingFileHandler(filename=options.log_file, maxBytes=options.log_file_max_size,
+                                                backupCount=options.log_file_num_backups, encoding='utf-8')
+    else:
+        channel = logging.StreamHandler()
     channel.setFormatter(CtxLogFormatter(fmt=LOG_FORMAT, datefmt='', color=not options.log_file))
     logger = logging.getLogger()
     logger.addHandler(channel)
@@ -34,6 +37,18 @@ def parse_app_name(app_name: str):
     options.http_service = f'http_{app_name}'
     options.define('rpc_service')
     options.rpc_service = f'rpc_{app_name}'
+
+
+def rpc_port_callback(port: int):
+    if port:
+        options.define('rpc_address')
+        options.rpc_address = f'{options.host}:{port}'
+
+
+def http_port_callback(port: int):
+    if port:
+        options.define('http_address')
+        options.http_address = f'{options.host}:{port}'
 
 
 options.log_to_stderr = False
@@ -47,3 +62,6 @@ define('redis_cluster', '', str, 'biz redis cluster url')
 define('datacenter', 0, int, 'data center id')
 define('log_file', type=str, help='log file path')
 define('mongo', type=str, help='mongo url')
+define('host', utils.ip_address(), str, 'public host')
+define('rpc_port', 0, int, 'rpc port', callback=rpc_port_callback)
+define('http_port', 0, int, 'http port', callback=http_port_callback)
