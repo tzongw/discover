@@ -13,5 +13,7 @@ def rpc_port_callback(port: int):
 define('host', utils.ip_address(), str, 'public host')
 define('rpc_port', 0, int, 'rpc port', callback=rpc_port_callback)
 
-options.app_name = const.APP_TIMER
 options.parse_command_line()
+
+if not options.app_name:
+    options.app_name = const.APP_TIMER

@@ -23,7 +23,6 @@ if options.env == const.Environment.DEV:
     app.debug = True
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
-rpc_service = const.RPC_USER
 
 
 def online_key(uid: int):

@@ -178,7 +178,7 @@ def main():
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     workers += shared.registry.start()
     shared.init_main()
-    shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
+    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     handler.load_timers()
     shared.at_exit(handler.retreat_timers)
     atexit.register(handler.retreat_timers)  # double check

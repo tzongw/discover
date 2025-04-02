@@ -15,7 +15,7 @@ changed = set()
 
 
 def is_api(name: str):
-    return name.startswith('ws') or name.startswith('http')
+    return name.startswith('http')
 
 
 def is_valid(addr: str):

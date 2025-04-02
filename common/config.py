@@ -29,11 +29,18 @@ def parse_callback():
     logger.addHandler(channel)
 
 
+def parse_app_name(app_name: str):
+    options.define('http_service')
+    options.http_service = f'http_{app_name}'
+    options.define('rpc_service')
+    options.rpc_service = f'rpc_{app_name}'
+
+
 options.log_to_stderr = False
 options.add_parse_callback(parse_callback)
 
 define('config', type=str, help='path to config file', callback=lambda path: parse_config_file(path, final=False))
-define('app_name', 'app', str, 'app name')
+define('app_name', None, str, 'app name', callback=parse_app_name)
 define('env', Environment.DEV, Environment, 'environment')
 define('redis', 'redis://', str, 'biz redis url')
 define('redis_cluster', '', str, 'biz redis cluster url')

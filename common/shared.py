@@ -30,6 +30,8 @@ dispatcher = Dispatcher()
 time_dispatcher = TimeDispatcher()
 
 app_name = options.app_name
+rpc_service = options.rpc_service
+http_service = options.http_service
 redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
     Redis.from_url(options.redis, decode_responses=True)
 registry = Registry(redis, const.SERVICES)

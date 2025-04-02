@@ -12,7 +12,7 @@ import rpc
 # noinspection PyUnresolvedReferences
 import handlers
 import api
-from shared import app_name, app_id, init_main
+from shared import app_name, app_id, init_main, rpc_service, http_service
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     workers += shared.invalidator.start()
     init_main()
     workers += shared.receiver.start()
-    shared.registry.register({const.HTTP_USER: options.http_address, const.RPC_USER: options.rpc_address})
+    shared.registry.register({http_service: options.http_address, rpc_service: options.rpc_address})
     gevent.joinall(workers, raise_error=True)
 
 

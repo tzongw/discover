@@ -7,5 +7,7 @@ define('conf_d', '/opt/homebrew/etc/nginx/servers' if sys.platform == 'darwin' e
        'nginx conf dir')
 define('same_host', True, bool, 'only same host addr')
 
-options.app_name = const.APP_RELOAD
 options.parse_command_line()
+
+if not options.app_name:
+    options.app_name = const.APP_RELOAD
