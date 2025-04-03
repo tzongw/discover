@@ -22,14 +22,15 @@ def is_valid(addr: str):
     if addr.startswith('unix://'):
         return os.path.exists(addr[len('unix://'):])
     else:
-        return not options.same_host or Addr(addr).host == ip_address()
+        return not options.same_host or Addr(addr).host == options.host
 
 
 def reload_nginx():
+    prefix = options.host + '_' if options.same_host and options.host != ip_address() else ''
     for name in changed:
         addrs = sorted(addr_map[name])
         logging.info(f'updating: {name} {addrs}')
-        with open(os.path.join(options.conf_d, name + '_upstream'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(options.conf_d, prefix + name + '_upstream'), 'w', encoding='utf-8') as f:
             f.write('\n'.join([f'server {addr};' for addr in addrs]))
             f.write('\n')
     changed.clear()

@@ -3,7 +3,7 @@ import os
 import logging
 import const
 from datetime import timedelta, datetime
-from base import ip_address, LogSuppress
+from base import LogSuppress
 from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
@@ -113,7 +113,7 @@ def init():
         timer.tick(const.TICK_TIMER, const.TICK_STREAM)
         at_exit(lambda: timer.kill(const.TICK_TIMER))
         log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
-        runtime = Runtime(address=ip_address(), pid=os.getpid(), log_level=log_level)
+        runtime = Runtime(address=options.host, pid=os.getpid(), log_level=log_level)
         key = f'runtime:{app_name}:{app_id}'
         parser.hset(key, runtime)
         at_exit(lambda: redis.delete(key))

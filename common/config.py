@@ -39,6 +39,10 @@ def parse_app_name(app_name: str):
     options.rpc_service = f'rpc_{app_name}'
 
 
+def host_callback(host: str):
+    assert 'rpc_address' not in options and 'http_address' not in options, f'set host={host} BEFORE rpc_port & http_port'
+
+
 def rpc_port_callback(port: int):
     if port:
         options.define('rpc_address')
@@ -62,6 +66,6 @@ define('redis_cluster', '', str, 'biz redis cluster url')
 define('datacenter', 0, int, 'data center id')
 define('log_file', type=str, help='log file path')
 define('mongo', type=str, help='mongo url')
-define('host', utils.ip_address(), str, 'public host')
+define('host', utils.ip_address(), str, 'public host', callback=host_callback)
 define('rpc_port', 0, int, 'rpc port', callback=rpc_port_callback)
 define('http_port', 0, int, 'http port', callback=http_port_callback)

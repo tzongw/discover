@@ -17,7 +17,7 @@ from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
     ShardingZTimer
-from base import func_desc, ip_address, base62, once
+from base import func_desc, base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
@@ -38,7 +38,7 @@ registry = Registry(redis, const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
-hint = f'{app_name}:{options.env}:{ip_address()}:{app_id}'
+hint = f'{app_name}:{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 invalidator = create_invalidator(redis)
 script = Script(redis)
@@ -60,9 +60,9 @@ else:
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
 
-user_service = UserService(registry, const.RPC_USER)  # type: Union[UserService, service.user.Iface]
-gate_service = GateService(registry, const.RPC_GATE)  # type: Union[GateService, service.gate.Iface]
-timer_service = TimerService(registry, const.RPC_TIMER)  # type: Union[TimerService, service.timer.Iface]
+user_service = UserService(registry, const.RPC_USER, options.host)  # type: Union[UserService, service.user.Iface]
+gate_service = GateService(registry, const.RPC_GATE, options.host)  # type: Union[GateService, service.gate.Iface]
+timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: Union[TimerService, service.timer.Iface]
 
 _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []

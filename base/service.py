@@ -8,12 +8,13 @@ import gevent
 from thrift.protocol.TProtocol import TProtocolBase
 from .registry import Registry
 from .thrift_pool import ThriftPool
-from .utils import ip_address, Addr, DefaultDict
+from .utils import Addr, DefaultDict
 
 
 class Service:
-    def __init__(self, registry: Registry, name, **settings):
+    def __init__(self, registry: Registry, name, host, **settings):
         self._name = name
+        self._local_host = host
         self._registry = registry
         self._pools = DefaultDict(lambda address: ThriftPool(Addr(address), **settings))  # type: Dict[str, ThriftPool]
         self._cooldown = {}  # type: Dict[str, float]
@@ -72,8 +73,7 @@ class Service:
             self._cooldown.pop(addr)
         addresses = sorted(self.addresses())
         self._good_addresses = [addr for addr in addresses if addr not in self._cooldown]
-        local_host = ip_address()
-        self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == local_host]
+        self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == self._local_host]
         return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire interval
 
     def _reap_cooldown(self):
