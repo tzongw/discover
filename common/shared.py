@@ -72,12 +72,6 @@ if options.env == const.Environment.DEV:
     ShardingHeavyTask.push = HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
 
-@receiver(const.TICK_STREAM)
-def _on_tick(_, sid):
-    ts = int(sid[:-2])
-    time_dispatcher.dispatch_tick(ts)
-
-
 @dataclass
 class Status:
     inited = False

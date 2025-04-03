@@ -87,14 +87,16 @@ def init():
         timer_service.call_later(rpc_service, 'notice:1', 'one shot', delay=3)
         timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
         at_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
-        timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
-        at_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
+        if options.tick_timer:
+            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
+            at_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
         at_exit(lambda: ztimer.kill('welcome:2'))
-        ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
-        at_exit(lambda: ztimer.kill(const.TICK_TIMER))
+        if options.tick_timer:
+            ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+            at_exit(lambda: ztimer.kill(const.TICK_TIMER))
         pc = PeriodicCallback(scheduler, poll_timeout, timedelta(seconds=1))
         at_exit(pc.stop)
     elif options.init_timer == 'task':
@@ -110,8 +112,9 @@ def init():
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
-        timer.tick(const.TICK_TIMER, const.TICK_STREAM)
-        at_exit(lambda: timer.kill(const.TICK_TIMER))
+        if options.tick_timer:
+            timer.tick(const.TICK_TIMER, const.TICK_STREAM)
+            at_exit(lambda: timer.kill(const.TICK_TIMER))
         log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
         runtime = Runtime(address=options.host, pid=os.getpid(), log_level=log_level)
         key = f'runtime:{app_name}:{app_id}'
