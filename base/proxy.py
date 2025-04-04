@@ -1,15 +1,21 @@
 import itertools
+from random import shuffle
 from datetime import datetime
 from typing import Callable
 from .singleflight import singleflight
 
 
-class SlaveProxy:
+class BalanceProxy:
     def __init__(self, targets):
+        targets = list(targets)
+        shuffle(targets)
         self._iter = itertools.cycle(targets)
 
+    def pick(self):
+        return next(self._iter)
+
     def __getattr__(self, name):
-        target = next(self._iter)
+        target = self.pick()
         return getattr(target, name)
 
 

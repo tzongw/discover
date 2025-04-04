@@ -18,8 +18,8 @@ class Service:
         self._registry = registry
         self._pools = DefaultDict(lambda address: ThriftPool(Addr(address), **settings))  # type: Dict[str, ThriftPool]
         self._cooldown = {}  # type: Dict[str, float]
-        self._local_addresses = []
-        self._good_addresses = []
+        self._healthy_addresses = []  # addresses not in cooldown
+        self._local_addresses = []  # healthy addresses with same host
         registry.add_callback(self._update_addresses)
         self._update_addresses()
         self._reaping = False
@@ -28,13 +28,13 @@ class Service:
         return self._registry.addresses(self._name)
 
     def address(self, hint: str):
-        addresses = self._local_addresses or self._good_addresses
+        addresses = self._local_addresses or self._healthy_addresses
         return addresses[crc32(hint.encode()) % len(addresses)]
 
     @contextlib.contextmanager
     def connection(self, address=None) -> ContextManager[TProtocolBase]:
         if address is None:
-            addresses = self._local_addresses or self._good_addresses
+            addresses = self._local_addresses or self._healthy_addresses
             address = choice(addresses)
         else:
             if address in self._cooldown and address not in self.addresses():
@@ -72,8 +72,8 @@ class Service:
         for addr in expired:
             self._cooldown.pop(addr)
         addresses = sorted(self.addresses())
-        self._good_addresses = [addr for addr in addresses if addr not in self._cooldown]
-        self._local_addresses = [addr for addr in self._good_addresses if Addr(addr).host == self._local_host]
+        self._healthy_addresses = [addr for addr in addresses if addr not in self._cooldown]
+        self._local_addresses = [addr for addr in self._healthy_addresses if Addr(addr).host == self._local_host]
         return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire interval
 
     def _reap_cooldown(self):

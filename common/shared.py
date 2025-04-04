@@ -158,5 +158,5 @@ def _sig_handler(sig, frame):
 
 signal.signal(signal.SIGTERM, _sig_handler)
 signal.signal(signal.SIGINT, _sig_handler)
-signal.signal(signal.SIGQUIT, _sig_handler)
+signal.signal(signal.SIGHUP, _sig_handler)
 signal.signal(signal.SIGUSR1, _sig_handler)

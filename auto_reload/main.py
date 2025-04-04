@@ -10,7 +10,7 @@ from setproctitle import setproctitle
 from common import shared
 from base import ip_address, Addr
 
-addr_map = {}
+service_addresses = {}
 changed = set()
 
 
@@ -27,11 +27,11 @@ def is_valid(addr: str):
 
 def reload_nginx():
     prefix = options.host + '_' if options.same_host and options.host != ip_address() else ''
-    for name in changed:
-        addrs = sorted(addr_map[name])
-        logging.info(f'updating: {name} {addrs}')
-        with open(os.path.join(options.conf_d, prefix + name + '_upstream'), 'w', encoding='utf-8') as f:
-            f.write('\n'.join([f'server {addr};' for addr in addrs]))
+    for service in changed:
+        addresses = sorted(service_addresses[service])
+        logging.info(f'updating: {service} {addresses}')
+        with open(os.path.join(options.conf_d, prefix + service + '_upstream'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join([f'server {addr};' for addr in addresses]))
             f.write('\n')
     changed.clear()
     os.system('nginx -s reload')
@@ -41,15 +41,15 @@ def reload_nginx():
 def update_upstreams():
     empty = not changed
     # noinspection PyProtectedMember
-    for name, addrs in shared.registry._addresses.items():
-        if not is_api(name):
+    for service, addresses in shared.registry._addresses.items():
+        if not is_api(service):
             continue
-        addrs = {addr for addr in addrs if is_valid(addr)}
-        exists = addr_map.get(name)
-        if addrs and addrs != exists:
-            logging.info(f'{name} changed: {exists} -> {addrs}')
-            addr_map[name] = addrs
-            changed.add(name)
+        addresses = {addr for addr in addresses if is_valid(addr)}
+        current = service_addresses.get(service)
+        if addresses and addresses != current:
+            logging.info(f'{service} changed: {current} -> {addresses}')
+            service_addresses[service] = addresses
+            changed.add(service)
     if empty and changed:
         logging.info('spawn reload')
         gevent.spawn_later(1.0, reload_nginx)
