@@ -199,7 +199,7 @@ def diff_dict(after: dict, before: dict):
 def apply_diff(origin: dict, diff: dict):
     for key, value in diff.items():
         if value is None:
-            origin.pop(key, None)
+            origin.pop(key)
             continue
         vo = origin.get(key)
         if isinstance(vo, dict) and isinstance(value, dict):
