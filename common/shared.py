@@ -25,9 +25,9 @@ from .config import options, ctx
 from .rpc_service import UserService, GateService, TimerService
 
 executor = Executor(name='shared')
+dispatcher = Dispatcher(executor)
+time_dispatcher = TimeDispatcher(executor)
 scheduler = Scheduler()
-dispatcher = Dispatcher()
-time_dispatcher = TimeDispatcher()
 
 app_name = options.app_name
 rpc_service = options.rpc_service
@@ -125,7 +125,7 @@ def spawn_worker(f, *args, **kwargs):
         with LogSuppress():
             f(*args, **kwargs)
         t = time.time() - start
-        if t > const.SLOW_WORKER:
+        if t > 30:
             logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
 
     g = gevent.spawn(worker)
