@@ -8,13 +8,14 @@ from dataclasses import dataclass
 from typing import Union
 from weakref import WeakSet
 import gevent
-from redis import Redis, RedisCluster
+from redis import RedisCluster
 from base import Registry, LogSuppress, Exclusion, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
+from base.utils import create_redis
 from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
     ShardingZTimer
 from base import func_desc, base62, once
@@ -32,9 +33,8 @@ scheduler = Scheduler()
 app_name = options.app_name
 rpc_service = options.rpc_service
 http_service = options.http_service
-redis = RedisCluster.from_url(options.redis_cluster, decode_responses=True) if options.redis_cluster else \
-    Redis.from_url(options.redis, decode_responses=True)
-registry = Registry(redis, const.SERVICES)
+redis = create_redis(options.redis)
+registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
@@ -44,7 +44,7 @@ invalidator = create_invalidator(redis)
 script = Script(redis)
 run_exclusively = Exclusion(redis)
 
-if options.redis_cluster:
+if isinstance(redis, RedisCluster):
     ztimer = ShardingZTimer(redis, app_name, sharding_key=ShardingKey(shards=3))
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)

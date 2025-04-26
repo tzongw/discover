@@ -6,6 +6,7 @@ import string
 import time
 import traceback
 import contextlib
+from random import choice
 from binascii import crc32
 from collections import defaultdict
 from functools import lru_cache, wraps
@@ -154,6 +155,14 @@ def redis_name(redis: Union[Redis, RedisCluster]):
         port = kwargs.get('port', 6379)
         db = kwargs.get('db', 0)
         return f'{host}:{port}/{db}'
+
+
+def create_redis(addr: str):
+    if ',' in addr:
+        addr = choice(addr.split(','))
+        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
+    else:
+        return Redis.from_url(f'redis://{addr}', decode_responses=True)
 
 
 def stable_hash(o):
