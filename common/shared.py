@@ -111,7 +111,7 @@ atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
 def _cleanup():  # call once
     logging.info(f'cleanup')
     with LogSuppress():
-        if options.env == const.Environment.DEV:  # ptpython compatible
+        if sys.argv[0].endswith('ptpython'):  # ptpython compatible
             for fn in _exits:
                 fn()
         else:
