@@ -34,11 +34,10 @@ def reload_nginx():
             f.write('\n'.join([f'server {addr};' for addr in addresses]))
             f.write('\n')
     changed.clear()
-    code = os.system('nginx -s reload')
-    if code == 0:
-        logging.info('nginx reload success')
+    if status := os.system('nginx -s reload'):
+        logging.error(f'nginx reload fail: {status}')
     else:
-        logging.error(f'nginx reload fail: {code}')
+        logging.info('nginx reload success')
 
 
 def update_upstreams():
