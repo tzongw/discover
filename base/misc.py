@@ -8,10 +8,13 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
 from random import shuffle
+from weakref import WeakKeyDictionary
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
+from gevent.hub import Hub
 from gevent.local import local
+from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
 from sqlalchemy import and_, DateTime, Date
 from pydantic import BaseModel
@@ -471,3 +474,31 @@ def build_operation(tb, params: dict):
         else:
             raise ValueError(f'`{op}` unrecognized operator')
     return operation
+
+
+class SwitchTracer:
+    def __init__(self):
+        self._tracing = WeakKeyDictionary()
+
+    def enable(self):
+        Hub.settrace(self._trace)
+
+    def __enter__(self):
+        g = getcurrent()
+        self._tracing[g] = False
+        return self
+
+    def __exit__(self, exctype, excinst, exctb):
+        g = getcurrent()
+        self._tracing.pop(g)
+
+    def is_switched(self):
+        g = getcurrent()
+        return self._tracing.get(g, False)
+
+    def _trace(self, event, args):
+        if event != 'switch':
+            return
+        g = args[0]
+        if g in self._tracing:
+            self._tracing[g] = True

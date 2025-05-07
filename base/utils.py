@@ -3,8 +3,6 @@ import fcntl
 import logging
 import socket
 import string
-import time
-import traceback
 import contextlib
 from random import choice
 from binascii import crc32
@@ -28,12 +26,6 @@ class LogSuppress(contextlib.suppress):
         if suppress:
             logging.exception('suppressed')
         return suppress
-
-
-def log_if_slow(start_time, threshold, message):
-    elapsed = time.time() - start_time
-    if elapsed > threshold:
-        logging.warning(f'elapsed: {elapsed:.2f}s {message}\n' + ''.join(traceback.format_stack()[:-1]))
 
 
 class Addr:

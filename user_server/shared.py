@@ -9,7 +9,7 @@ from flasgger import Swagger
 from flask import Flask, g
 from base import TtlCache
 from base import ListConverter
-from base.misc import JSONProvider, make_response
+from base.misc import JSONProvider, make_response, SwitchTracer
 import const
 from models import Session
 
@@ -23,6 +23,7 @@ if options.env == const.Environment.DEV:
     app.debug = True
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
+switch_tracer = SwitchTracer()
 
 
 def online_key(uid: int):
