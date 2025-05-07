@@ -6,7 +6,7 @@ from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
 from typing import Type, Self
 from contextlib import contextmanager
-from gevent import threading
+from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
@@ -31,7 +31,7 @@ class SessionMaker(sessionmaker):
     def __init__(self, bind, *, tx_slow=0.1, **kwargs):
         super().__init__(bind, **kwargs)
         self.tx_slow = tx_slow
-        self.tx_lock = threading.RLock()
+        self.tx_lock = RLock()
 
     @contextmanager
     def transaction(self):
