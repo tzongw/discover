@@ -38,8 +38,7 @@ class SessionMaker(sessionmaker):
         with self.tx_lock, self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
             yield session
-            if switch_tracer.is_switched():
-                logging.error('transaction switched\n' + ''.join(traceback.format_stack()))
+            assert not switch_tracer.is_switched(), 'transaction switched'
 
 
 if options.env in [const.Environment.DEV, const.Environment.TEST]:

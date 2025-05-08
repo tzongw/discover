@@ -25,14 +25,13 @@ from . import const
 from .config import options, ctx
 from .rpc_service import UserService, GateService, TimerService
 
+app_name = options.app_name
+rpc_service = options.rpc_service
+http_service = options.http_service
 executor = Executor(name='shared')
 dispatcher = Dispatcher(executor)
 time_dispatcher = TimeDispatcher(executor)
 scheduler = Scheduler()
-
-app_name = options.app_name
-rpc_service = options.rpc_service
-http_service = options.http_service
 redis = create_redis(options.redis)
 registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)
 unique_id = UniqueId(redis)
@@ -40,8 +39,8 @@ app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
 id_generator = snowflake.IdGenerator(options.datacenter, app_id)
 hint = f'{app_name}:{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
-invalidator = create_invalidator(redis)
 script = Script(redis)
+invalidator = create_invalidator(redis)
 run_exclusively = Exclusion(redis)
 
 if isinstance(redis, RedisCluster):
