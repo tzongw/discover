@@ -3,16 +3,15 @@ import fcntl
 import logging
 import socket
 import string
+import hashlib
 import contextlib
 from random import choice
-from binascii import crc32
 from collections import defaultdict
 from functools import lru_cache, wraps
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
-from yaml import safe_dump
 
 
 class LogSuppress(contextlib.suppress):
@@ -157,9 +156,9 @@ def create_redis(addr: str):
         return Redis.from_url(f'redis://{addr}', decode_responses=True)
 
 
-def stable_hash(o):
-    s = safe_dump(o)
-    return crc32(s.encode())
+def string_hash(s: str):
+    digest = hashlib.md5(s.encode()).digest()
+    return int.from_bytes(digest[:8], signed=True)
 
 
 def flock(path):
