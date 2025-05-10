@@ -147,7 +147,7 @@ class FullMixin(Generic[T]):
         self._version = version
         return values
 
-    def cached(self, maxsize=128, typed=False, get_expire=None):
+    def cached(self, func=None, *, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
             @functools.lru_cache(maxsize, typed)
             def inner(*args, **kwargs):
@@ -173,7 +173,7 @@ class FullMixin(Generic[T]):
             wrapper.cache_clear = inner.cache_clear
             return wrapper
 
-        return decorator
+        return decorator(func) if func else decorator
 
 
 class FullCache(FullMixin[T], Cache[T]):

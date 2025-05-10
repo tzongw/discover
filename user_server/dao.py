@@ -278,7 +278,7 @@ profile_cache.listen(invalidator, Profile.__name__)
 Profile.mget = profile_cache.mget
 
 
-@profile_cache.cached()
+@profile_cache.cached
 def valid_profiles():
     now = datetime.now()
     return [profile for profile in profile_cache.values if profile.expire > now]
