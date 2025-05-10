@@ -50,7 +50,7 @@ def init_trace():
 
 
 @async_task
-@heavy_task
+@heavy_task(priority=heavy_task.Priority.HIGH)
 @exclusion('lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
@@ -482,7 +482,7 @@ def authorize():
 
 
 @bp.route('/whoami')
-@user_limiter(cooldown=10, count=2)
+@user_limiter(cooldown=10, threshold=2)
 def whoami():
     """whoami
     ---
