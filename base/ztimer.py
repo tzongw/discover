@@ -50,8 +50,8 @@ class ZTimer:
             redis.function_load(_SCRIPT, replace=True)
             self.loaded.add(name)
         self.redis = redis
-        self._timeout_key = f'ztimer.timeout:{{{biz}}}'
-        self._meta_key = f'ztimer.meta:{{{biz}}}'
+        self._timeout_key = f'ztimer:timeout:{{{biz}}}'
+        self._meta_key = f'ztimer:meta:{{{biz}}}'
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         interval = interval.total_seconds()

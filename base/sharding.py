@@ -94,7 +94,7 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardingReceiver(Receiver):
-    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=50):
+    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=32):
         super().__init__(redis, group, consumer, workers, dispatcher=NormalizedDispatcher)
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
@@ -218,7 +218,7 @@ class MigratingTimer(ShardingTimer):
 
 
 class MigratingReceiver(ShardingReceiver):
-    def __init__(self, redis, group: str, consumer: str, *, workers=50, old_receiver: Receiver):
+    def __init__(self, redis, group: str, consumer: str, *, workers=32, old_receiver: Receiver):
         assert old_receiver.redis is not redis, 'same redis, use ShardingReceiver instead'
         super().__init__(redis, group, consumer, workers=workers)
         self.old_receiver = old_receiver
@@ -381,15 +381,15 @@ class MigratingZTimer(ShardingZTimer):
 
 
 class ShardingHeavyTask(HeavyTask):
-    def __init__(self, redis: RedisCluster, key: str):
-        super().__init__(redis, key)
+    def __init__(self, redis: RedisCluster, biz: str):
+        super().__init__(redis, biz)
         self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
 
-    def push(self, task):
-        value = task.json(exclude_defaults=True)
+    def _get_queue(self, task):
         key = self._sharding_key.random_sharded_key(self._key)
-        total = self.redis.rpush(key, value)
-        logging.info(f'+task {task} total {total}')
+        priority = self._priorities[task.path]
+        queue = f'{key}:{priority}'
+        return queue
 
     def start(self, exec_func=None):
         logging.info(f'start {self._key}')
@@ -411,9 +411,9 @@ class ShardingHeavyTask(HeavyTask):
 
 
 class MigratingHeavyTask(ShardingHeavyTask):
-    def __init__(self, redis: RedisCluster, key: str, *, old_heavy_task: HeavyTask):
+    def __init__(self, redis: RedisCluster, biz: str, *, old_heavy_task: HeavyTask):
         assert old_heavy_task.redis is not redis, 'same redis, use ShardingHeavyTask instead'
-        super().__init__(redis, key)
+        super().__init__(redis, biz)
         self.old_heavy_task = old_heavy_task
 
     def start(self, exec_func=None):

@@ -48,13 +48,13 @@ if isinstance(redis, RedisCluster):
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
+    heavy_task = ShardingHeavyTask(redis, app_name)
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    heavy_task = HeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
+    heavy_task = HeavyTask(redis, app_name)
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -67,8 +67,8 @@ _exits = [registry.stop, receiver.stop, heavy_task.stop]
 _mains = []
 
 if options.env == const.Environment.DEV:
-    # run in thread for debugging
-    ShardingHeavyTask.push = HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
+    # for debug
+    HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
 
 
 @dataclass
@@ -146,7 +146,7 @@ def _sig_handler(sig, frame):
         _cleanup()
         if sig == signal.SIGUSR1 or not status.sysexit:
             return
-        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 3}.get(options.env, 10)
+        seconds = {const.Environment.DEV: 0, const.Environment.TEST: 3}.get(options.env, 10)
         gevent.sleep(seconds)  # wait for requests & messages
         sys.exit(0)
 

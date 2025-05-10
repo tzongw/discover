@@ -186,7 +186,7 @@ class RedisCacheMixin(CacheMixin):
         v = cls.__fields_version__
         if v is None:
             v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
-        return f'{cls.__name__}.{v}:{cls.id.to_python(key)}'
+        return f'{cls.__name__}:{v}:{cls.id.to_python(key)}'
 
     def invalidate(self, invalidator: Invalidator):
         key = self.make_key(self.id)
