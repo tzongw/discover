@@ -41,20 +41,20 @@ hint = f'{app_name}:{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
 invalidator = create_invalidator(redis)
-run_exclusively = Exclusion(redis)
+exclusion = Exclusion(redis)
 
 if isinstance(redis, RedisCluster):
     ztimer = ShardingZTimer(redis, app_name, sharding_key=ShardingKey(shards=3))
     timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
+    heavy_task = ShardingHeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
     publisher = Publisher(redis, hint=hint)
     receiver = Receiver(redis, group=app_name, consumer=hint)
-    run_in_process = heavy_task = HeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
+    heavy_task = HeavyTask(redis, f'heavy_tasks:{app_name}:{options.env}')
 
 async_task = AsyncTask(timer, publisher, receiver)
 poller = Poller(redis, async_task)
@@ -132,7 +132,7 @@ def spawn_worker(f, *args, **kwargs):
     return g
 
 
-def run_in_worker(f):
+def async_worker(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         spawn_worker(f, *args, **kwargs)

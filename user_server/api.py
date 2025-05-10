@@ -22,12 +22,11 @@ from base.poller import PollStatus
 from base.utils import base62
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
-from common.shared import run_exclusively
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, run_in_process, script, scheduler
+from shared import session_key, async_task, heavy_task, script, scheduler, exclusion
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -51,8 +50,8 @@ def init_trace():
 
 
 @async_task
-@run_in_process
-@run_exclusively('lock:{message}', timedelta(seconds=30))
+@heavy_task
+@exclusion('lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')

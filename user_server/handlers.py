@@ -7,7 +7,7 @@ from base import LogSuppress
 from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
-    time_dispatcher, run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
+    time_dispatcher, async_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
 from config import options
@@ -70,7 +70,7 @@ def on_10s(dt: datetime):
 
 
 @async_task
-@run_in_worker
+@async_worker
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
     async_task.cancel('task:hello')
