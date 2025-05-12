@@ -67,13 +67,13 @@ class AsyncTask(_BaseTask):
 
     def __call__(self, f):
         path = self.add_path(f)
+        vf = self.paths[path]
         stream = self.stream_name(Task(path=path))
-        vf = var_args(f)
 
         @self.receiver(Task, stream=stream)
         def handler(task: Task):
-            args = loads(task.args)  # type: list
-            kwargs = loads(task.kwargs)  # type: dict
+            args = loads(task.args)
+            kwargs = loads(task.kwargs)
             vf(*args, **kwargs)
 
         @functools.wraps(f)
