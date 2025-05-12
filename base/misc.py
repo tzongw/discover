@@ -7,7 +7,7 @@ from binascii import crc32
 from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
-from random import shuffle
+from random import choice
 from weakref import WeakKeyDictionary
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
@@ -196,7 +196,7 @@ class RedisCacheMixin(CacheMixin):
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'semaphore:{name}:{i}' for i in range(value)]
+        self.keys = [f'semaphore:{name}:{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
@@ -205,30 +205,28 @@ class Semaphore:
     def __enter__(self):
         assert not self.local.__dict__, 'recursive lock'
         token = str(uuid.uuid4())
-        shuffle(self.names)
-        for name in self.names:
-            if self.redis.set(name, token, nx=True, px=self.timeout):
-                self.local.name = name
+        keys = self.keys
+        while keys:
+            key = choice(keys)
+            if self.redis.set(key, token, nx=True, px=self.timeout):
+                self.local.key = key
                 self.local.token = token
                 return self
+            values = self.redis.mget_nonatomic(keys) if isinstance(self.redis, RedisCluster) else self.redis.mget(keys)
+            keys = [key for key, value in zip(keys, values) if value is None]
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exctype, excinst, exctb):
-        keys = [self.local.name]
-        args = [self.local.token]
-        del self.local.name
-        del self.local.token
+        keys, args = [self.local.key], [self.local.token]
+        del self.local.key, self.local.token
         self.lua_release(keys=keys, args=args)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
-        name, token = self.local.name, self.local.token
-        if self.lua_reacquire(keys=[name], args=[token, timeout]):
+        key, token = self.local.key, self.local.token
+        if self.lua_reacquire(keys=[key], args=[token, timeout]):
             return
         raise LockError('Lock not owned')
-
-    def occupied(self):
-        return sum(self.redis.exists(*self.names))
 
 
 class Inventory:
