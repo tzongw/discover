@@ -6,7 +6,6 @@ import logging
 from functools import wraps
 from dataclasses import dataclass
 from typing import Union
-from weakref import WeakSet
 import gevent
 from redis import RedisCluster
 from base import Registry, LogSuppress, Exclusion, ZTimer
@@ -79,7 +78,7 @@ class Status:
 
 
 status = Status()
-_workers = WeakSet()  # thread workers
+_workers = set()  # thread workers
 
 
 def at_main(func):

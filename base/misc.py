@@ -8,7 +8,6 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
 from random import choice
-from weakref import WeakKeyDictionary
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
@@ -476,7 +475,7 @@ def build_operation(tb, params: dict):
 
 class SwitchTracer:
     def __init__(self):
-        self._tracing = WeakKeyDictionary()
+        self._tracing = {}
 
     def enable(self):
         Hub.settrace(self._trace)
@@ -492,7 +491,7 @@ class SwitchTracer:
 
     def is_switched(self):
         g = getcurrent()
-        return self._tracing.get(g, False)
+        return self._tracing[g]
 
     def _trace(self, event, args):
         if event != 'switch':
