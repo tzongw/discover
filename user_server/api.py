@@ -435,8 +435,7 @@ def login(username: str, password: str):
     key = session_key(account.id)
     with redis.pipeline(transaction=True, shard_hint=key) as pipe:
         pipe.hkeys(key)
-        pipe.hset(key, token, models.Session(create_time=datetime.now()))
-        pipe.hexpire(key, app.permanent_session_lifetime, token)
+        pipe.hsetex(key, token, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime)
         tokens = pipe.execute()[0]
     if len(tokens) >= MAX_SESSIONS:
         ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
