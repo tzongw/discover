@@ -1,3 +1,4 @@
+import json
 import logging
 import gevent
 from redis import Redis, RedisCluster
@@ -38,15 +39,15 @@ class Registry:
         logging.info(f'stop {self._registered}')
         self._stopped = True
         if self._registered:
-            self._unregister()
+            self._unregister_and_notify()
 
     def register(self, services):
         assert not self._stopped, 'MUST start first'
         logging.info(f'register {services}')
         self._registered.update(services)
         self._register()
-        logging.info(f'publish {self._registered}')
-        self._redis.publish(self._PREFIX, 'register')
+        msg = json.dumps({'action': 'register', 'services': services})
+        self._redis.publish(self._PREFIX, msg)  # notify
 
     def _register(self):
         with self._redis.pipeline(transaction=False) as pipe:
@@ -55,12 +56,13 @@ class Registry:
                 pipe.hsetex(key, address, '', ex=self._TTL)
             pipe.execute()
 
-    def _unregister(self):
+    def _unregister_and_notify(self):
         with self._redis.pipeline(transaction=False) as pipe:
             for name, address in self._registered.items():
                 pipe.hdel(self._full_key(name), address)
+            msg = json.dumps({'action': 'unregister', 'services': self._registered})
+            pipe.publish(self._PREFIX, msg)
             pipe.execute()
-        self._redis.publish(self._PREFIX, 'unregister')
 
     def addresses(self, name) -> frozenset[str]:  # constant
         return self._addresses.get(name) or frozenset()
@@ -87,7 +89,7 @@ class Registry:
                 if self._registered and not self._stopped:
                     self._register()
                     if self._stopped:  # race
-                        self._unregister()
+                        self._unregister_and_notify()
                 if not pubsub:
                     pubsub = self._redis.pubsub()
                     pubsub.subscribe(self._PREFIX)
