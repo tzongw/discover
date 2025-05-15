@@ -37,17 +37,25 @@ class Registry:
             return
         logging.info(f'stop {self._registered}')
         self._stopped = True
-        self._unregister()
+        if self._registered:
+            self._unregister()
 
     def register(self, services):
         assert not self._stopped, 'MUST start first'
         logging.info(f'register {services}')
         self._registered.update(services)
-        self._unregister()  # remove first & wake up
+        self._register()
+        logging.info(f'publish {self._registered}')
+        self._redis.publish(self._PREFIX, 'register')
+
+    def _register(self):
+        with self._redis.pipeline(transaction=False) as pipe:
+            for name, address in self._registered.items():
+                key = self._full_key(name)
+                pipe.hsetex(key, address, '', ex=self._TTL)
+            pipe.execute()
 
     def _unregister(self):
-        if not self._registered:
-            return
         with self._redis.pipeline(transaction=False) as pipe:
             for name, address in self._registered.items():
                 pipe.hdel(self._full_key(name), address)
@@ -74,21 +82,12 @@ class Registry:
 
     def _run(self):
         pubsub = None
-        published = False
         while True:
             try:
                 if self._registered and not self._stopped:
-                    with self._redis.pipeline(transaction=False) as pipe:
-                        for name, address in self._registered.items():
-                            key = self._full_key(name)
-                            pipe.hsetex(key, address, '', ex=self._TTL)
-                        pipe.execute()
+                    self._register()
                     if self._stopped:  # race
                         self._unregister()
-                    elif not published:
-                        logging.info(f'publish {self._registered}')
-                        self._redis.publish(self._PREFIX, 'register')
-                        published = True
                 if not pubsub:
                     pubsub = self._redis.pubsub()
                     pubsub.subscribe(self._PREFIX)
