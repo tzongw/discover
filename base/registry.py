@@ -51,8 +51,8 @@ class Registry:
         with self._redis.pipeline(transaction=False) as pipe:
             for name, address in self._registered.items():
                 pipe.hdel(self._full_key(name), address)
-            pipe.publish(self._PREFIX, 'unregister')
             pipe.execute()
+        self._redis.publish(self._PREFIX, 'unregister')
 
     def addresses(self, name) -> frozenset[str]:  # constant
         return self._addresses.get(name) or frozenset()
