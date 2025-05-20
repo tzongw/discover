@@ -37,6 +37,7 @@ def patch_callbacks(callbacks):
         callbacks['GETEX'] = callback
         callbacks['MGET'] = mget_callback
         callbacks['HMGET'] = callback
+        callbacks['HGET'] = callback
     if 'HGETALL_ORIG' not in callbacks and 'HGETALL' in callbacks:
         callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
         callbacks['HGETALL'] = hgetall_callback
@@ -107,6 +108,9 @@ class Parser:
 
     def hgetall(self, name, cls: Type[M]):
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
+
+    def hgetone(self, name, field, cls: Type[M]):
+        return self._redis.execute_command('HGET', name, field, convert=self._parser(cls))
 
     mget_nonatomic = mget
 
