@@ -23,7 +23,7 @@ def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-def poll_timeout():
+def poll_timeouts():
     for full_key, data in ztimer.poll().items():
         with LogSuppress():
             dispatch_timeout(full_key, data)
@@ -97,7 +97,7 @@ def init():
         if options.tick_timer:
             ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
             at_exit(lambda: ztimer.kill(const.TICK_TIMER))
-        pc = PeriodicCallback(scheduler, poll_timeout, timedelta(seconds=1))
+        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
         at_exit(pc.stop)
     elif options.init_timer == 'task':
         oneshot_id = 'timer:oneshot'
