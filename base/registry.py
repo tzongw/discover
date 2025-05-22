@@ -74,21 +74,21 @@ class Registry:
 
     def _run(self):
         pubsub = None
+        published = False
         while True:
             try:
                 if self._registered and not self._stopped:
-                    values = []
-                    for name, address in self._registered.items():
-                        key = self._full_key(name)
-                        with self._redis.pipeline(transaction=True, shard_hint=key) as pipe:
-                            pipe.hset(key, address, '')
-                            pipe.hexpire(key, self._TTL, address)
-                            values += pipe.execute()
+                    with self._redis.pipeline(transaction=False) as pipe:
+                        for name, address in self._registered.items():
+                            key = self._full_key(name)
+                            pipe.hsetex(key, address, '', ex=self._TTL)
+                        pipe.execute()
                     if self._stopped:  # race
                         self._unregister()
-                    elif any(added for added in values[::2]):
+                    elif not published:
                         logging.info(f'publish {self._registered}')
                         self._redis.publish(self._PREFIX, 'register')
+                        published = True
                 if not pubsub:
                     pubsub = self._redis.pubsub()
                     pubsub.subscribe(self._PREFIX)

@@ -47,7 +47,7 @@ class Handler:
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
         self._services = DefaultDict(
-            lambda name: Service(shared.registry, name))  # type: Dict[str, Service]
+            lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
 
     def load_timers(self):
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
@@ -100,11 +100,7 @@ class Handler:
         old_info = shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
-
-        def callback():
-            self._fire_timer(service, key, data)
-
-        pc = PeriodicCallback(shared.scheduler, callback, interval)
+        pc = PeriodicCallback(shared.scheduler, lambda: self._fire_timer(service, key, data), interval)
         self._delete_timer(service, key)
         self._timers[full_key] = Timer(info=info, cancel=pc.stop)
 
@@ -180,7 +176,7 @@ def main():
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     workers += shared.registry.start()
     shared.init_main()
-    shared.registry.register({const.RPC_TIMER: f'{options.rpc_address}'})
+    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     handler.load_timers()
     shared.at_exit(handler.retreat_timers)
     atexit.register(handler.retreat_timers)  # double check

@@ -3,11 +3,11 @@ import os
 import logging
 import const
 from datetime import timedelta, datetime
-from base import ip_address, LogSuppress
+from base import LogSuppress
 from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
-    time_dispatcher, run_in_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout
+    time_dispatcher, async_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
 from config import options
@@ -23,7 +23,7 @@ def on_notice(key, data):
     logging.info(f'got timer {key} {data}')
 
 
-def poll_timeout():
+def poll_timeouts():
     for full_key, data in ztimer.poll().items():
         with LogSuppress():
             dispatch_timeout(full_key, data)
@@ -70,7 +70,7 @@ def on_10s(dt: datetime):
 
 
 @async_task
-@run_in_worker
+@async_worker
 def task(hello: str, repeat: int, interval: timedelta):
     logging.info(f'{hello * repeat} {interval}')
     async_task.cancel('task:hello')
@@ -84,18 +84,20 @@ def on_quarter(dt: datetime):
 @at_main
 def init():
     if options.init_timer == 'rpc':
-        timer_service.call_later(const.RPC_USER, 'notice:1', 'one shot', delay=3)
-        timer_service.call_repeat(const.RPC_USER, 'welcome:2', 'repeat', interval=5)
-        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, 'welcome:2'))
-        timer_service.call_repeat(const.RPC_USER, const.TICK_TIMER, '', interval=1)
-        at_exit(lambda: timer_service.remove_timer(const.RPC_USER, const.TICK_TIMER))
+        timer_service.call_later(rpc_service, 'notice:1', 'one shot', delay=3)
+        timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
+        at_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
+        if options.tick_timer:
+            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
+            at_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
         at_exit(lambda: ztimer.kill('welcome:2'))
-        ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
-        at_exit(lambda: ztimer.kill(const.TICK_TIMER))
-        pc = PeriodicCallback(scheduler, poll_timeout, timedelta(seconds=1))
+        if options.tick_timer:
+            ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+            at_exit(lambda: ztimer.kill(const.TICK_TIMER))
+        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
         at_exit(pc.stop)
     elif options.init_timer == 'task':
         oneshot_id = 'timer:oneshot'
@@ -110,10 +112,11 @@ def init():
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
-        timer.tick(const.TICK_TIMER, const.TICK_STREAM)
-        at_exit(lambda: timer.kill(const.TICK_TIMER))
+        if options.tick_timer:
+            timer.tick(const.TICK_TIMER, const.TICK_STREAM)
+            at_exit(lambda: timer.kill(const.TICK_TIMER))
         log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
-        runtime = Runtime(address=ip_address(), pid=os.getpid(), log_level=log_level)
+        runtime = Runtime(address=options.host, pid=os.getpid(), log_level=log_level)
         key = f'runtime:{app_name}:{app_id}'
         parser.hset(key, runtime)
         at_exit(lambda: redis.delete(key))

@@ -2,11 +2,12 @@
 from __future__ import annotations
 import time
 import logging
+import traceback
 from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
 from typing import Type, Self
 from contextlib import contextmanager
-from gevent import threading
+from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
@@ -20,27 +21,28 @@ from sqlalchemy.orm import sessionmaker
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
-from base.utils import PascalCaseDict, log_if_slow, apply_diff
+from base.utils import PascalCaseDict, apply_diff
 from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
 from config import options
-from shared import invalidator, id_generator
-from models import QueueConfig, SmsConfig
+from shared import invalidator, id_generator, switch_tracer
+from models import QueueConfig, SmsConfig, ConfigModels
 
 
 class SessionMaker(sessionmaker):
-    def __init__(self, bind, *, tx_slow=0.1, **kwargs):
+    def __init__(self, bind, **kwargs):
         super().__init__(bind, **kwargs)
-        self.tx_slow = tx_slow
-        self.tx_lock = threading.RLock()
+        self.tx_lock = RLock()
 
     @contextmanager
     def transaction(self):
-        with self.tx_lock, self() as session, session.begin():
+        with self.tx_lock, self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
-            start_time = time.time()
             yield session
-            log_if_slow(start_time, self.tx_slow, 'slow transaction')
+            assert not switch_tracer.is_switched(), 'transaction switched'
 
+
+if options.env in [const.Environment.DEV, const.Environment.TEST]:
+    switch_tracer.enable()
 
 echo = options.env == const.Environment.DEV
 engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
@@ -63,9 +65,10 @@ if slow_log := options.slow_log:
 
     @event.listens_for(engine, 'after_cursor_execute')
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        start_time = context.query_start_time
-        message = f'slow query: {statement} parameters: {parameters}'
-        log_if_slow(start_time, slow_log, message)
+        elapsed = time.time() - context.query_start_time
+        if elapsed > slow_log:
+            logging.warning(f'elapsed: {elapsed:.2f}s slow query: {statement} parameters: {parameters}\n' +
+                            ''.join(traceback.format_stack()))
 
 Base = declarative_base()
 
@@ -138,8 +141,6 @@ config_models = {
     ConfigKey.QUEUE: QueueConfig,
     ConfigKey.SMS: SmsConfig,
 }
-
-ConfigModels = QueueConfig | SmsConfig
 
 
 @table
@@ -277,7 +278,7 @@ profile_cache.listen(invalidator, Profile.__name__)
 Profile.mget = profile_cache.mget
 
 
-@profile_cache.cached()
+@profile_cache.cached
 def valid_profiles():
     now = datetime.now()
     return [profile for profile in profile_cache.values if profile.expire > now]

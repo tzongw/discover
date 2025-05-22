@@ -29,9 +29,9 @@ class Manager:
 
 
 class Dispatcher:
-    def __init__(self, executor=None):
+    def __init__(self, executor: Executor):
         self._handlers = defaultdict(list)
-        self._executor = executor or Executor(name='dispatcher')
+        self._executor = executor
 
     def keys(self):
         return self._handlers.keys()
@@ -69,8 +69,8 @@ class _Crontab:
 
 
 class TimeDispatcher(Dispatcher):
-    def __init__(self, executor=None):
-        super().__init__(executor or Executor(name='time_dispatcher'))
+    def __init__(self, executor: Executor):
+        super().__init__(executor)
         self._periodic_handlers = []
         self._crontab_handlers = []
 

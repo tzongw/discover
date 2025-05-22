@@ -9,7 +9,7 @@ from flasgger import Swagger
 from flask import Flask, g
 from base import TtlCache
 from base import ListConverter
-from base.misc import JSONProvider, make_response
+from base.misc import JSONProvider, make_response, SwitchTracer
 import const
 from models import Session
 
@@ -23,6 +23,7 @@ if options.env == const.Environment.DEV:
     app.debug = True
     app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
 swagger = Swagger(app)
+switch_tracer = SwitchTracer()
 
 
 def online_key(uid: int):
@@ -50,29 +51,34 @@ class Limiter:
     count: int
 
 
-def user_limiter(cooldown, count=1):
+def user_limiter(*, cooldown, threshold=1):
+    doing = set()
     limiters = {}  # type: dict[int, Limiter]
-    barrier = Limiter(expire=float('inf'), count=sys.maxsize)
 
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
+            uid = g.uid
+            if uid in doing:  # not reentrant
+                raise TooManyRequests
             now = time.time()
-            while limiters:
+            while limiters:  # expire sorted
                 uid, limiter = next(iter(limiters.items()))
                 if limiter.expire > now:
                     break
                 limiters.pop(uid)
-            uid = g.uid
-            limiter = limiters.get(uid) or Limiter(expire=now + cooldown, count=0)
-            if limiter.expire > now and limiter.count >= count:
+            limiter = limiters.get(uid)
+            if not limiter:
+                limiters[uid] = Limiter(expire=now + cooldown, count=1)
+            elif limiter.count < threshold:
+                limiter.count += 1
+            else:
                 raise TooManyRequests
+            doing.add(uid)
             try:
-                limiters[uid] = barrier  # not reentrant
                 return f(*args, **kwargs)
             finally:
-                limiter.count += 1
-                limiters[uid] = limiter
+                doing.discard(uid)
 
         return wrapper
 
@@ -80,12 +86,19 @@ def user_limiter(cooldown, count=1):
 
 
 def dispatch_timeout(full_key, data):
-    if full_key == const.TICK_TIMER:
+    if full_key != const.TICK_TIMER:
+        group, key = full_key.split(':', maxsplit=1)
+        time_dispatcher.dispatch(group, key, data)
+    elif options.tick_timer:
         now = int(time.time())
         increment = script.limited_incrby('timestamp:tick', amount=now, limit=now)
         offset = min(increment, 10)
         for ts in range(now - offset + 1, now + 1):
             time_dispatcher.dispatch_tick(ts)
-    else:
-        group, key = full_key.split(':', maxsplit=1)
-        time_dispatcher.dispatch(group, key, data)
+
+
+if options.tick_timer:
+    @receiver(const.TICK_STREAM)
+    def on_tick(_, sid):
+        ts = int(sid[:-2])
+        time_dispatcher.dispatch_tick(ts)

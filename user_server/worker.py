@@ -11,10 +11,7 @@ define('slow_time', 600, int, 'time threshold for slow task')
 
 def handle_task(task):
     ctx.trace = base62.encode(shared.id_generator.gen())
-    if shared.status.exiting:  # return back, exit asap
-        shared.heavy_task.push(task, front=True)
-    else:
-        shared.heavy_task.exec(task)
+    shared.heavy_task.exec(task)
 
 
 def main():

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+import json
 from typing import Union, Type, Optional, List, TypeVar
 from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
 from redis.cluster import ClusterPipeline
 from redis.client import _RedisCallbacks, _RedisCallbacksRESP2
+from .misc import JSONEncoder
 
 M = TypeVar('M', bound=BaseModel)
 
@@ -35,6 +37,7 @@ def patch_callbacks(callbacks):
         callbacks['GETEX'] = callback
         callbacks['MGET'] = mget_callback
         callbacks['HMGET'] = callback
+        callbacks['HGET'] = callback
     if 'HGETALL_ORIG' not in callbacks and 'HGETALL' in callbacks:
         callbacks['HGETALL_ORIG'] = callbacks['HGETALL']
         callbacks['HGETALL'] = hgetall_callback
@@ -86,24 +89,28 @@ class Parser:
     def mget(self, keys, cls: Type[M]) -> List[M]:
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
-    def hget(self, name, cls: Type[M], *, include=(), exclude=()) -> Optional[M]:
-        if not include:
-            include = [field for field in cls.__fields__ if field not in exclude]
-        else:
-            assert not exclude, '`include`, `exclude` are mutually exclusive'
-
+    def hget(self, name, cls: Type[M], *, default=False) -> Optional[M]:
         def convert(values):
-            mapping = {k: v for k, v in zip(include, values) if v is not None}
-            return cls.parse_obj(mapping) if mapping else None
+            json_fields = getattr(cls, '__json_fields__', [])
+            mapping = {k: json.loads(v) if k in json_fields else v for k, v in zip(fields, values) if v is not None}
+            return cls.parse_obj(mapping) if mapping or default else None
 
-        return self._redis.execute_command('HMGET', name, *include, convert=convert)
+        fields = cls.__fields__
+        return self._redis.execute_command('HMGET', name, *fields, convert=convert)
 
     def hset(self, name: str, model: M) -> int:
+        json_fields = getattr(model, '__json_fields__', [])
         mapping = model.dict(exclude_unset=True)
+        for k, v in mapping.items():
+            if k in json_fields:
+                mapping[k] = json.dumps(v, cls=JSONEncoder)
         return self._redis.hset(name, mapping=mapping)
 
     def hgetall(self, name, cls: Type[M]):
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
+
+    def hgetone(self, name, field, cls: Type[M]):
+        return self._redis.execute_command('HGET', name, field, convert=self._parser(cls))
 
     mget_nonatomic = mget
 

@@ -22,12 +22,11 @@ from base.poller import PollStatus
 from base.utils import base62
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
-from common.shared import run_exclusively
 from config import options, ctx
-from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS
+from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, run_in_process, script, scheduler
+from shared import session_key, async_task, heavy_task, script, scheduler, exclusion
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -35,7 +34,8 @@ cursor_filed.num_type = lambda v: int(v or 0)
 
 
 def serve():
-    server = pywsgi.WSGIServer(f':{options.http_port}', app, log=logging.getLogger(), error_log=logging.getLogger())
+    logger = None if options.env == Environment.PROD else logging.getLogger()
+    server = pywsgi.WSGIServer(f':{options.http_port}', app, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.http_port:
         gevent.sleep(0.01)
@@ -50,8 +50,8 @@ def init_trace():
 
 
 @async_task
-@run_in_process
-@run_exclusively('lock:{message}', timedelta(seconds=30))
+@heavy_task(priority=heavy_task.Priority.HIGH)
+@exclusion('lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')
@@ -435,8 +435,7 @@ def login(username: str, password: str):
     key = session_key(account.id)
     with redis.pipeline(transaction=True, shard_hint=key) as pipe:
         pipe.hkeys(key)
-        pipe.hset(key, token, models.Session(create_time=datetime.now()))
-        pipe.hexpire(key, app.permanent_session_lifetime, token)
+        pipe.hsetex(key, token, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime)
         tokens = pipe.execute()[0]
     if len(tokens) >= MAX_SESSIONS:
         ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
@@ -467,7 +466,7 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token or token not in sessions.get(uid):
         raise Unauthorized
-    g.uid = uid
+    g.uid, g.token = uid, token
     if uid in user_actives:
         return
     # refresh last active & token ttl
@@ -482,7 +481,7 @@ def authorize():
 
 
 @bp.route('/whoami')
-@user_limiter(cooldown=10, count=2)
+@user_limiter(cooldown=10, threshold=2)
 def whoami():
     """whoami
     ---

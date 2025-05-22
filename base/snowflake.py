@@ -1,6 +1,5 @@
 import time
 from datetime import datetime
-from random import randrange
 
 # twitter's snowflake parameters
 twepoch = 1288834974657
@@ -8,6 +7,7 @@ timestamp_bits = 41
 datacenter_id_bits = 5
 worker_id_bits = 10
 sequence_id_bits = 7
+assert timestamp_bits + datacenter_id_bits + worker_id_bits + sequence_id_bits == 63
 
 max_timestamp = 1 << timestamp_bits
 timestamp_mask = max_timestamp - 1
@@ -67,18 +67,20 @@ class IdGenerator:
         self._datacenter_id = datacenter_id
         self._worker_id = worker_id
         self._last_ms = 0
-        self._starting_id = self._sequence_id = randrange(0, max_sequence_id)
+        self._sequence_id = 0
 
     def gen(self) -> int:
         cur_ms = time.time_ns() // 1_000_000
         if cur_ms < self._last_ms:  # clock backwards
             cur_ms = self._last_ms
-        self._sequence_id = (self._sequence_id + 1) & sequence_id_mask
-        if cur_ms > self._last_ms:
+        if cur_ms == self._last_ms:
+            self._sequence_id += 1
+            if self._sequence_id >= max_sequence_id:
+                self._last_ms = cur_ms = cur_ms + 1  # borrow next ms
+                self._sequence_id = 0
+        else:
             self._last_ms = cur_ms
-            self._starting_id = self._sequence_id
-        elif self._sequence_id == self._starting_id:  # wrapped, borrow next ms
-            self._last_ms = cur_ms = cur_ms + 1
+            self._sequence_id = 0
         return make(cur_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
 

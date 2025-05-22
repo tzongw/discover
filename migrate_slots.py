@@ -18,7 +18,10 @@ class Confirm(Enum):
     SOME = auto()
 
 
-def migrate(redis: RedisCluster, source: Addr, target: Addr, slot, confirm=Confirm.SOME):
+confirm = Confirm.SOME
+
+
+def migrate(redis: RedisCluster, source: Addr, target: Addr, slot):
     source_node: ClusterNode = redis.nodes_manager.get_node(host=source.host, port=source.port)
     if not source_node or source_node.server_type != 'primary':
         raise ValueError(f'source({source}) not exists or not primary')
@@ -29,10 +32,13 @@ def migrate(redis: RedisCluster, source: Addr, target: Addr, slot, confirm=Confi
         raise ValueError(f'source({source}) not own slot({slot})')
     count = redis.cluster_countkeysinslot(slot)
     logging.info(f'migrate slot({slot} source({source}) -> target({target}) begin')
+    global confirm
     if confirm == Confirm.ALWAYS or confirm == Confirm.SOME and count > 0:
-        logging.info(f'{count} keys in slot({slot}), continue? (Y/n)')
-        answer = sys.stdin.readline()
-        if answer.strip() != 'Y':
+        logging.info(f'{count} keys in slot({slot}), continue? (YES/Y/n)')
+        answer = sys.stdin.readline().strip()
+        if answer == 'YES':
+            confirm = Confirm.NEVER
+        elif answer != 'Y':
             logging.info(f'migrate break!!')
             sys.exit(0)
     source_id = redis.cluster_myid(target_node=source_node)

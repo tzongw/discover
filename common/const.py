@@ -1,10 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 PING_INTERVAL = 45
 WS_TIMEOUT = 60
 RPC_PING_STEP = 10
 ONLINE_TTL = 3 * PING_INTERVAL * RPC_PING_STEP
-SLOW_WORKER = 30
 
 APP_USER = 'user'
 APP_GATE = 'gate'
@@ -18,12 +17,12 @@ RPC_USER = f'rpc_{APP_USER}'
 HTTP_USER = f'http_{APP_USER}'
 RPC_TIMER = f'rpc_{APP_TIMER}'
 RPC_GATE = f'rpc_{APP_GATE}'
-WS_GATE = f'ws_{APP_GATE}'
+HTTP_GATE = f'http_{APP_GATE}'
 
-SERVICES = [RPC_USER, HTTP_USER, RPC_TIMER, RPC_GATE, WS_GATE]
+SERVICES = [RPC_USER, HTTP_USER, RPC_TIMER, RPC_GATE, HTTP_GATE]
 
 
-class Environment(Enum):
+class Environment(StrEnum):
     DEV = 'dev'
     TEST = 'test'
     STAGING = 'staging'

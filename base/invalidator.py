@@ -19,8 +19,8 @@ class Invalidator:
         self.futures = WeakValueDictionary()
         self.getters = {}
 
-    def __call__(self, key):
-        return self.dispatcher(key)
+    def __call__(self, group):
+        return self.dispatcher(group)
 
     def getter(self, group):
         def decorator(f):

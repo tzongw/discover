@@ -7,11 +7,13 @@ from binascii import crc32
 from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
-from random import shuffle
+from random import choice
 from typing import Any, Callable, Optional, Self, Union
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
+from gevent.hub import Hub
 from gevent.local import local
+from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
 from sqlalchemy import and_, DateTime, Date
 from pydantic import BaseModel
@@ -127,21 +129,20 @@ class GetterMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, field, start, end, *, asc=True, batch=1000):
+    def batch_range(cls, field, *, start, stop, batch=1000):
+        asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
         while True:
-            query = {f'{field}__gte': start, f'{field}__lte': end, f'{cls.id.name}__nin': seen_ids}
+            query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
+                {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
             docs = list(cls.objects(**query).order_by(order_by).limit(batch))
             if not docs:
                 return
             last = docs[-1][field]
-            if asc and last != start:
+            if last != start:
                 seen_ids = []
                 start = last
-            elif not asc and last != end:
-                seen_ids = []
-                end = last
             for doc in reversed(docs):
                 if doc[field] != last:
                     break
@@ -183,7 +184,7 @@ class RedisCacheMixin(CacheMixin):
         v = cls.__fields_version__
         if v is None:
             v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
-        return f'{cls.__name__}.{v}:{cls.id.to_python(key)}'
+        return f'{cls.__name__}:{v}:{cls.id.to_python(key)}'
 
     def invalidate(self, invalidator: Invalidator):
         key = self.make_key(self.id)
@@ -193,7 +194,7 @@ class RedisCacheMixin(CacheMixin):
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
         self.redis = redis
-        self.names = [f'semaphore:{name}_{i}' for i in range(value)]
+        self.keys = [f'semaphore:{name}:{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
         self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
@@ -202,30 +203,28 @@ class Semaphore:
     def __enter__(self):
         assert not self.local.__dict__, 'recursive lock'
         token = str(uuid.uuid4())
-        shuffle(self.names)
-        for name in self.names:
-            if self.redis.set(name, token, nx=True, px=self.timeout):
-                self.local.name = name
+        keys = self.keys
+        while keys:
+            key = choice(keys)
+            if self.redis.set(key, token, nx=True, px=self.timeout):
+                self.local.key = key
                 self.local.token = token
                 return self
+            values = self.redis.mget_nonatomic(keys) if isinstance(self.redis, RedisCluster) else self.redis.mget(keys)
+            keys = [key for key, value in zip(keys, values) if value is None]
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exctype, excinst, exctb):
-        keys = [self.local.name]
-        args = [self.local.token]
-        del self.local.name
-        del self.local.token
+        keys, args = [self.local.key], [self.local.token]
+        del self.local.key, self.local.token
         self.lua_release(keys=keys, args=args)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
-        name, token = self.local.name, self.local.token
-        if self.lua_reacquire(keys=[name], args=[token, timeout]):
+        key, token = self.local.key, self.local.token
+        if self.lua_reacquire(keys=[key], args=[token, timeout]):
             return
         raise LockError('Lock not owned')
-
-    def acquired(self):
-        return sum(self.redis.exists(*self.names))
 
 
 class Inventory:
@@ -351,24 +350,23 @@ class SqlGetterMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, start, end, *, asc=True, batch=1000):
+    def batch_range(cls, column, *, start, stop, batch=1000):
         col = getattr(cls.__table__.columns, column)
         pk = cls.__table__.primary_key.columns[0]
+        asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
         while True:
             with cls.Session() as session:
-                query = [col >= start, col <= end, pk.not_in(seen_ids)]
+                query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
+                    [col <= start, col > stop, pk.not_in(seen_ids)]
                 rows = session.query(cls).filter(*query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
             last = getattr(rows[-1], column)
-            if asc and last != start:
+            if last != start:
                 seen_ids = []
                 start = last
-            elif not asc and last != end:
-                seen_ids = []
-                end = last
             for row in reversed(rows):
                 if getattr(row, column) != last:
                     break
@@ -401,9 +399,9 @@ def build_order_by(tb, keys):
         pk = tb.__table__.primary_key.columns[0]
         return [pk.desc()]
     order_by = []
-    for key in keys:
+    for key in keys:  # type: str
         asc = True
-        if key[0] == '-':
+        if key.startswith('-'):
             asc = False
             key = key[1:]
         column = getattr(tb, key)
@@ -471,3 +469,31 @@ def build_operation(tb, params: dict):
         else:
             raise ValueError(f'`{op}` unrecognized operator')
     return operation
+
+
+class SwitchTracer:
+    def __init__(self):
+        self._tracing = {}
+
+    def enable(self):
+        Hub.settrace(self._trace)
+
+    def __enter__(self):
+        g = getcurrent()
+        self._tracing[g] = False
+        return self
+
+    def __exit__(self, exctype, excinst, exctb):
+        g = getcurrent()
+        self._tracing.pop(g)
+
+    def is_switched(self):
+        g = getcurrent()
+        return self._tracing[g]
+
+    def _trace(self, event, args):
+        if event != 'switch':
+            return
+        g = args[0]
+        if g in self._tracing:
+            self._tracing[g] = True

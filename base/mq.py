@@ -51,7 +51,7 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, workers=50, dispatcher=ProtoDispatcher):
+    def __init__(self, redis: Redis, group: str, consumer: str, workers=32, dispatcher=ProtoDispatcher):
         self.redis = redis
         self._group = group
         self._consumer = consumer
@@ -93,7 +93,7 @@ class Receiver:
 
     def _run(self, streams):
         streams = {stream: '>' for stream in streams}
-        count = self._workers
+        count = self._workers * 2
         while not self._stopped:
             try:
                 result = self.redis.xreadgroup(self._group, self._consumer, streams, count=count, block=0, noack=True)

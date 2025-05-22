@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import logging
 import time
 import uuid
+import logging
+import functools
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 from importlib import import_module
-from typing import TypeVar, Callable, Optional
-import functools
+from typing import Optional
 import gevent
 from redis import Redis, RedisCluster
 from pydantic import BaseModel
@@ -30,7 +31,6 @@ class Info:
     loop: bool
 
 
-F = TypeVar('F', bound=Callable)
 TASK_THRESHOLD = 16384
 
 
@@ -65,15 +65,15 @@ class AsyncTask(_BaseTask):
     def stream_name(task: Task):
         return f'{stream_name(task)}:{task.path}'
 
-    def __call__(self, f: F) -> F:
+    def __call__(self, f):
         path = self.add_path(f)
+        vf = self.paths[path]
         stream = self.stream_name(Task(path=path))
-        vf = var_args(f)
 
         @self.receiver(Task, stream=stream)
         def handler(task: Task):
-            args = loads(task.args)  # type: list
-            kwargs = loads(task.kwargs)  # type: dict
+            args = loads(task.args)
+            kwargs = loads(task.kwargs)
             vf(*args, **kwargs)
 
         @functools.wraps(f)
@@ -99,7 +99,7 @@ class AsyncTask(_BaseTask):
     def info(self, task_id: str) -> Optional[Info]:
         res = self.timer.info(task_id)
         if res is None:
-            return
+            return None
         return Info(remaining=timedelta(milliseconds=res['remaining']),
                     interval=timedelta(milliseconds=res['interval']),
                     loop=res['loop'])
@@ -110,33 +110,45 @@ class AsyncTask(_BaseTask):
 
 
 class HeavyTask(_BaseTask):
-    def __init__(self, redis: Redis | RedisCluster, key: str):
+    class Priority(StrEnum):
+        HIGH = 'high'
+        DEFAULT = 'default'
+        LOW = 'low'
+
+    def __init__(self, redis: Redis | RedisCluster, biz: str):
         super().__init__()
         self.redis = redis
-        self._key = key
-        self._waker = f'waker:{{{key}}}:{uuid.uuid4()}'
+        self._key = f'heavy_task:queue:{{{biz}}}'
+        self._waker = f'heavy_task:waker:{{{biz}}}:{uuid.uuid4()}'
         self._stopped = True
+        self._priorities = {}
 
-    def __call__(self, f: F) -> F:
-        path = self.add_path(f)
-        assert not path.startswith('__main__'), '__main__ is different in another process'
+    def __call__(self, func=None, *, priority=Priority.DEFAULT):
+        def decorator(f):
+            path = self.add_path(f)
+            self._priorities[path] = priority
+            assert not path.startswith('__main__'), '__main__ is different in another process'
 
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs):
-            task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
-            if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
-                logging.warning(f'task parameters too big {task}')
-            self.push(task)
+            @functools.wraps(f)
+            def wrapper(*args, **kwargs):
+                task = Task(path=path, args=dumps(args), kwargs=dumps(kwargs))
+                if len(task.args) + len(task.kwargs) > TASK_THRESHOLD:
+                    logging.warning(f'task parameters too big {task}')
+                self.push(task)
 
-        wrapper.__task_wrapped__ = f
-        return wrapper
+            wrapper.__task_wrapped__ = f
+            return wrapper
 
-    def push(self, task: Task, front=False):
+        return decorator(func) if func else decorator
+
+    def _get_queue(self, task):
+        priority = self._priorities[task.path]
+        return f'{self._key}:{priority}'
+
+    def push(self, task: Task):
         value = task.json(exclude_defaults=True)
-        if front:
-            total = self.redis.lpush(self._key, value)
-        else:
-            total = self.redis.rpush(self._key, value)
+        queue = self._get_queue(task)
+        total = self.redis.rpush(queue, value)
         logging.info(f'+task {task} total {total}')
 
     def start(self, exec_func=None):
@@ -155,9 +167,10 @@ class HeavyTask(_BaseTask):
             pipe.execute()
 
     def _run(self, exec_func, key, waker):
+        queues = [f'{key}:{priority}' for priority in self.Priority] + [waker]
         while not self._stopped:
             try:
-                r = self.redis.blpop([key, waker])
+                r = self.redis.blpop(queues)
                 if r is None or r[0] == waker:
                     continue
                 task = Task.parse_raw(r[1])
@@ -166,16 +179,20 @@ class HeavyTask(_BaseTask):
                 logging.exception(f'')
                 gevent.sleep(1)
 
+    def _get_func(self, path):
+        func = self.paths.get(path)
+        if func is None:
+            logging.info(f'adding path {path}')
+            module_name, func_name = path.rsplit('.', maxsplit=1)
+            import_module(module_name)  # will auto add_path
+            func = self.paths[path]
+        return func
+
     def exec(self, task: Task):
         logging.info(f'doing task {task}')
-        func = self.paths.get(task.path)
-        if func is None:
-            logging.info(f'adding path {task.path}')
-            module_name, func_name = task.path.rsplit('.', maxsplit=1)
-            import_module(module_name)  # will auto add_path
-            func = self.paths[task.path]
-        args = loads(task.args)  # type: list
-        kwargs = loads(task.kwargs)  # type: dict
+        func = self._get_func(task.path)
+        args = loads(task.args)
+        kwargs = loads(task.kwargs)
         start = time.time()
         r = func(*args, **kwargs)
         logging.info(f'done task {task} {time.time() - start}')

@@ -3,17 +3,15 @@ import fcntl
 import logging
 import socket
 import string
-import time
-import traceback
+import hashlib
 import contextlib
-from binascii import crc32
+from random import choice
 from collections import defaultdict
 from functools import lru_cache, wraps
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
-from yaml import safe_dump
 
 
 class LogSuppress(contextlib.suppress):
@@ -27,12 +25,6 @@ class LogSuppress(contextlib.suppress):
         if suppress:
             logging.exception('suppressed')
         return suppress
-
-
-def log_if_slow(start_time, threshold, message):
-    elapsed = time.time() - start_time
-    if elapsed > threshold:
-        logging.warning(f'elapsed: {elapsed:.2f}s {message}\n' + ''.join(traceback.format_stack()[:-1]))
 
 
 class Addr:
@@ -156,9 +148,17 @@ def redis_name(redis: Union[Redis, RedisCluster]):
         return f'{host}:{port}/{db}'
 
 
-def stable_hash(o):
-    s = safe_dump(o)
-    return crc32(s.encode())
+def create_redis(addr: str):
+    if ',' in addr:
+        addr = choice(addr.split(','))
+        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
+    else:
+        return Redis.from_url(f'redis://{addr}', decode_responses=True)
+
+
+def string_hash(s: str):
+    digest = hashlib.md5(s.encode()).digest()
+    return int.from_bytes(digest[:8], signed=True)
 
 
 def flock(path):
@@ -182,8 +182,8 @@ def flock(path):
 
 def diff_dict(after: dict, before: dict):
     diff = {}
-    for key in after.keys() | before.keys():
-        if key[0] == '_':  # ignore
+    for key in after.keys() | before.keys():  # type: str
+        if key.startswith('_'):  # ignore
             continue
         va = after.get(key)
         vb = before.get(key)
@@ -199,7 +199,7 @@ def diff_dict(after: dict, before: dict):
 def apply_diff(origin: dict, diff: dict):
     for key, value in diff.items():
         if value is None:
-            origin.pop(key, None)
+            origin.pop(key)
             continue
         vo = origin.get(key)
         if isinstance(vo, dict) and isinstance(value, dict):

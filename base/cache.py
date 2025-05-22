@@ -147,7 +147,7 @@ class FullMixin(Generic[T]):
         self._version = version
         return values
 
-    def cached(self, maxsize=128, typed=False, get_expire=None):
+    def cached(self, func=None, *, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
             @functools.lru_cache(maxsize, typed)
             def inner(*args, **kwargs):
@@ -173,7 +173,7 @@ class FullMixin(Generic[T]):
             wrapper.cache_clear = inner.cache_clear
             return wrapper
 
-        return decorator
+        return decorator(func) if func else decorator
 
 
 class FullCache(FullMixin[T], Cache[T]):
@@ -211,7 +211,6 @@ class RedisCache(Singleflight[T]):
                  prefix='PLACEHOLDER', try_interval=timedelta(milliseconds=50), try_times=5):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis  # type: Redis | RedisCluster
-        self.mget_nonatomic = redis.mget_nonatomic if isinstance(redis, RedisCluster) else redis.mget
         self.raw_mget = utils.make_mget(get, mget)
         self.serialize = serialize
         self.deserialize = deserialize
@@ -251,7 +250,9 @@ class RedisCache(Singleflight[T]):
         while wait_indexes:
             try_times += 1
             gevent.sleep(self.try_interval.total_seconds())
-            new_values = self.mget_nonatomic(*[made_keys[index] for index in wait_indexes])
+            wait_keys = [made_keys[index] for index in wait_indexes]
+            new_values = self.redis.mget_nonatomic(wait_keys) if isinstance(self.redis, RedisCluster) else \
+                self.redis.mget(wait_keys)
             fail_indexes = []
             for index, value in zip(wait_indexes, new_values):
                 if value is None or value.startswith(self.prefix):
