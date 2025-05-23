@@ -12,6 +12,7 @@ from inspect import signature, Parameter
 from typing import Callable, Type, Union
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
+import gevent
 
 
 class LogSuppress(contextlib.suppress):
@@ -94,6 +95,15 @@ def func_desc(func):
         return f'{func.__module__}.{func.__name__}'
     except AttributeError:
         return str(func)
+
+
+def native_worker(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        pool = gevent.get_hub().threadpool
+        return pool.spawn(f, *args, **kwargs).get()
+
+    return wrapper
 
 
 class DefaultDict(defaultdict):
