@@ -15,7 +15,7 @@ from base import Publisher, Receiver, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.utils import create_redis
-from base.sharding import ShardingKey, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
+from base.sharding import Sharding, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
     ShardingZTimer
 from base import func_desc, base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
@@ -43,8 +43,8 @@ invalidator = create_invalidator(redis)
 exclusion = Exclusion(redis)
 
 if isinstance(redis, RedisCluster):
-    ztimer = ShardingZTimer(redis, app_name, sharding_key=ShardingKey(shards=3))
-    timer = ShardingTimer(redis, hint=hint, sharding_key=ShardingKey(shards=3, fixed=[const.TICK_TIMER]))
+    ztimer = ShardingZTimer(redis, app_name, sharding=Sharding(shards=3))
+    timer = ShardingTimer(redis, hint=hint, sharding=Sharding(shards=3, fixed_keys=[const.TICK_TIMER]))
     publisher = ShardingPublisher(redis, hint=hint)
     receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
     heavy_task = ShardingHeavyTask(redis, app_name)
