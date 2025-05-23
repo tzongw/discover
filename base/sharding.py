@@ -24,7 +24,7 @@ from .task import HeavyTask
 Node = namedtuple('Node', ['hash', 'shard'])
 
 
-class ShardingKey:
+class Sharding:
     _ring_cache = {}
 
     @classmethod
@@ -40,13 +40,13 @@ class ShardingKey:
             cls._ring_cache[key] = ring
         return ring
 
-    def __init__(self, shards, fixed=(), replicas=5):
+    def __init__(self, shards, fixed_keys=(), replicas=5):
         self.shards = shards
-        self.fixed = fixed  # keys fixed in shard 0
+        self.fixed_keys = fixed_keys  # keys fixed in shard 0
         self.ring = self.get_ring(shards, replicas)
 
     def get_shard(self, key):
-        if key in self.fixed:
+        if key in self.fixed_keys:
             return 0
         i = bisect.bisect(self.ring, Node(crc32(key.encode()), 0))
         if i >= len(self.ring):
@@ -79,24 +79,24 @@ class ShardingKey:
 class ShardingPublisher(Publisher):
     def __init__(self, redis: Union[Redis, RedisCluster], *, hint=None):
         super().__init__(redis, hint)
-        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+        self._sharding = Sharding(shards=len(redis.get_primaries()))
 
     def publish(self, message: BaseModel, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
-        stream = self._sharding_key.random_sharded_key(stream)
+        stream = self._sharding.random_sharded_key(stream)
         return super().publish(message, maxlen, stream)
 
 
 class NormalizedDispatcher(ProtoDispatcher):
     def dispatch(self, stream, *args, **kwargs):
-        stream = ShardingKey.normalized_key(stream)
+        stream = Sharding.normalized_key(stream)
         return super().dispatch(stream, *args, **kwargs)
 
 
 class ShardingReceiver(Receiver):
     def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=32):
         super().__init__(redis, group, consumer, workers, dispatcher=NormalizedDispatcher)
-        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+        self._sharding = Sharding(shards=len(redis.get_primaries()))
 
     def start(self):
         logging.info(f'start {self._group} {self._consumer}')
@@ -104,12 +104,12 @@ class ShardingReceiver(Receiver):
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             for stream in streams:
-                for sharded_stream in self._sharding_key.all_sharded_keys(stream):
+                for sharded_stream in self._sharding.all_sharded_keys(stream):
                     # create group & stream
                     pipe.xgroup_create(sharded_stream, self._group, mkstream=True)
             pipe.execute(raise_on_error=False)  # group already exists
         return [gevent.spawn(self._run, sharded_streams) for sharded_streams in
-                zip(*[self._sharding_key.all_sharded_keys(stream) for stream in streams])]
+                zip(*[self._sharding.all_sharded_keys(stream) for stream in streams])]
 
     def stop(self):
         if self._stopped:
@@ -118,54 +118,54 @@ class ShardingReceiver(Receiver):
         self._stopped = True
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
-            for waker in self._sharding_key.all_sharded_keys(self._waker):
+            for waker in self._sharding.all_sharded_keys(self._waker):
                 pipe.xadd(waker, {'wake': 'up'})
                 pipe.delete(waker)
             for stream in streams:
                 if stream == self._waker:  # already deleted
                     continue
-                for sharded_stream in self._sharding_key.all_sharded_keys(stream):
+                for sharded_stream in self._sharding.all_sharded_keys(stream):
                     pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
             pipe.execute()
 
 
 class ShardingTimer(Timer):
-    def __init__(self, redis, *, sharding_key: ShardingKey, hint=None):
+    def __init__(self, redis, *, sharding: Sharding, hint=None):
         super().__init__(redis, hint)
-        self._sharding_key = sharding_key
+        self._sharding = sharding
 
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
-        key, stream = self._sharding_key.sharded_keys(key, stream)
+        key, stream = self._sharding.sharded_keys(key, stream)
         return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
 
     def kill(self, key):
-        key = self._sharding_key.sharded_key(key)
+        key = self._sharding.sharded_key(key)
         return super().kill(key)
 
     def exists(self, key: str):
-        key = self._sharding_key.sharded_key(key)
+        key = self._sharding.sharded_key(key)
         return super().exists(key)
 
     def info(self, key: str):
-        key = self._sharding_key.sharded_key(key)
+        key = self._sharding.sharded_key(key)
         return super().info(key)
 
     def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
-        assert key in self._sharding_key.fixed, 'SHOULD fixed shard to avoid duplicated timestamp'
-        key, stream = self._sharding_key.sharded_keys(key, stream)
+        assert key in self._sharding.fixed_keys, 'SHOULD fixed shard to avoid duplicated timestamp'
+        key, stream = self._sharding.sharded_keys(key, stream)
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
 
 class MigratingTimer(ShardingTimer):
-    def __init__(self, redis, *, sharding_key: ShardingKey, old_timer: Timer, start_time: datetime, hint=None):
-        super().__init__(redis, sharding_key=sharding_key, hint=hint)
+    def __init__(self, redis, *, sharding: Sharding, old_timer: Timer, start_time: datetime, hint=None):
+        super().__init__(redis, sharding=sharding, hint=hint)
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 
     def is_moved(self, key):
         consistent = self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingTimer) and \
-                     self._sharding_key.get_shard(key) == self.old_timer._sharding_key.get_shard(key)
+                     self._sharding.get_shard(key) == self.old_timer._sharding.get_shard(key)
         return not consistent
 
     @property
@@ -207,12 +207,12 @@ class MigratingTimer(ShardingTimer):
     def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         if self.redis is not self.old_timer.redis and self.old_timer.kill(key):
             if isinstance(self.old_timer, ShardingTimer):
-                _, old_stream = self.old_timer._sharding_key.sharded_keys(key, stream)
+                _, old_stream = self.old_timer._sharding.sharded_keys(key, stream)
             else:
                 old_stream = stream
             last_id = self.old_timer.redis.xinfo_stream(old_stream)['last-generated-id']
             last_tick = int(last_id[:-2])
-            _, new_stream = self._sharding_key.sharded_keys(key, stream)
+            _, new_stream = self._sharding.sharded_keys(key, stream)
             self.redis.xadd(new_stream, fields={'': ''}, id=str(last_tick + 1))
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
@@ -242,19 +242,19 @@ class MigratingReceiver(ShardingReceiver):
 class ShardingInventory(Inventory):
     def __init__(self, redis: RedisCluster):
         super().__init__(redis)
-        self.sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+        self.sharding = Sharding(shards=len(redis.get_primaries()))
 
     def mget(self, keys, hint=None):
         with self.redis.pipeline(transaction=False) as pipe:
             for key in keys:
-                for sharded_key in self.sharding_key.all_sharded_keys(key):
+                for sharded_key in self.sharding.all_sharded_keys(key):
                     pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            shard = None if hint is None else self.sharding_key.get_shard(hint)
+            shard = None if hint is None else self.sharding.get_shard(hint)
             return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
-                    for chunk in batched(pipe.execute(), self.sharding_key.shards)]
+                    for chunk in batched(pipe.execute(), self.sharding.shards)]
 
     def _fair_amounts(self, total):
-        shards = self.sharding_key.shards
+        shards = self.sharding.shards
         amounts = [total // shards] * shards
         for i in range(total - sum(amounts)):
             amounts[i] += 1
@@ -264,7 +264,7 @@ class ShardingInventory(Inventory):
     def reset(self, key, total=0, expire=None):
         assert total >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self._fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(total)):
                 pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
                 if expire is not None:
                     pipe.expire(sharded_key, expire)
@@ -273,29 +273,29 @@ class ShardingInventory(Inventory):
     def incrby(self, key, total):
         assert total >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding_key.all_sharded_keys(key), self._fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(total)):
                 pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
             return sum(values[0] for values in pipe.execute())
 
     def try_lock(self, key, hint=None) -> bool:
         if hint is None:
-            sharded_key = self.sharding_key.random_sharded_key(key)
+            sharded_key = self.sharding.random_sharded_key(key)
         else:
-            _, sharded_key = self.sharding_key.sharded_keys(hint, key)
+            _, sharded_key = self.sharding.sharded_keys(hint, key)
         bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
         return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
 
 
 class ShardingZTimer(ZTimer):
-    def __init__(self, redis: RedisCluster, biz, *, sharding_key: ShardingKey):
+    def __init__(self, redis: RedisCluster, biz, *, sharding: Sharding):
         super().__init__(redis, biz)
-        self._sharding_key = sharding_key
+        self._sharding = sharding
         self._orig_timeout_key = self._timeout_key
         self._orig_meta_key = self._meta_key
 
     def _update_sharded(self, key: str):
-        _, self._timeout_key, self._meta_key = self._sharding_key.sharded_keys(key, self._orig_timeout_key,
-                                                                               self._orig_meta_key)
+        _, self._timeout_key, self._meta_key = self._sharding.sharded_keys(key, self._orig_timeout_key,
+                                                                           self._orig_meta_key)
 
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         self._update_sharded(key)
@@ -316,8 +316,8 @@ class ShardingZTimer(ZTimer):
     def poll(self, limit=100):
         with self.redis.pipeline(transaction=False) as pipe:
             now = time.time()
-            for timeout_key, meta_key in zip(self._sharding_key.all_sharded_keys(self._orig_timeout_key),
-                                             self._sharding_key.all_sharded_keys(self._orig_meta_key)):
+            for timeout_key, meta_key in zip(self._sharding.all_sharded_keys(self._orig_timeout_key),
+                                             self._sharding.all_sharded_keys(self._orig_meta_key)):
                 keys_and_args = [timeout_key, meta_key, now, limit]
                 pipe.fcall('ztimer_poll', 2, *keys_and_args)
             res = sum(pipe.execute(), [])
@@ -325,14 +325,14 @@ class ShardingZTimer(ZTimer):
 
 
 class MigratingZTimer(ShardingZTimer):
-    def __init__(self, redis, biz, *, sharding_key: ShardingKey, old_timer: ZTimer, start_time: datetime):
-        super().__init__(redis, biz, sharding_key=sharding_key)
+    def __init__(self, redis, biz, *, sharding: Sharding, old_timer: ZTimer, start_time: datetime):
+        super().__init__(redis, biz, sharding=sharding)
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 
     def is_moved(self, key):
         consistent = self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingZTimer) and \
-                     self._sharding_key.get_shard(key) == self.old_timer._sharding_key.get_shard(key)
+                     self._sharding.get_shard(key) == self.old_timer._sharding.get_shard(key)
         return not consistent
 
     @property
@@ -375,7 +375,7 @@ class MigratingZTimer(ShardingZTimer):
         if not self.is_migrating:
             return self.old_timer.poll(limit)
         if self.redis is self.old_timer.redis and isinstance(self.old_timer, ShardingZTimer):
-            return super().poll(limit) if self._sharding_key.shards >= self.old_timer._sharding_key.shards \
+            return super().poll(limit) if self._sharding.shards >= self.old_timer._sharding.shards \
                 else self.old_timer.poll(limit)
         return super().poll(limit) | self.old_timer.poll(limit)
 
@@ -383,10 +383,10 @@ class MigratingZTimer(ShardingZTimer):
 class ShardingHeavyTask(HeavyTask):
     def __init__(self, redis: RedisCluster, biz: str):
         super().__init__(redis, biz)
-        self._sharding_key = ShardingKey(shards=len(redis.get_primaries()))
+        self._sharding = Sharding(shards=len(redis.get_primaries()))
 
     def _get_queue(self, task):
-        key = self._sharding_key.random_sharded_key(self._key)
+        key = self._sharding.random_sharded_key(self._key)
         priority = self._priorities[task.path]
         queue = f'{key}:{priority}'
         return queue
@@ -395,8 +395,8 @@ class ShardingHeavyTask(HeavyTask):
         logging.info(f'start {self._key}')
         self._stopped = False
         return [gevent.spawn(self._run, exec_func or self.exec, key, waker)
-                for key, waker in zip(self._sharding_key.all_sharded_keys(self._key),
-                                      self._sharding_key.all_sharded_keys(self._waker))]
+                for key, waker in zip(self._sharding.all_sharded_keys(self._key),
+                                      self._sharding.all_sharded_keys(self._waker))]
 
     def stop(self):
         if self._stopped:
@@ -404,7 +404,7 @@ class ShardingHeavyTask(HeavyTask):
         logging.info(f'stop {self._key}')
         self._stopped = True
         with self.redis.pipeline(transaction=False) as pipe:
-            for waker in self._sharding_key.all_sharded_keys(self._waker):
+            for waker in self._sharding.all_sharded_keys(self._waker):
                 pipe.rpush(waker, 'wake up')
                 pipe.expire(waker, 10)
             pipe.execute()
