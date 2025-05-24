@@ -66,13 +66,13 @@ class Script:
             self.loaded.add(name)
         self.redis = redis
 
-    def limited_incrby(self, key: str, amount: int, limit: int, expire: timedelta = None):
+    def limited_incrby(self, key, amount: int, limit: int, expire: timedelta = None):
         keys_and_args = [key, amount, limit]
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)
 
-    def compare_set(self, key: str, expected: str, value: str, expire: timedelta = None, keepttl=False):
+    def compare_set(self, key, expected, value, expire: timedelta = None, keepttl=False):
         keys_and_args = [key, expected, value]
         if expire:
             keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
@@ -80,6 +80,6 @@ class Script:
             keys_and_args.append('KEEPTTL')
         return self.redis.fcall('compare_set', 1, *keys_and_args)
 
-    def compare_del(self, key: str, expected: str):
+    def compare_del(self, key, expected):
         keys_and_args = [key, expected]
         return self.redis.fcall('compare_del', 1, *keys_and_args)
