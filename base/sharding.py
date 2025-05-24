@@ -406,7 +406,7 @@ class ShardingHeavyTask(HeavyTask):
         with self.redis.pipeline(transaction=False) as pipe:
             for waker in self._sharding.all_sharded_keys(self._waker):
                 pipe.rpush(waker, 'wake up')
-                pipe.expire(waker, 10)
+                pipe.delete(waker)
             pipe.execute()
 
 
