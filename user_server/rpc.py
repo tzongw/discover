@@ -32,7 +32,7 @@ class Handler:
             if token not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
                 raise ValueError('token error')
             key = online_key(uid)
-            with redis.pipeline(transaction=True, shard_hint=key) as pipe:
+            with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
                 pipe.hsetex(key, conn_id, Online(token=token, address=address), ex=const.ONLINE_TTL)
                 conns = pipe.execute()[0]

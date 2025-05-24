@@ -242,7 +242,7 @@ class Inventory:
 
     def reset(self, key, total=0, expire=None):
         assert total >= 0
-        with self.redis.pipeline(transaction=True, shard_hint=key) as pipe:
+        with self.redis.pipeline(transaction=True) as pipe:
             pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
             if expire is not None:
                 pipe.expire(key, expire)

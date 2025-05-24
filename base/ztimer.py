@@ -56,13 +56,13 @@ class ZTimer:
     def new(self, key: str, data: str, interval: timedelta, *, loop=False):
         interval = interval.total_seconds()
         meta = f'{1 if loop else 0}|{interval}|{data}'
-        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
+        with self.redis.pipeline(transaction=True) as pipe:
             pipe.zadd(self._timeout_key, {key: time.time() + interval})
             pipe.hset(self._meta_key, key, meta)
             return pipe.execute()[0]
 
     def kill(self, key: str):
-        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
+        with self.redis.pipeline(transaction=True) as pipe:
             pipe.zrem(self._timeout_key, key)
             pipe.hdel(self._meta_key, key)
             return pipe.execute()[0]
@@ -71,7 +71,7 @@ class ZTimer:
         return self.redis.hexists(self._meta_key, key)
 
     def info(self, key: str):
-        with self.redis.pipeline(transaction=True, shard_hint=self._timeout_key) as pipe:
+        with self.redis.pipeline(transaction=True) as pipe:
             pipe.zscore(self._timeout_key, key)
             pipe.hget(self._meta_key, key)
             timeout, meta = pipe.execute()

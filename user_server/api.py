@@ -433,7 +433,7 @@ def login(username: str, password: str):
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     key = session_key(account.id)
-    with redis.pipeline(transaction=True, shard_hint=key) as pipe:
+    with redis.pipeline(transaction=True) as pipe:
         pipe.hkeys(key)
         pipe.hsetex(key, token, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime)
         tokens = pipe.execute()[0]

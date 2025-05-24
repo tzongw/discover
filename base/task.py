@@ -161,7 +161,7 @@ class HeavyTask(_BaseTask):
             return
         logging.info(f'stop {self._key}')
         self._stopped = True
-        with self.redis.pipeline(transaction=True, shard_hint=self._waker) as pipe:
+        with self.redis.pipeline(transaction=True) as pipe:
             pipe.rpush(self._waker, 'wake up')
             pipe.expire(self._waker, 10)
             pipe.execute()
