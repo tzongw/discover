@@ -7,11 +7,11 @@ from .utils import stream_name, redis_name
 
 _SCRIPT = """#!lua name=timer
 local function timer_xadd(keys, args)
-    return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
-end
-
-local function timer_xadd_hint(keys, args)
-    return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
+    if args[3] then
+        return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], 'HINT', args[3], '*', '', args[1])
+    else
+        return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], '*', '', args[1])
+    end
 end
 
 local function array_to_table(array)
@@ -34,7 +34,6 @@ local function timer_tick(keys, args)
 end
 
 redis.register_function('timer_xadd', timer_xadd)
-redis.register_function('timer_xadd_hint', timer_xadd_hint)
 redis.register_function('timer_tick', timer_tick)
 """
 
@@ -73,13 +72,11 @@ class Timer:
 
     def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
         stream = stream or stream_name(message)
-        function = 'timer_xadd'
         data = message.json(exclude_defaults=True)
         keys_and_args = [stream, data, maxlen]
         if self.hint:
-            function = 'timer_xadd_hint'
             keys_and_args.append(self.hint)
-        return self.new(key, function, interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
+        return self.new(key, 'timer_xadd', interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
     def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
         keys_and_args = [stream, offset, maxlen]
