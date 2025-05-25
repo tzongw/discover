@@ -50,9 +50,16 @@ local function compare_del(keys, args)
     end
 end
 
+local function hset_get(keys, args)
+    local value = redis.call('HGET', keys[1], args[#args - 1])
+    redis.call('HSETEX', keys[1], unpack(args))
+    return value
+end
+
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
+redis.register_function('hset_get', hset_get)
 """
 
 
@@ -83,3 +90,16 @@ class Script:
     def compare_del(self, key, expected):
         keys_and_args = [key, expected]
         return self.redis.fcall('compare_del', 1, *keys_and_args)
+
+    def hset_get(self, key, field, value, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+        keys_and_args = [key]
+        if fnx:
+            keys_and_args.append('FNX')
+        if fxx:
+            keys_and_args.append('FXX')
+        if expire:
+            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
+        if keepttl:
+            keys_and_args.append('KEEPTTL')
+        keys_and_args += ['FIELDS', 1, field, value]
+        return self.redis.fcall('hset_get', 1, *keys_and_args)
