@@ -62,7 +62,7 @@ class ZTimer:
             return pipe.execute()[0]
 
     def fire(self, key: str):
-        return self.redis.zadd(self._timeout_key, {key: 0}, xx=True)
+        return self.redis.zadd(self._timeout_key, {key: 0}, xx=True, ch=True)
 
     def kill(self, key: str):
         with self.redis.pipeline(transaction=True) as pipe:
