@@ -13,8 +13,8 @@ from redis import Redis, RedisCluster
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
-from .mq import Receiver, Publisher
-from .timer import Timer
+from .ztimer import ZTimer
+from .dispatcher import TimeDispatcher
 from .utils import var_args, func_desc, stream_name
 
 
@@ -53,28 +53,24 @@ class AsyncTask(_BaseTask):
     2. add new argument at the end and set a default value
     """
 
-    def __init__(self, timer: Timer, publisher: Publisher, receiver: Receiver, maxlen=4096):
-        assert timer.redis is publisher.redis is receiver.redis
+    def __init__(self, ztimer: ZTimer, dispatcher: TimeDispatcher):
         super().__init__()
-        self.timer = timer
-        self.receiver = receiver
-        self.publisher = publisher
-        self.maxlen = maxlen
+        self.ztimer = ztimer
+
+        @dispatcher('async_task')
+        def handler(task_id, data: str):
+            task = Task.parse_raw(data)
+            args = loads(task.args)
+            kwargs = loads(task.kwargs)
+            vf = self.paths[task.path]
+            vf(*args, **kwargs)
 
     @staticmethod
-    def stream_name(task: Task):
-        return f'{stream_name(task)}:{task.path}'
+    def timer_key(task_id):
+        return f'async_task:{task_id}'
 
     def __call__(self, f):
         path = self.add_path(f)
-        vf = self.paths[path]
-        stream = self.stream_name(Task(path=path))
-
-        @self.receiver(Task, stream=stream)
-        def handler(task: Task):
-            args = loads(task.args)
-            kwargs = loads(task.kwargs)
-            vf(*args, **kwargs)
 
         @functools.wraps(f)
         def wrapper(*args, **kwargs) -> Task:
@@ -87,17 +83,21 @@ class AsyncTask(_BaseTask):
         return wrapper
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
-        stream = self.stream_name(task)
-        return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, stream=stream)
+        key = self.timer_key(task_id)
+        data = task.json(exclude_defaults=True)
+        return self.ztimer.new(key, data, interval, loop=loop)
 
     def cancel(self, task_id: str):
-        return self.timer.kill(task_id)
+        key = self.timer_key(task_id)
+        return self.ztimer.kill(key)
 
     def exists(self, task_id: str):
-        return self.timer.exists(task_id)
+        key = self.timer_key(task_id)
+        return self.ztimer.exists(key)
 
     def info(self, task_id: str) -> Optional[Info]:
-        res = self.timer.info(task_id)
+        key = self.timer_key(task_id)
+        res = self.ztimer.info(key)
         if res is None:
             return None
         return Info(remaining=timedelta(milliseconds=res['remaining']),
@@ -105,8 +105,7 @@ class AsyncTask(_BaseTask):
                     loop=res['loop'])
 
     def publish(self, task):
-        stream = self.stream_name(task)
-        self.publisher.publish(task, maxlen=self.maxlen, stream=stream)
+        self.post(str(uuid.uuid4()), task, timedelta())
 
 
 class HeavyTask(_BaseTask):

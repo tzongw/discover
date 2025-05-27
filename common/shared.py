@@ -55,7 +55,7 @@ else:
     receiver = Receiver(redis, group=app_name, consumer=hint)
     heavy_task = HeavyTask(redis, app_name)
 
-async_task = AsyncTask(timer, publisher, receiver)
+async_task = AsyncTask(ztimer, time_dispatcher)
 poller = Poller(redis, async_task)
 
 user_service = UserService(registry, const.RPC_USER, options.host)  # type: Union[UserService, service.user.Iface]
