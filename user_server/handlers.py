@@ -100,23 +100,9 @@ def init():
         pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
         at_exit(pc.stop)
     elif options.init_timer == 'task':
-        oneshot_id = 'timer:oneshot'
-        timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))
-        at_exit(lambda: timer.kill(oneshot_id))
-        loop_id = 'timer:loop'
-        timer.create(loop_id, Alarm(tip='loop'), timedelta(seconds=8), loop=True)
-        at_exit(lambda: timer.kill(loop_id))
         task_id = 'task:hello'
-        async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
+        async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=5), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
-        logging.info(timer.info(oneshot_id))
-        logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
-        if options.tick_timer:
-            timer.tick(const.TICK_TIMER, const.TICK_STREAM)
-            at_exit(lambda: timer.kill(const.TICK_TIMER))
-        log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
-        runtime = Runtime(address=options.host, pid=os.getpid(), log_level=log_level)
-        key = f'runtime:{app_name}:{app_id}'
-        parser.hset(key, runtime)
-        at_exit(lambda: redis.delete(key))
+        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
+        at_exit(pc.stop)
