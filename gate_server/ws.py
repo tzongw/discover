@@ -130,7 +130,7 @@ class Client:
             self.context.pop(key, None)
 
 
-clients = ShardingDict[str, Client](shards=32)
+clients = ShardingDict[str, Client](shards=64)
 groups = defaultdict(lambda: ShardingSet(shards=8))  # type: dict[str, ShardingSet[Client]]
 
 

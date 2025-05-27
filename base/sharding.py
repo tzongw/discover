@@ -469,7 +469,7 @@ class ShardingDict(Generic[K, V]):
     def items(self) -> Generator[tuple[K, V], None, None]:
         done = 0
         for d in self._dicts:
-            if done >= 1024:
+            if done >= 512:
                 done = 0
                 gevent.sleep(0)
             for item in d.items():
@@ -502,7 +502,7 @@ class ShardingSet(Generic[E]):
     def __iter__(self) -> Generator[tuple[K, V], None, None]:
         done = 0
         for s in self._sets:
-            if done >= 1024:
+            if done >= 512:
                 done = 0
                 gevent.sleep(0)
             for elem in s:
