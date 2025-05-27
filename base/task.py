@@ -104,8 +104,9 @@ class AsyncTask(_BaseTask):
                     interval=timedelta(milliseconds=res['interval']),
                     loop=res['loop'])
 
-    def publish(self, task):
-        self.post(str(uuid.uuid4()), task, timedelta())
+    def fire(self, task_id: str):
+        key = self.timer_key(task_id)
+        self.ztimer.fire(key)
 
 
 class HeavyTask(_BaseTask):
