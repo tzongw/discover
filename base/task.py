@@ -15,7 +15,7 @@ from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .ztimer import ZTimer
 from .dispatcher import TimeDispatcher
-from .utils import var_args, func_desc, stream_name
+from .utils import var_args, func_desc
 
 
 class Task(BaseModel):
