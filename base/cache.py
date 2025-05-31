@@ -207,8 +207,8 @@ def ttl_cache(expire, *, maxsize=128):
 
 
 class RedisCache(Singleflight[T]):
-    def __init__(self, redis, *, get=None, mget=None, expire: timedelta, make_key, serialize, deserialize,
-                 prefix='PLACEHOLDER', try_interval=timedelta(milliseconds=50), try_times=5):
+    def __init__(self, redis, *, get=None, mget=None, expire: timedelta, make_key, serialize=None, deserialize=None,
+                 prefix='PLACEHOLDER:', try_interval=timedelta(milliseconds=50), try_times=10):
         super().__init__(mget=self._cached_mget, make_key=make_key)
         self.redis = redis  # type: Redis | RedisCluster
         self.raw_mget = utils.make_mget(get, mget)
@@ -225,7 +225,7 @@ class RedisCache(Singleflight[T]):
         todo_indexes = []
         wait_indexes = []
         with self.redis.pipeline(transaction=False) as pipe:
-            lock_time = self.try_interval * self.try_times
+            lock_time = max(self.try_interval * self.try_times, timedelta(seconds=5))
             for key in keys:
                 made_key = self._make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
@@ -237,14 +237,15 @@ class RedisCache(Singleflight[T]):
             elif value.startswith(self.prefix):
                 wait_indexes.append(index)
             else:
-                values[index] = self.deserialize(value)
+                values[index] = self.deserialize(value) if self.deserialize else value
         if todo_indexes:
             new_values = self.raw_mget([keys[index] for index in todo_indexes], *args, **kwargs)
             with self.redis.pipeline(transaction=False) as pipe:
                 script = Script(pipe)
                 for index, value in zip(todo_indexes, new_values):
                     values[index] = value
-                    script.compare_set(made_keys[index], placeholder, self.serialize(value), self.expire)
+                    data = self.serialize(value) if self.serialize else value
+                    script.compare_set(made_keys[index], placeholder, data, self.expire)
                 pipe.execute()
         try_times = 0
         while wait_indexes:
