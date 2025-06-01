@@ -163,7 +163,8 @@ def create_redis(addr: str):
         addr = choice(addr.split(','))
         return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
     else:
-        return Redis.from_url(f'redis://{addr}', decode_responses=True)
+        proto = 'redis' if ':' in addr else 'unix'
+        return Redis.from_url(f'{proto}://{addr}', decode_responses=True)
 
 
 def string_hash(s: str):
