@@ -44,7 +44,7 @@ if options.env in [const.Environment.DEV, const.Environment.TEST]:
     switch_tracer.enable()
 
 echo = options.env == const.Environment.DEV
-engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
+engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.2})
 Session = SessionMaker(engine, expire_on_commit=False)
 
 

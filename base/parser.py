@@ -106,10 +106,10 @@ class Parser:
                 mapping[k] = json.dumps(v, cls=JSONEncoder)
         return self._redis.hset(name, mapping=mapping)
 
-    def hgetall(self, name, cls: Type[M]):
+    def hgetall(self, name, cls: Type[M]) -> dict[str, M]:
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
 
-    def hgetone(self, name, field, cls: Type[M]):
+    def hgetone(self, name, field, cls: Type[M]) -> Optional[M]:
         return self._redis.execute_command('HGET', name, field, convert=self._parser(cls))
 
     mget_nonatomic = mget
