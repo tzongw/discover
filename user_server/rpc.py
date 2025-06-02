@@ -39,7 +39,7 @@ class Handler:
                 pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL)
                 conns = pipe.execute()[0]
             for _conn_id, online in conns.items():
-                if online.sid != sid:
+                if online.session_id != sid:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
                 with LogSuppress(), shared.gate_service.client(online.address) as client:

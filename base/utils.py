@@ -163,7 +163,7 @@ def create_redis(addr: str):
         addr = choice(addr.split(','))
         return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
     else:
-        proto = 'redis' if ':' in addr else 'unix'
+        proto = 'unix' if addr.startswith('/') else 'redis'
         return Redis.from_url(f'{proto}://{addr}', decode_responses=True)
 
 
@@ -173,7 +173,7 @@ def string_hash(s: str):
 
 
 def salt_hash(value, *, salt):
-    return hashlib.sha1(f'{salt}{value}'.encode()).digest()
+    return hashlib.sha1(f'{salt}{value}'.encode()).hexdigest()
 
 
 def flock(path):
