@@ -21,7 +21,7 @@ import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
-from base.misc import GetterMixin, CacheMixin, TimeDeltaField, SqlGetterMixin, SqlCacheMixin
+from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
 from config import options
 from shared import invalidator, id_generator, switch_tracer
 from models import QueueConfig, SmsConfig, ConfigModels
@@ -85,7 +85,7 @@ class BaseModel(Base):
         super().__init__(**kwargs)
 
 
-tables: dict[str, Type[BaseModel | SqlGetterMixin]] = {}
+tables: dict[str, Type[BaseModel | TableMixin]] = {}
 
 
 def table(tb):
@@ -117,7 +117,7 @@ class RowChange(BaseModel):
 
 
 @table
-class Account(BaseModel, SqlGetterMixin):
+class Account(BaseModel, TableMixin):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = ('hashed',)
@@ -174,7 +174,7 @@ config_cache = FullCache[ConfigModels](mget=Config.mget, maxsize=None, make_key=
 config_cache.listen(invalidator, Config.__name__)
 Config.mget = config_cache.mget
 
-collections: dict[str, Type[Document | GetterMixin]] = PascalCaseDict()
+collections: dict[str, Type[Document | DocumentMixin]] = PascalCaseDict()
 
 
 def collection(coll):
