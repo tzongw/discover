@@ -172,6 +172,10 @@ def string_hash(s: str):
     return int.from_bytes(digest[:8], signed=True)
 
 
+def salt_hash(value, *, salt):
+    return hashlib.sha1(f'{salt}{value}'.encode()).digest()
+
+
 def flock(path):
     f = open(path, 'a+')
     try:

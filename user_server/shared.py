@@ -34,14 +34,14 @@ def session_key(uid: int):
     return f'session:{uid}'
 
 
-def _get_tokens(uid: int):
+def _get_sessions(uid: int):
     key = session_key(uid)
-    tokens = parser.hgetall(key, Session)
-    ttl = min(redis.httl(key, *tokens)) if tokens else None
-    return MappingProxyType(tokens), ttl
+    sessions = parser.hgetall(key, Session)
+    ttl = min(redis.httl(key, *sessions)) if sessions else None
+    return MappingProxyType(sessions), ttl
 
 
-sessions: TtlCache[dict[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
+sessions: TtlCache[dict[str, Session]] = TtlCache(get=_get_sessions, make_key=int)
 sessions.listen(invalidator, 'session')
 
 

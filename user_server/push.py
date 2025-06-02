@@ -24,10 +24,10 @@ def send(uid=None, message=None, mapping: dict = None):
                         client.send_binary(conn_id, message)
 
 
-def kick(uid, message=None, *, token=None):
+def kick(uid, message=None, *, session_id=None):
     conns = parser.hgetall(online_key(uid), Online)
     for conn_id, online in conns.items():
-        if token and online.token != token:
+        if session_id and online.session_id != session_id:
             continue
         with LogSuppress(), gate_service.client(online.address) as client:
             if isinstance(message, str):
@@ -37,19 +37,19 @@ def kick(uid, message=None, *, token=None):
             client.remove_conn(conn_id)
 
 
-def join(uid, group, *, token=None):
+def join(uid, group, *, session_id=None):
     conns = parser.hgetall(online_key(uid), Online)
     for conn_id, online in conns.items():
-        if token and online.token != token:
+        if session_id and online.session_id != session_id:
             continue
         with LogSuppress(), gate_service.client(online.address) as client:
             client.join_group(conn_id, group)
 
 
-def leave(uid, group, *, token=None):
+def leave(uid, group, *, session_id=None):
     conns = parser.hgetall(online_key(uid), Online)
     for conn_id, online in conns.items():
-        if token and online.token != token:
+        if session_id and online.session_id != session_id:
             continue
         with LogSuppress(), gate_service.client(online.address) as client:
             client.leave_group(conn_id, group)

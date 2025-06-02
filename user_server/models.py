@@ -9,7 +9,7 @@ class Session(BaseModel):
 
 
 class Online(BaseModel):
-    token: str
+    session_id: str
     address: str
 
 

@@ -8,6 +8,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from base import create_parser
 from base import LogSuppress
+from base.utils import salt_hash
 import const
 from config import options
 from models import Online
@@ -29,15 +30,16 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            if token not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+            sid = salt_hash(token, salt=uid)
+            if sid not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
                 raise ValueError('token error')
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
-                pipe.hsetex(key, conn_id, Online(token=token, address=address), ex=const.ONLINE_TTL)
+                pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL)
                 conns = pipe.execute()[0]
             for _conn_id, online in conns.items():
-                if online.token != token:
+                if online.sid != sid:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
                 with LogSuppress(), shared.gate_service.client(online.address) as client:

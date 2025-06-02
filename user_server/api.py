@@ -12,6 +12,7 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
+from redis.commands.core import HashDataPersistOptions
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -19,7 +20,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Co
 import models
 from base import singleflight
 from base.poller import PollStatus
-from base.utils import base62
+from base.utils import base62, salt_hash
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
@@ -394,11 +395,6 @@ def args_error(e: DoesNotExist):
     return e.args[0]
 
 
-def hash_password(uid: int, password: str) -> str:
-    # uid as salt
-    return sha1(f'{uid}{password}'.encode()).hexdigest()
-
-
 @app.route('/login', methods=['POST'])
 @use_kwargs({'username': fields.Str(required=True), 'password': fields.Str(required=True)}, location='json_or_form')
 def login(username: str, password: str):
@@ -423,27 +419,30 @@ def login(username: str, password: str):
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
             account = Account(username=username)
-            account.hashed = hash_password(account.id, password)
+            account.hashed = salt_hash(password, salt=account.id)
             session.add(account)
             dispatcher.signal(account)
-        elif account.hashed != hash_password(account.id, password):
+        elif account.hashed != salt_hash(password, salt=account.id):
             return 'account not exist or password error'
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     key = session_key(account.id)
+    session_id = salt_hash(token, salt=account.id)
     with redis.pipeline(transaction=True) as pipe:
         pipe.hkeys(key)
-        pipe.hsetex(key, token, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime)
-        tokens = pipe.execute()[0]
-    if len(tokens) >= MAX_SESSIONS:
-        ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
-        tokens.sort(key=lambda x: ttls[x])
-        to_delete = tokens[:len(tokens) - MAX_SESSIONS + 1]
+        pipe.hsetex(key, session_id, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime,
+                    data_persist_option=HashDataPersistOptions.FNX)
+        session_ids, added = pipe.execute()
+        assert added, 'session id conflict'
+    if len(session_ids) >= MAX_SESSIONS:
+        ttls = {sid: ttl for sid, ttl in zip(session_ids, redis.httl(key, *session_ids))}
+        session_ids.sort(key=lambda x: ttls[x])
+        to_delete = session_ids[:len(session_ids) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
-        for token in to_delete:  # normally, len(to_delete) == 1
-            push.kick(account.id, 'token expired', token=token)
+        for sid in to_delete:  # normally, len(to_delete) == 1
+            push.kick(account.id, 'token expired', session_id=sid)
     return account
 
 
@@ -464,7 +463,7 @@ def reap_user_active():
 @bp.before_request
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
-    if not uid or not token or token not in sessions.get(uid):
+    if not uid or not token or salt_hash(token, salt=uid) not in sessions.get(uid):
         raise Unauthorized
     g.uid, g.token = uid, token
     if uid in user_actives:
