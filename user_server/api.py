@@ -4,7 +4,6 @@ import logging
 import time
 import uuid
 from datetime import timedelta, datetime
-from hashlib import sha1
 from copy import copy
 
 import flask

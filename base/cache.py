@@ -259,7 +259,7 @@ class RedisCache(Singleflight[T]):
                 if value is None or value.startswith(self.prefix):
                     fail_indexes.append(index)
                 else:
-                    values[index] = self.deserialize(value)
+                    values[index] = self.deserialize(value) if self.deserialize else value
             if not fail_indexes:  # all done
                 break
             if try_times >= self.try_times:
