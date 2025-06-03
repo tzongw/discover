@@ -462,9 +462,12 @@ def reap_user_active():
 @bp.before_request
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
-    if not uid or not token or salt_hash(token, salt=uid) not in sessions.get(uid):
+    if not uid or not token:
         raise Unauthorized
-    g.uid, g.token = uid, token
+    session_id = salt_hash(token, salt=uid)
+    if session_id not in sessions.get(uid):
+        raise Unauthorized
+    g.uid, g.session_id = uid, session_id
     if uid in user_actives:
         return
     # refresh last active & token ttl
