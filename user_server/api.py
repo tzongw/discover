@@ -428,13 +428,13 @@ def login(username: str, password: str):
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     key = session_key(account.id)
-    session_id = salt_hash(token, salt=account.id)
     with redis.pipeline(transaction=True) as pipe:
         pipe.hkeys(key)
+        session_id = salt_hash(token, salt=account.id)
         pipe.hsetex(key, session_id, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime,
                     data_persist_option=HashDataPersistOptions.FNX)
         session_ids, added = pipe.execute()
-        assert added, 'session id conflict'
+        assert added, 'session id conflicts'
     if len(session_ids) >= MAX_SESSIONS:
         ttls = {sid: ttl for sid, ttl in zip(session_ids, redis.httl(key, *session_ids))}
         session_ids.sort(key=lambda x: ttls[x])
