@@ -14,6 +14,7 @@ from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
+from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
@@ -87,6 +88,7 @@ def make_response(app, rv):
 class DocumentMixin:
     id: Any
     objects: Callable
+    _get_collection: Callable
     _fields: dict
     _data: dict
     __include__ = ()
@@ -126,6 +128,9 @@ class DocumentMixin:
         after = self._data
         before = origin._data if origin else {self.__class__.id.name: self.id}
         return diff_dict(after, before)
+
+    def bulk_write(self, requests, ordered=True, **kwargs) -> BulkWriteResult:
+        return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
     def batch_range(cls, field, *, start, stop, batch=1000):
