@@ -7,7 +7,7 @@ from werkzeug.exceptions import TooManyRequests
 from werkzeug.debug import DebuggedApplication
 from flasgger import Swagger
 from flask import Flask, g
-from base import TtlCache
+from base import Cache
 from base import ListConverter
 from base.misc import JSONProvider, make_response, SwitchTracer
 import const
@@ -34,14 +34,13 @@ def session_key(uid: int):
     return f'session:{uid}'
 
 
-def _get_tokens(uid: int):
+def _get_user_sessions(uid: int):
     key = session_key(uid)
-    tokens = parser.hgetall(key, Session)
-    ttl = min(redis.httl(key, *tokens)) if tokens else None
-    return MappingProxyType(tokens), ttl
+    user_sessions = parser.hgetall(key, Session)
+    return MappingProxyType(user_sessions)
 
 
-sessions: TtlCache[dict[str, Session]] = TtlCache(get=_get_tokens, make_key=int)
+sessions: Cache[dict[str, Session]] = Cache(get=_get_user_sessions, make_key=int)
 sessions.listen(invalidator, 'session')
 
 

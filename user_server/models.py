@@ -9,7 +9,7 @@ class Session(BaseModel):
 
 
 class Online(BaseModel):
-    token: str
+    session_id: str
     address: str
 
 
@@ -19,22 +19,11 @@ class Runtime(BaseModel):
     log_level: str
 
 
-config_models: dict[str, Type['ConfigModels']] = {}
-
-
-def config_model(model):
-    assert model.__name__ not in config_models
-    config_models[model.__name__] = model
-    return model
-
-
-@config_model
 class QueueConfig(BaseModel):
     limit = 1024
     regions = 10
 
 
-@config_model
 class SmsConfig(BaseModel):
     cooldown = timedelta(minutes=1)
     invalid_date = date(2000, 1, 1)

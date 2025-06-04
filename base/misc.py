@@ -1,4 +1,3 @@
-from __future__ import annotations
 import contextlib
 import dataclasses
 import json
@@ -45,7 +44,7 @@ class ListConverter(BaseConverter):
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, (GetterMixin, SqlGetterMixin)):
+        if isinstance(o, (DocumentMixin, TableMixin)):
             return o.to_dict()
         elif isinstance(o, BaseModel):
             return o.dict()
@@ -74,7 +73,7 @@ class JSONProvider(DefaultJSONProvider):
 def make_response(app, rv):
     if rv is None:
         rv = {}
-    elif isinstance(rv, (GetterMixin, SqlGetterMixin)):
+    elif isinstance(rv, (DocumentMixin, TableMixin)):
         rv = rv.to_dict()
     elif isinstance(rv, BaseModel):
         rv = rv.dict()
@@ -85,7 +84,7 @@ def make_response(app, rv):
     return Flask.make_response(app, rv)
 
 
-class GetterMixin:
+class DocumentMixin:
     id: Any
     objects: Callable
     _fields: dict
@@ -150,7 +149,7 @@ class GetterMixin:
             yield docs
 
 
-class CacheMixin(GetterMixin):
+class CacheMixin(DocumentMixin):
     @classmethod
     def make_key(cls, key):
         return cls.id.to_python(key)
@@ -302,7 +301,7 @@ class Exclusion:
         return decorator
 
 
-class SqlGetterMixin:
+class TableMixin:
     Session: Callable
     __table__: Any
     __include__ = ()
@@ -374,7 +373,7 @@ class SqlGetterMixin:
             yield rows
 
 
-class SqlCacheMixin(SqlGetterMixin):
+class SqlCacheMixin(TableMixin):
     @classmethod
     def make_key(cls, key):
         pk = cls.__table__.primary_key.columns[0]

@@ -50,16 +50,23 @@ local function compare_del(keys, args)
     end
 end
 
-local function hset_get(keys, args)
-    local value = redis.call('HGET', keys[1], args[#args - 1])
+local function hget_set(keys, args)
+    local value = redis.call('HGETALL', keys[1])
     redis.call('HSETEX', keys[1], unpack(args))
+    return value
+end
+
+local function hget_del(keys, args)
+    local value = redis.call('HGETALL', keys[1])
+    redis.call('DEL', keys[1])
     return value
 end
 
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
-redis.register_function('hset_get', hset_get)
+redis.register_function('hget_set', hget_set)
+redis.register_function('hget_del', hget_del)
 """
 
 
@@ -91,7 +98,7 @@ class Script:
         keys_and_args = [key, expected]
         return self.redis.fcall('compare_del', 1, *keys_and_args)
 
-    def hset_get(self, key, field, value, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+    def hget_set(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         keys_and_args = [key]
         if fnx:
             keys_and_args.append('FNX')
@@ -101,5 +108,12 @@ class Script:
             keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
         if keepttl:
             keys_and_args.append('KEEPTTL')
-        keys_and_args += ['FIELDS', 1, field, value]
-        return self.redis.fcall('hset_get', 1, *keys_and_args)
+        keys_and_args += ['FIELDS', 1]
+        for pair in mapping.items():
+            keys_and_args += pair
+        res = self.redis.fcall('hget_set', 1, *keys_and_args)
+        return dict(zip(res[::2], res[1::2]))
+
+    def hget_del(self, key):
+        res = self.redis.fcall('hget_del', 1, key)
+        return dict(zip(res[::2], res[1::2]))
