@@ -44,7 +44,7 @@ class Service:
             with pool.connection() as conn:
                 yield conn
         except Exception as e:
-            if not ThriftPool.biz_exception(e):
+            if not pool.biz_exception(e):
                 exists = address in self._cooldown
                 self._cooldown[address] = time.time() + Registry.COOLDOWN
                 if not exists:
