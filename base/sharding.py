@@ -411,7 +411,8 @@ class ShardingHeavyTask(HeavyTask):
 
 class MigratingHeavyTask(ShardingHeavyTask):
     def __init__(self, redis: RedisCluster, biz: str, *, old_heavy_task: HeavyTask):
-        assert old_heavy_task.redis is not redis, 'same redis, use ShardingHeavyTask instead'
+        assert old_heavy_task.redis is not redis or not isinstance(old_heavy_task, ShardingHeavyTask), \
+            'same redis, use ShardingHeavyTask instead'
         super().__init__(redis, biz)
         self.old_heavy_task = old_heavy_task
 
