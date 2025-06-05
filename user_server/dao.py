@@ -131,14 +131,14 @@ class Account(BaseModel, TableMixin):
     Index('idx_last_active', last_active)
 
 
-class ConfigKey(IntEnum):
+class ConfigId(IntEnum):
     QUEUE = 1
     SMS = 2
 
 
 config_models = {
-    ConfigKey.QUEUE: QueueConfig,
-    ConfigKey.SMS: SmsConfig,
+    ConfigId.QUEUE: QueueConfig,
+    ConfigId.SMS: SmsConfig,
 }
 
 
@@ -166,7 +166,7 @@ class Config(BaseModel, SqlCacheMixin):
 
 
 def get_all_configs():
-    return tuple(config_cache.mget(ConfigKey)), None
+    return tuple(config_cache.mget(ConfigId)), None
 
 
 config_cache = FullCache[ConfigModels](mget=Config.mget, maxsize=None, make_key=Config.make_key,
