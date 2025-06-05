@@ -2,6 +2,7 @@
 import logging
 from typing import Dict
 import gevent
+from redis.commands.core import HashDataPersistOptions
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -36,8 +37,10 @@ class Handler:
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
-                pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL)
-                conns = pipe.execute()[0]
+                pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL,
+                            data_persist_option=HashDataPersistOptions.FNX)
+                conns, added = pipe.execute()
+                assert added, 'conn id conflicts or login twice'
             for _conn_id, online in conns.items():
                 if online.session_id != sid:
                     continue
