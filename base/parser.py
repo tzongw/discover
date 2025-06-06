@@ -91,6 +91,8 @@ class Parser:
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
     def hget(self, name, cls: Type[M], *, default=False) -> Optional[M]:
+        """hash as model"""
+
         def convert(values):
             json_fields = getattr(cls, '__json_fields__', [])
             mapping = {k: json.loads(v) if k in json_fields else v for k, v in zip(fields, values) if v is not None}
@@ -99,18 +101,21 @@ class Parser:
         fields = cls.__fields__
         return self._redis.execute_command('HMGET', name, *fields, convert=convert)
 
-    def hset(self, name: str, model: M) -> int:
+    def hset(self, name: str, model: M, **kwargs) -> int:
+        """hash as model"""
         json_fields = getattr(model, '__json_fields__', [])
         mapping = model.dict(exclude_unset=True)
         for k, v in mapping.items():
             if k in json_fields:
                 mapping[k] = json.dumps(v, cls=JSONEncoder)
-        return self._redis.hset(name, mapping=mapping)
+        return self._redis.hsetex(name, mapping=mapping, **kwargs)
 
     def hgetall(self, name, cls: Type[M]) -> dict[str, M]:
+        """field as model"""
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
 
     def hgetex(self, name, keys, cls: Type[M], **kwargs) -> List[M]:
+        """field as model"""
         response = self._redis.hgetex(name, *keys, **kwargs)
         convert = self._parser(cls)
         if response is self._redis:  # pipeline command staged
