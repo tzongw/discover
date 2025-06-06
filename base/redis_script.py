@@ -8,28 +8,28 @@ _SCRIPT = """#!lua name=utils
 local function limited_incrby(keys, args)
     local val = redis.call('GET', keys[1])
     local cur = tonumber(val) or 0
-    local amount = tonumber(args[1])
+    local increment = tonumber(args[1])
     local limit = tonumber(args[2])
-    if amount > 0 then
+    if increment > 0 then
         if cur >= limit then
             return 0
         end
-        if limit - cur < amount then
-            amount = limit - cur
+        if limit - cur < increment then
+            increment = limit - cur
         end
     else
         if cur <= limit then
             return 0
         end
-        if limit - cur > amount then
-            amount = limit - cur
+        if limit - cur > increment then
+            increment = limit - cur
         end
     end 
-    redis.call('INCRBY', keys[1], amount)
+    redis.call('INCRBY', keys[1], increment)
     if not val and args[3] then
         redis.call('PEXPIRE', keys[1], args[3])
     end
-    return amount
+    return increment
 end
 
 local function compare_set(keys, args)
@@ -80,8 +80,9 @@ class Script:
             self.loaded.add(name)
         self.redis = redis
 
-    def limited_incrby(self, key, amount: int, limit: int, expire: timedelta = None):
-        keys_and_args = [key, amount, limit]
+    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None):
+        """return result increment"""
+        keys_and_args = [key, increment, limit]
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)

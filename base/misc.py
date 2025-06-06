@@ -244,17 +244,17 @@ class Inventory:
                 pipe.bitfield(key).get(fmt='u32', offset=0).execute()
             return [values[0] for values in pipe.execute()]
 
-    def reset(self, key, total=0, expire=None):
-        assert total >= 0
+    def reset(self, key, value=0, expire=None):
+        assert value >= 0
         with self.redis.pipeline(transaction=True) as pipe:
-            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=value).execute()
             if expire is not None:
                 pipe.expire(key, expire)
             pipe.execute()
 
-    def incrby(self, key, total):
-        assert total >= 0
-        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()[0]
+    def incrby(self, key, increment):
+        assert increment >= 0
+        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=increment).execute()[0]
 
     def try_lock(self, key, hint=None) -> bool:
         bitfield = self.redis.bitfield(key, default_overflow='FAIL')
