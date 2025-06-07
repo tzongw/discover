@@ -88,6 +88,15 @@ local function hget_hdel(keys, args)
     return value
 end
 
+local function hsetx(keys, args)
+    if redis.call('EXISTS', keys[1]) == 1 then
+        redis.call('HSETEX', keys[1], unpack(args))
+        return 1
+    else
+        return 0
+    end
+end
+
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
@@ -95,6 +104,7 @@ redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
 redis.register_function('hget_hset', hget_hset)
 redis.register_function('hget_hdel', hget_hdel)
+redis.register_function('hsetx', hsetx)
 """
 
 
@@ -162,3 +172,8 @@ class Script:
         """empty fields to del key"""
         res = self.redis.fcall('hget_hdel', 1, key, *fields)
         return dict(zip(res[::2], res[1::2]))
+
+    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+        keys_and_args = [key]
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        return self.redis.fcall('hsetx', 1, *keys_and_args)
