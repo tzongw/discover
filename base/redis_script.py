@@ -72,22 +72,6 @@ local function compare_hdel(keys, args)
     end
 end
 
-local function hget_hset(keys, args)
-    local value = redis.call('HGETALL', keys[1])
-    redis.call('HSETEX', keys[1], unpack(args))
-    return value
-end
-
-local function hget_hdel(keys, args)
-    local value = redis.call('HGETALL', keys[1])
-    if args[1] then
-        redis.call('HDEL', keys[1], unpack(args))
-    else
-        redis.call('DEL', keys[1])
-    end
-    return value
-end
-
 local function hsetx(keys, args)
     if redis.call('EXISTS', keys[1]) == 1 then
         redis.call('HSETEX', keys[1], unpack(args))
@@ -102,8 +86,6 @@ redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
 redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
-redis.register_function('hget_hset', hget_hset)
-redis.register_function('hget_hdel', hget_hdel)
 redis.register_function('hsetx', hsetx)
 """
 
@@ -146,12 +128,6 @@ class Script:
         """empty fields to del key"""
         return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
 
-    def hget_hset(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
-        keys_and_args = [key]
-        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
-        res = self.redis.fcall('hget_hset', 1, *keys_and_args)
-        return dict(zip(res[::2], res[1::2]))
-
     @staticmethod
     def _hsetex_args(mapping, expire=None, keepttl=False, fnx=False, fxx=False):
         args = []
@@ -167,11 +143,6 @@ class Script:
         for pair in mapping.items():
             args += pair
         return args
-
-    def hget_hdel(self, key, *fields):
-        """empty fields to del key"""
-        res = self.redis.fcall('hget_hdel', 1, key, *fields)
-        return dict(zip(res[::2], res[1::2]))
 
     def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         keys_and_args = [key]
