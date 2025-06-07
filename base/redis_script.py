@@ -50,6 +50,15 @@ local function compare_del(keys, args)
     end
 end
 
+local function compare_hset(keys, args)
+    if redis.call('HGET', keys[1], args[1]) == args[2] then
+        redis.call('HSETEX', keys[1], unpack(args, 3))
+        return 1
+    else
+        return 0
+    end
+end
+
 local function hget_set(keys, args)
     local value = redis.call('HGETALL', keys[1])
     redis.call('HSETEX', keys[1], unpack(args))
@@ -65,6 +74,7 @@ end
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
+redis.register_function('compare_hset', compare_hset)
 redis.register_function('hget_set', hget_set)
 redis.register_function('hget_del', hget_del)
 """
@@ -96,24 +106,35 @@ class Script:
         return self.redis.fcall('compare_set', 1, *keys_and_args)
 
     def compare_del(self, key, expected):
-        keys_and_args = [key, expected]
-        return self.redis.fcall('compare_del', 1, *keys_and_args)
+        return self.redis.fcall('compare_del', 1, key, expected)
+
+    def compare_hset(self, key, field, expected, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False,
+                     fxx=False):
+        keys_and_args = [key, field, expected]
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        return self.redis.fcall('compare_hset', 1, *keys_and_args)
 
     def hget_set(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         keys_and_args = [key]
-        if fnx:
-            keys_and_args.append('FNX')
-        if fxx:
-            keys_and_args.append('FXX')
-        if expire:
-            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
-        if keepttl:
-            keys_and_args.append('KEEPTTL')
-        keys_and_args += ['FIELDS', 1]
-        for pair in mapping.items():
-            keys_and_args += pair
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
         res = self.redis.fcall('hget_set', 1, *keys_and_args)
         return dict(zip(res[::2], res[1::2]))
+
+    @staticmethod
+    def _hsetex_args(mapping, expire=None, keepttl=False, fnx=False, fxx=False):
+        args = []
+        if fnx:
+            args.append('FNX')
+        if fxx:
+            args.append('FXX')
+        if expire:
+            args += ['PX', int(expire.total_seconds() * 1000)]
+        if keepttl:
+            args.append('KEEPTTL')
+        args += ['FIELDS', 1]
+        for pair in mapping.items():
+            args += pair
+        return args
 
     def hget_del(self, key):
         res = self.redis.fcall('hget_del', 1, key)
