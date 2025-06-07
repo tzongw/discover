@@ -133,14 +133,18 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=1000):
+    def batch_range(cls, field, *, start, stop, batch=1000, query=None):
+        if not isinstance(field, str):
+            field = field.name
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
+        if query is None:
+            query = {}
         while True:
-            query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
+            range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
-            docs = list(cls.objects(**query).order_by(order_by).limit(batch))
+            docs = list(cls.objects(**query, **range_query).order_by(order_by).limit(batch))
             if not docs:
                 return
             last = docs[-1][field]
@@ -354,17 +358,20 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=1000):
-        col = getattr(cls.__table__.columns, column)
+    def batch_range(cls, column, *, start, stop, batch=1000, query=()):
+        if isinstance(column, str):
+            col = getattr(cls, column)
+        else:
+            col, column = column, column.name
         pk = cls.__table__.primary_key.columns[0]
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
         while True:
             with cls.Session() as session:
-                query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
+                range_query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
                     [col <= start, col > stop, pk.not_in(seen_ids)]
-                rows = session.query(cls).filter(*query).order_by(order_by).limit(batch).all()
+                rows = session.query(cls).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
             last = getattr(rows[-1], column)
