@@ -34,7 +34,7 @@ end
 
 local function compare_set(keys, args)
     if redis.call('GET', keys[1]) == args[1] then
-        redis.call('SET', keys[1], args[2], unpack(args, 3))
+        redis.call('SET', keys[1], unpack(args, 2))
         return 1
     else
         return 0
@@ -72,15 +72,19 @@ local function compare_hdel(keys, args)
     end
 end
 
-local function hget_set(keys, args)
+local function hget_hset(keys, args)
     local value = redis.call('HGETALL', keys[1])
     redis.call('HSETEX', keys[1], unpack(args))
     return value
 end
 
-local function hget_del(keys, args)
+local function hget_hdel(keys, args)
     local value = redis.call('HGETALL', keys[1])
-    redis.call('DEL', keys[1])
+    if args[1] then
+        redis.call('HDEL', keys[1], unpack(args))
+    else
+        redis.call('DEL', keys[1])
+    end
     return value
 end
 
@@ -89,8 +93,8 @@ redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
 redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
-redis.register_function('hget_set', hget_set)
-redis.register_function('hget_del', hget_del)
+redis.register_function('hget_hset', hget_hset)
+redis.register_function('hget_hdel', hget_hdel)
 """
 
 
@@ -129,12 +133,13 @@ class Script:
         return self.redis.fcall('compare_hset', 1, *keys_and_args)
 
     def compare_hdel(self, key, field, expected, *fields):
+        """empty fields to del key"""
         return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
 
-    def hget_set(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+    def hget_hset(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         keys_and_args = [key]
         keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
-        res = self.redis.fcall('hget_set', 1, *keys_and_args)
+        res = self.redis.fcall('hget_hset', 1, *keys_and_args)
         return dict(zip(res[::2], res[1::2]))
 
     @staticmethod
@@ -153,6 +158,7 @@ class Script:
             args += pair
         return args
 
-    def hget_del(self, key):
-        res = self.redis.fcall('hget_del', 1, key)
+    def hget_hdel(self, key, *fields):
+        """empty fields to del key"""
+        res = self.redis.fcall('hget_hdel', 1, key, *fields)
         return dict(zip(res[::2], res[1::2]))
