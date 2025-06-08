@@ -117,7 +117,7 @@ class RowChange(BaseModel):
 
 
 @table
-class Account(BaseModel, TableMixin):
+class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = ('hashed',)
@@ -143,7 +143,7 @@ config_models = {
 
 
 @table
-class Config(BaseModel, SqlCacheMixin):
+class Config(SqlCacheMixin, BaseModel):
     __tablename__ = 'configs'
 
     id = Column(Integer, primary_key=True)
@@ -225,7 +225,7 @@ class Permission(EmbeddedDocument):
 
 
 @collection
-class Role(Document, CacheMixin):
+class Role(CacheMixin, Document):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
@@ -242,7 +242,7 @@ Role.mget = role_cache.mget
 
 
 @collection
-class Profile(Document, CacheMixin):
+class Profile(CacheMixin, Document):
     __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
@@ -284,7 +284,7 @@ def valid_profiles():
 
 
 @collection
-class Setting(Document, CacheMixin):
+class Setting(CacheMixin, Document):
     meta = {'strict': False, 'allow_inheritance': True}
 
     id = StringField(primary_key=True)
