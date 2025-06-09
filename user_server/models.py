@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta, date
-from typing import Type
 from pydantic import BaseModel
 
 
