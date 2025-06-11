@@ -43,7 +43,8 @@ def serve():
     server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.unix_sock and not options.http_port:
-        gevent.sleep(0.01)
+        while not server.address[1]:
+            gevent.sleep(0.01)
         options.http_port = server.address[1]
     logging.info(f'Starting ws server {options.http_address} ...')
     return g
