@@ -3,6 +3,7 @@ import sys
 import subprocess
 from dataclasses import dataclass
 
+
 @dataclass
 class ProcessInfo:
     name: str
@@ -17,16 +18,17 @@ def rollover_restart(running):
     print(f'total {len(running)} to restart')
     for info in running:
         print('> ', info.name)
-    yes = False
     for index, info in enumerate(running):
-        if not yes:
-            print(f'restart {info.name} {index + 1}/{len(running)}, continue? (YES/Y/n)')
-            answer = sys.stdin.readline().strip()
-            if answer == 'YES':
-                yes = True
-            elif answer != 'Y':
-                print('user aborted')
-                exit(0)
+        print(f'restart {info.name} {index + 1}/{len(running)}, continue? (ALL/Y/n)')
+        answer = sys.stdin.readline().strip()
+        if answer == 'ALL':  # restart all rest
+            pids = [info.pid for info in running[index:]]
+            text = subprocess.check_output(['kill', ' -TERM'] + pids, text=True)
+            print(f'kill output: {text}')
+            exit(0)
+        if answer != 'Y':
+            print('user aborted')
+            exit(0)
         print(f'restarting {info.name} {index + 1}/{len(running)}')
         text = subprocess.check_output(['supervisorctl', 'restart', info.name], text=True)
         print(f'done {info.name} {index + 1}/{len(running)}, output: {text}')
