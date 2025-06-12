@@ -18,28 +18,47 @@ def rollover_restart(running):
     print(f'total {len(running)} to restart')
     for info in running:
         print('> ', info.name)
-    for index, info in enumerate(running):
-        actions = ['y', 'NO']
-        if index:
+    start_index = 0
+    batch = 1
+    total = len(running)
+    while start_index < total:
+        actions = ['y', 'NO', '<batch>']
+        if start_index:
             actions += ['REST']
         prompt = '/'.join(actions)
         while True:
-            print(f'restart {info.name} {index + 1}/{len(running)}, continue? ({prompt})')
+            print(f'restart {start_index}/{total}, continue? ({prompt})')
             answer = sys.stdin.readline().strip()
-            if answer in actions:
+            if answer.isdigit():
+                n = int(answer)
+                upperbound = total - max(start_index, 1)
+                if not (1 <= n <= upperbound):
+                    print(f'batch out of range: [1, {upperbound}]')
+                    continue
+                batch = n
+                answer = 'y'
+            if answer in actions and answer != '<batch>':
                 break
             print('unrecognized action')
         if answer == 'REST':  # restart all rest
-            pids = [str(info.pid) for info in running[index:]]
+            pids = [str(info.pid) for info in running[start_index:]]
             text = subprocess.check_output(['kill', '-TERM'] + pids, text=True)
             print(f'kill output: {text}')
             exit(0)
-        if answer != 'y':
+        if answer == 'NO':
             print('user aborted')
             exit(0)
-        print(f'restarting {info.name} {index + 1}/{len(running)}')
-        text = subprocess.check_output(['supervisorctl', 'restart', info.name], text=True)
-        print(f'done {info.name} {index + 1}/{len(running)}, supervisorctl output: {text}')
+        assert answer == 'y'
+        names = []
+        stop_index = min(start_index + batch, total)
+        for index in range(start_index, stop_index):
+            info = running[index]
+            names.append(info.name)
+            print(f'restarting {index + 1}/{len(running)}')
+        text = subprocess.check_output(['supervisorctl', 'restart'] + names, text=True)
+        print(f'supervisor output:')
+        print(text)
+        start_index = stop_index
 
 
 def main():
