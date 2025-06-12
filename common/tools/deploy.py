@@ -18,18 +18,32 @@ def rollover_restart(running):
     for info in running:
         print('> ', info.name)
     yes = False
-    for index, info in enumerate(running):
+    start_index = 0
+    batch = 1
+    while start_index < len(running):
         if not yes:
-            print(f'restart {info.name} {index + 1}/{len(running)}, continue? (YES/Y/n)')
+            stop_index = min(start_index + batch, len(running))
+            for index in range(start_index, stop_index):
+                print(f'restart batch: {batch}, continue? (YES/Y/<batch>/n)')
             answer = sys.stdin.readline().strip()
             if answer == 'YES':
                 yes = True
+            if answer.isdigit():
+                batch = int(answer)
+                assert batch > 0
+                stop_index = min(start_index + batch, len(running))
             elif answer != 'Y':
                 print('user aborted')
                 exit(0)
-        print(f'restarting {info.name} {index + 1}/{len(running)}')
-        text = subprocess.check_output(['supervisorctl', 'restart', info.name], text=True)
-        print(f'done {info.name} {index + 1}/{len(running)}, output: {text}')
+        names = []
+        for index in range(start_index, stop_index):
+            info = running[index]
+            names.append(info.name)
+            print(f'restarting {info.name} {index + 1}/{len(running)}')
+        text = subprocess.check_output(['supervisorctl', 'restart'] + names, text=True)
+        print(f'supervisor output:')
+        print(text)
+        start_index = stop_index
 
 
 def main():
