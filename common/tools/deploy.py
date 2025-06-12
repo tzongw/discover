@@ -10,7 +10,7 @@ class ProcessInfo:
     pid: int
 
 
-def rollover_restart(running):
+def rolling_update(running):
     if not running:
         raise RuntimeError('no service processes running')
     if len(running) == 1:
@@ -73,7 +73,7 @@ def main():
         if status != 'RUNNING':
             raise RuntimeError(f'process not running: {line}')
         running.append(info)
-    rollover_restart(running)
+    rolling_update(running)
 
 
 if __name__ == '__main__':
