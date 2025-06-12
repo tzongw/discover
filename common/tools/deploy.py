@@ -48,16 +48,13 @@ def main():
     service = sys.argv[1]
     text = subprocess.check_output(['supervisorctl', 'status', f'{service}:*'], text=True)
     running = []
-    stopped = []
     for line in text.strip().split('\n'):
         name, status, _, pid, *_ = line.split()
         info = ProcessInfo(name=name, pid=int(pid.strip(',')))
-        if status == 'RUNNING':
-            running.append(info)
-        elif status == 'STOPPED':
-            stopped.append(info)
+        if status != 'RUNNING':
+            raise RuntimeError(f'process not running: {line}')
+        running.append(info)
     rollover_restart(running)
-    print(f'{service} restart all done')
 
 
 if __name__ == '__main__':
