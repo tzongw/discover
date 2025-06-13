@@ -27,7 +27,7 @@ def rolling_update(running, all_yes):
             actions += ['REST']
         prompt = '/'.join(actions)
         while True:
-            print(f'restart {start_index}/{total}, continue? ({prompt})')
+            print(f'restart {start_index + 1}/{total}, continue? ({prompt})')
             answer = 'y' if all_yes else sys.stdin.readline().strip()
             if answer.isdigit():
                 n = int(answer)
@@ -54,7 +54,7 @@ def rolling_update(running, all_yes):
         for index in range(start_index, stop_index):
             info = running[index]
             names.append(info.name)
-            print(f'restarting {index + 1}/{total}')
+            print(f'restarting {index + 1}/{total} ...')
         text = subprocess.check_output(['supervisorctl', 'restart'] + names, text=True)
         print(f'supervisor output:')
         print(text)
@@ -74,7 +74,7 @@ def migrating_update(running, idle, all_yes):
         actions = ['y', 'NO', '<batch>']
         prompt = '/'.join(actions)
         while True:
-            print(f'migrate {start_index}/{total}, continue? ({prompt})')
+            print(f'migrate {start_index + 1}/{total}, continue? ({prompt})')
             answer = 'y' if all_yes else sys.stdin.readline().strip()
             if answer.isdigit():
                 n = int(answer)
@@ -97,7 +97,7 @@ def migrating_update(running, idle, all_yes):
         for index in range(start_index, stop_index):
             pids.append(str(running[index].pid))
             idle_names.append(idle[index].name)
-            print(f'migrating {index + 1}/{len(running)}')
+            print(f'migrating {index + 1}/{total} ...')
         text = subprocess.check_output(['supervisorctl', 'start'] + idle_names, text=True)
         print(f'supervisor output:')
         print(text)
