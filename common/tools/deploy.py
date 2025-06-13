@@ -73,11 +73,11 @@ def migrating_update(running, stopped):
         actions = ['y', 'NO', '<batch>']
         prompt = '/'.join(actions)
         while True:
-            print(f'restart {start_index}/{total}, continue? ({prompt})')
+            print(f'migrate {start_index}/{total}, continue? ({prompt})')
             answer = sys.stdin.readline().strip()
             if answer.isdigit():
                 n = int(answer)
-                upperbound = total - max(start_index, 1)
+                upperbound = total - start_index
                 if not (1 <= n <= upperbound):
                     print(f'batch out of range: [1, {upperbound}]')
                     continue
