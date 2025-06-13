@@ -34,7 +34,7 @@ def serve():
             pass
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind(sock_path)
-        os.chmod(sock_path, 0o777)
+        os.chmod(sock_path, 0o700)
         sock.listen()
         listener = sock
     else:
