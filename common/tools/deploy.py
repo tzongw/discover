@@ -60,13 +60,13 @@ def rolling_update(running):
         start_index = stop_index
 
 
-def migrating_update(running, stopped):
+def migrating_update(running, idle):
     total = len(running)
-    if len(stopped) < total:
-        raise RuntimeError('not enough processes in stopped')
+    if len(idle) < total:
+        raise RuntimeError('not enough idle processes')
     print(f'total {total} to migrate')
-    for ri, si in zip(running, stopped):
-        print('> ', ri.name, '>>', si.name)
+    for r, i in zip(running, idle):
+        print('> ', r.name, '>>', i.name)
     start_index = 0
     batch = 1
     while start_index < total:
@@ -91,13 +91,13 @@ def migrating_update(running, stopped):
             exit(0)
         assert answer == 'y'
         pids = []
-        stopped_names = []
+        idle_names = []
         stop_index = min(start_index + batch, total)
         for index in range(start_index, stop_index):
             pids.append(str(running[index].pid))
-            stopped_names.append(stopped[index].name)
+            idle_names.append(idle[index].name)
             print(f'migrating {index + 1}/{len(running)}')
-        text = subprocess.check_output(['supervisorctl', 'start'] + stopped_names, text=True)
+        text = subprocess.check_output(['supervisorctl', 'start'] + idle_names, text=True)
         print(f'supervisor output:')
         print(text)
         text = subprocess.check_output(['kill', '-TERM'] + pids, text=True)
@@ -119,7 +119,7 @@ def main():
     print(f'supervisor output:')
     print(text)
     running = []
-    stopped = []
+    idle = []
     other = []
     for line in text.strip().split('\n'):
         name, status, *rest = line.split()
@@ -129,14 +129,14 @@ def main():
             running.append(info)
         else:
             info = ProcessInfo(name=name, status=status)
-            if status == 'STOPPED':
-                stopped.append(info)
+            if status in ['STOPPED', 'EXITED']:
+                idle.append(info)
             else:
                 other.append(info)
     if not running:
         raise RuntimeError('no process running')
-    if stopped:
-        migrating_update(running, stopped)
+    if idle:
+        migrating_update(running, idle)
     elif not other:
         rolling_update(running)
     else:
