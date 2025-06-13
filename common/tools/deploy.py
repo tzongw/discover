@@ -2,6 +2,7 @@
 import sys
 import subprocess
 from dataclasses import dataclass
+from base.utils import flock
 
 
 @dataclass
@@ -106,11 +107,7 @@ def migrating_update(running, idle, all_yes):
         start_index = stop_index
 
 
-def main():
-    if not (len(sys.argv) == 2 or len(sys.argv) == 3 and sys.argv[1] == '-y'):
-        raise RuntimeError('usage: python deploy.py [-y] <service>')
-    all_yes = len(sys.argv) == 3
-    service = sys.argv[-1]
+def deploy(service, all_yes):
     try:
         text = subprocess.check_output(['supervisorctl', 'status', f'{service}:*'], text=True)
     except subprocess.CalledProcessError as e:
@@ -142,6 +139,16 @@ def main():
         rolling_update(running, all_yes)
     else:
         raise RuntimeError('no strategy match')
+
+
+def main():
+    if not (len(sys.argv) == 2 or len(sys.argv) == 3 and sys.argv[1] == '-y'):
+        raise RuntimeError('usage: python deploy.py [-y] <service>')
+    all_yes = len(sys.argv) == 3
+    service = sys.argv[-1]
+    f = flock(f'/tmp/deploy-{service}.lock')
+    deploy(service, all_yes)
+    f.close()
 
 
 if __name__ == '__main__':
