@@ -7,20 +7,19 @@ from dataclasses import dataclass
 @dataclass
 class ProcessInfo:
     name: str
-    pid: int
+    status: str
+    pid: int = None
 
 
 def rolling_update(running):
-    if not running:
-        raise RuntimeError('no service processes running')
-    if len(running) == 1:
-        raise RuntimeError('one process running can not rollover')
-    print(f'total {len(running)} to restart')
+    total = len(running)
+    if total == 1:
+        raise RuntimeError('one process can not rolling')
+    print(f'total {total} to roll')
     for info in running:
         print('> ', info.name)
     start_index = 0
     batch = 1
-    total = len(running)
     while start_index < total:
         actions = ['y', 'NO', '<batch>']
         if start_index:
@@ -54,9 +53,55 @@ def rolling_update(running):
         for index in range(start_index, stop_index):
             info = running[index]
             names.append(info.name)
-            print(f'restarting {index + 1}/{len(running)}')
+            print(f'restarting {index + 1}/{total}')
         text = subprocess.check_output(['supervisorctl', 'restart'] + names, text=True)
         print(f'supervisor output:')
+        print(text)
+        start_index = stop_index
+
+
+def migrating_update(running, stopped):
+    total = len(running)
+    if len(stopped) < total:
+        raise RuntimeError('not enough processes in stopped')
+    print(f'total {total} to migrate')
+    for ri, si in zip(running, stopped):
+        print('> ', ri.name, '>>', si.name)
+    start_index = 0
+    batch = 1
+    while start_index < total:
+        actions = ['y', 'NO', '<batch>']
+        prompt = '/'.join(actions)
+        while True:
+            print(f'restart {start_index}/{total}, continue? ({prompt})')
+            answer = sys.stdin.readline().strip()
+            if answer.isdigit():
+                n = int(answer)
+                upperbound = total - max(start_index, 1)
+                if not (1 <= n <= upperbound):
+                    print(f'batch out of range: [1, {upperbound}]')
+                    continue
+                batch = n
+                answer = 'y'
+            if answer in actions and answer != '<batch>':
+                break
+            print('unrecognized action')
+        if answer == 'NO':
+            print('user aborted')
+            exit(0)
+        assert answer == 'y'
+        pids = []
+        stopped_names = []
+        stop_index = min(start_index + batch, total)
+        for index in range(start_index, stop_index):
+            pids.append(str(running[index].pid))
+            stopped_names.append(stopped[index].name)
+            print(f'migrating {index + 1}/{len(running)}')
+        text = subprocess.check_output(['supervisorctl', 'start'] + stopped_names, text=True)
+        print(f'supervisor output:')
+        print(text)
+        text = subprocess.check_output(['kill', '-TERM'] + pids, text=True)
+        print(f'kill output:')
         print(text)
         start_index = stop_index
 
@@ -65,15 +110,37 @@ def main():
     if len(sys.argv) <= 1:
         raise RuntimeError('usage: python deploy.py <service>')
     service = sys.argv[1]
-    text = subprocess.check_output(['supervisorctl', 'status', f'{service}:*'], text=True)
+    try:
+        text = subprocess.check_output(['supervisorctl', 'status', f'{service}:*'], text=True)
+    except subprocess.CalledProcessError as e:
+        if e.returncode != 3:
+            raise
+        text = e.stdout
+    print(f'supervisor output:')
+    print(text)
     running = []
+    stopped = []
+    other = []
     for line in text.strip().split('\n'):
-        name, status, _, pid, *_ = line.split()
-        info = ProcessInfo(name=name, pid=int(pid.strip(',')))
-        if status != 'RUNNING':
-            raise RuntimeError(f'process not running: {line}')
-        running.append(info)
-    rolling_update(running)
+        name, status, *rest = line.split()
+        if status == 'RUNNING':
+            pid = rest[1]
+            info = ProcessInfo(name=name, status=status, pid=int(pid.strip(',')))
+            running.append(info)
+        else:
+            info = ProcessInfo(name=name, status=status)
+            if status == 'STOPPED':
+                stopped.append(info)
+            else:
+                other.append(info)
+    if not running:
+        raise RuntimeError('no process running')
+    if stopped:
+        migrating_update(running, stopped)
+    elif not other:
+        rolling_update(running)
+    else:
+        raise RuntimeError('no strategy match')
 
 
 if __name__ == '__main__':
