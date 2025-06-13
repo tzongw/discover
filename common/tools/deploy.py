@@ -11,7 +11,7 @@ class ProcessInfo:
     pid: int = None
 
 
-def rolling_update(running):
+def rolling_update(running, all_yes):
     total = len(running)
     if total == 1:
         raise RuntimeError('one process can not rolling')
@@ -27,7 +27,7 @@ def rolling_update(running):
         prompt = '/'.join(actions)
         while True:
             print(f'restart {start_index}/{total}, continue? ({prompt})')
-            answer = sys.stdin.readline().strip()
+            answer = 'y' if all_yes else sys.stdin.readline().strip()
             if answer.isdigit():
                 n = int(answer)
                 upperbound = total - max(start_index, 1)
@@ -60,7 +60,7 @@ def rolling_update(running):
         start_index = stop_index
 
 
-def migrating_update(running, idle):
+def migrating_update(running, idle, all_yes):
     total = len(running)
     if len(idle) < total:
         raise RuntimeError('not enough idle processes')
@@ -74,7 +74,7 @@ def migrating_update(running, idle):
         prompt = '/'.join(actions)
         while True:
             print(f'migrate {start_index}/{total}, continue? ({prompt})')
-            answer = sys.stdin.readline().strip()
+            answer = 'y' if all_yes else sys.stdin.readline().strip()
             if answer.isdigit():
                 n = int(answer)
                 upperbound = total - start_index
@@ -107,9 +107,10 @@ def migrating_update(running, idle):
 
 
 def main():
-    if len(sys.argv) <= 1:
-        raise RuntimeError('usage: python deploy.py <service>')
-    service = sys.argv[1]
+    if not (len(sys.argv) == 2 or len(sys.argv) == 3 and sys.argv[1] == '-y'):
+        raise RuntimeError('usage: python deploy.py [-y] <service>')
+    all_yes = len(sys.argv) == 3
+    service = sys.argv[-1]
     try:
         text = subprocess.check_output(['supervisorctl', 'status', f'{service}:*'], text=True)
     except subprocess.CalledProcessError as e:
@@ -136,9 +137,9 @@ def main():
     if not running:
         raise RuntimeError('no process running')
     if idle:
-        migrating_update(running, idle)
+        migrating_update(running, idle, all_yes)
     elif not other:
-        rolling_update(running)
+        rolling_update(running, all_yes)
     else:
         raise RuntimeError('no strategy match')
 
