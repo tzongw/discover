@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import subprocess
+import contextlib
 from dataclasses import dataclass
 from base.utils import flock
 
@@ -146,9 +147,8 @@ def main():
         raise RuntimeError('usage: python deploy.py [-y] <service>')
     all_yes = len(sys.argv) == 3
     service = sys.argv[-1]
-    f = flock(f'/tmp/deploy-{service}.lock')
-    deploy(service, all_yes)
-    f.close()
+    with contextlib.closing(flock(f'/tmp/deploy-{service}.lock')):
+        deploy(service, all_yes)
 
 
 if __name__ == '__main__':
