@@ -4,6 +4,7 @@ from gevent import monkey
 monkey.patch_all()
 from config import options
 import os
+import signal
 import logging
 import gevent
 from setproctitle import setproctitle
@@ -34,10 +35,10 @@ def reload_nginx():
             f.write('\n'.join([f'server {addr};' for addr in addresses]))
             f.write('\n')
     changed.clear()
-    if status := os.system('nginx -s reload'):
-        logging.error(f'nginx reload fail: {status}')
-    else:
-        logging.info('nginx reload success')
+    with open(options.pid_file, 'r') as f:
+        pid = int(f.readline().strip())
+    os.kill(pid, signal.SIGHUP)
+    logging.info('nginx reload done')
 
 
 def update_upstreams():
