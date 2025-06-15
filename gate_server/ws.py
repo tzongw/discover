@@ -2,6 +2,7 @@
 import os
 import logging
 import socket
+import atexit
 from urllib import parse
 from collections import defaultdict
 import gevent
@@ -37,6 +38,7 @@ def serve():
         os.chmod(sock_path, 0o700)
         sock.listen()
         listener = sock
+        atexit.register(os.unlink, sock_path)
     else:
         listener = options.http_port
     logger = None if options.env == const.Environment.PROD else logging.getLogger()
