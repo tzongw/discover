@@ -20,11 +20,11 @@ class Pool(metaclass=abc.ABCMeta):
         self.close_all()
 
     @abc.abstractmethod
-    def create_connection(self):
+    def create_conn(self):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def close_connection(self, conn):
+    def close_conn(self, conn):
         raise NotImplementedError
 
     @staticmethod
@@ -44,11 +44,10 @@ class Pool(metaclass=abc.ABCMeta):
 
         self._size += 1
         try:
-            conn = self.create_connection()
+            return self.create_conn()
         except Exception:
             self._size -= 1
             raise
-        return conn
 
     def _reap_stale(self):
         while self._idle.qsize():
@@ -63,7 +62,7 @@ class Pool(metaclass=abc.ABCMeta):
 
     def _close_conn(self, conn):
         self._size -= 1
-        self.close_connection(conn)
+        self.close_conn(conn)
 
     def _return_conn(self, conn):
         if self._idle.qsize() < self._maxsize:
