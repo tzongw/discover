@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-from typing import Callable
+from typing import Callable, Iterable
 from functools import partial
 from gevent import queue
 from gevent.event import Event
@@ -66,11 +66,11 @@ class Executor:
     def join(self, timeout=None):
         return self._done.wait(timeout=timeout)
 
-    def gather(self, fns):
+    def gather(self, fns: Iterable[Callable]):
         futures = [self.submit(fn) for fn in fns]
         return [fut.result() for fut in futures]
 
-    def map(self, fn: Callable, args):
+    def map(self, fn: Callable, args: Iterable):
         return self.gather([partial(fn, arg) for arg in args])
 
     def _adjust_workers(self):
