@@ -7,7 +7,8 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
 from random import choice
-from typing import Any, Callable, Optional, Self, Union
+from collections import defaultdict
+from typing import Any, Callable, Optional, Self, Union, Iterable
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
@@ -508,3 +509,41 @@ class SwitchTracer:
         g = args[0]
         if g in self._tracing:
             self._tracing[g] = True
+
+
+class UvCache:
+    def __init__(self, save: Callable[[dict[Any, set]], None]):
+        self._cache = defaultdict(set)
+        self._save = save
+
+    def cache(self, uid, views: Iterable) -> int:
+        for view in views:
+            self._cache[view].add(uid)
+        return len(self._cache)
+
+    def save(self):
+        if cache := self._cache:
+            self._cache = defaultdict(set)
+            self._save(cache)
+
+    def get(self, view) -> set:
+        return self._cache.get(view) or set()
+
+
+class PvCache:
+    def __init__(self, save: Callable[[dict[Any, int]], None]):
+        self._cache = defaultdict(int)
+        self._save = save
+
+    def cache(self, views: Iterable) -> int:
+        for view in views:
+            self._cache[view] += 1
+        return len(self._cache)
+
+    def save(self):
+        if cache := self._cache:
+            self._cache = defaultdict(int)
+            self._save(cache)
+
+    def get(self, view) -> int:
+        return self._cache.get(view) or 0
