@@ -478,8 +478,8 @@ def authorize():
         session.query(Account).filter(Account.id == uid).update({Account.last_active: datetime.now()})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    if redis.httl(key, token)[0] < 0.9 * ttl:
-        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
+    if redis.httl(key, session_id)[0] < 0.9 * ttl:
+        redis.hexpire(key, int(ttl), session_id)  # will invalidate local cache
 
 
 @bp.route('/whoami')

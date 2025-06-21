@@ -31,18 +31,18 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            sid = salt_hash(token, salt=uid)
-            if sid not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+            session_id = salt_hash(token, salt=uid)
+            if session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
                 raise ValueError('token error')
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
-                pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL,
+                pipe.hsetex(key, conn_id, Online(session_id=session_id, address=address), ex=const.ONLINE_TTL,
                             data_persist_option=HashDataPersistOptions.FNX)
                 conns, added = pipe.execute()
                 assert added, 'conn id conflicts or login twice'
             for _conn_id, online in conns.items():
-                if online.session_id != sid:
+                if online.session_id != session_id:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
                 with LogSuppress(), shared.gate_service.client(online.address) as client:
