@@ -229,11 +229,10 @@ class Role(CacheMixin, Document):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
-    admin = BooleanField(default=False)
     permissions = EmbeddedDocumentListField(Permission, required=True)
 
     def can_access(self, coll, op: CRUD):
-        return self.admin or any(permission.can_access(coll, op) for permission in self.permissions)
+        return any(permission.can_access(coll, op) for permission in self.permissions)
 
 
 role_cache = Cache[Role](mget=Role.mget, make_key=Role.make_key, maxsize=None)
@@ -251,10 +250,11 @@ class Profile(CacheMixin, Document):
     addr = StringField(default='')
     rank = IntField()
     expire = DateTimeField()
+    root = BooleanField(default=False)
     roles = ListField(StringField())
 
     def can_access(self, coll, op: CRUD):
-        return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
+        return self.root or any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
 def get_all_profiles():
