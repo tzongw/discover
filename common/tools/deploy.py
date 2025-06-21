@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
+import signal
 import subprocess
 import contextlib
 from dataclasses import dataclass
@@ -42,9 +44,8 @@ def rolling_update(running, all_yes):
                 break
             print('unrecognized action')
         if answer == 'REST':  # restart all rest
-            pids = [str(info.pid) for info in running[start_index:]]
-            text = subprocess.check_output(['kill', '-TERM'] + pids, text=True)
-            print(f'kill output: {text}')
+            for info in running[start_index:]:
+                os.kill(info.pid, signal.SIGHUP)
             exit(0)
         if answer == 'NO':
             print('user aborted')
@@ -96,15 +97,14 @@ def migrating_update(running, idle, all_yes):
         idle_names = []
         stop_index = min(start_index + batch, total)
         for index in range(start_index, stop_index):
-            pids.append(str(running[index].pid))
+            pids.append(running[index].pid)
             idle_names.append(idle[index].name)
             print(f'migrating {index + 1}/{total} ...')
         text = subprocess.check_output(['supervisorctl', 'start'] + idle_names, text=True)
         print(f'supervisor output:')
         print(text)
-        text = subprocess.check_output(['kill', '-TERM'] + pids, text=True)
-        print(f'kill output:')
-        print(text)
+        for pid in pids:
+            os.kill(pid, signal.SIGHUP)
         start_index = stop_index
 
 
