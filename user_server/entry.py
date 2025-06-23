@@ -18,7 +18,7 @@ def main():
     shared.invalidator.start()
     init_main()
     if not remaining:
-        raise RuntimeError('usage: python user_server/entry.py [--option ...] <module> [--option ...]')
+        raise RuntimeError('usage: python entry.py [--option ...] <module> [--option ...]')
     entry = remaining[0]
     setproctitle(f'{app_name}-{app_id}-{entry}')
     module = import_module(entry)

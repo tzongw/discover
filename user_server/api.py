@@ -38,7 +38,8 @@ def serve():
     server = pywsgi.WSGIServer(options.http_port, app, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.http_port:
-        gevent.sleep(0.01)
+        while not server.address[1]:
+            gevent.sleep(0.01)
         options.http_port = server.address[1]
     logging.info(f'Starting http server {options.http_address} ...')
     return g
@@ -474,11 +475,11 @@ def authorize():
     logging.info(f'user active: {uid}')
     user_actives[uid] = time.time()
     with Session() as session:
-        session.query(Account).filter(Account.id == uid).update({'last_active': datetime.now()})
+        session.query(Account).filter(Account.id == uid).update({Account.last_active: datetime.now()})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    if redis.httl(key, token)[0] < 0.9 * ttl:
-        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
+    if redis.httl(key, session_id)[0] < 0.9 * ttl:
+        redis.hexpire(key, int(ttl), session_id)  # will invalidate local cache
 
 
 @bp.route('/whoami')

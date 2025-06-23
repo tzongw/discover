@@ -8,33 +8,33 @@ _SCRIPT = """#!lua name=utils
 local function limited_incrby(keys, args)
     local val = redis.call('GET', keys[1])
     local cur = tonumber(val) or 0
-    local amount = tonumber(args[1])
+    local increment = tonumber(args[1])
     local limit = tonumber(args[2])
-    if amount > 0 then
+    if increment > 0 then
         if cur >= limit then
             return 0
         end
-        if limit - cur < amount then
-            amount = limit - cur
+        if limit - cur < increment then
+            increment = limit - cur
         end
     else
         if cur <= limit then
             return 0
         end
-        if limit - cur > amount then
-            amount = limit - cur
+        if limit - cur > increment then
+            increment = limit - cur
         end
     end 
-    redis.call('INCRBY', keys[1], amount)
+    redis.call('INCRBY', keys[1], increment)
     if not val and args[3] then
         redis.call('PEXPIRE', keys[1], args[3])
     end
-    return amount
+    return increment
 end
 
 local function compare_set(keys, args)
     if redis.call('GET', keys[1]) == args[1] then
-        redis.call('SET', keys[1], args[2], unpack(args, 3))
+        redis.call('SET', keys[1], unpack(args, 2))
         return 1
     else
         return 0
@@ -50,23 +50,43 @@ local function compare_del(keys, args)
     end
 end
 
-local function hget_set(keys, args)
-    local value = redis.call('HGETALL', keys[1])
-    redis.call('HSETEX', keys[1], unpack(args))
-    return value
+local function compare_hset(keys, args)
+    if redis.call('HGET', keys[1], args[1]) == args[2] then
+        redis.call('HSETEX', keys[1], unpack(args, 3))
+        return 1
+    else
+        return 0
+    end
 end
 
-local function hget_del(keys, args)
-    local value = redis.call('HGETALL', keys[1])
-    redis.call('DEL', keys[1])
-    return value
+local function compare_hdel(keys, args)
+    if redis.call('HGET', keys[1], args[1]) == args[2] then
+        if args[3] then
+            redis.call('HDEL', keys[1], unpack(args, 3))
+        else
+            redis.call('DEL', keys[1])
+        end
+        return 1
+    else
+        return 0
+    end
+end
+
+local function hsetx(keys, args)
+    if redis.call('EXISTS', keys[1]) == 1 then
+        redis.call('HSETEX', keys[1], unpack(args))
+        return 1
+    else
+        return 0
+    end
 end
 
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
-redis.register_function('hget_set', hget_set)
-redis.register_function('hget_del', hget_del)
+redis.register_function('compare_hset', compare_hset)
+redis.register_function('compare_hdel', compare_hdel)
+redis.register_function('hsetx', hsetx)
 """
 
 
@@ -80,8 +100,9 @@ class Script:
             self.loaded.add(name)
         self.redis = redis
 
-    def limited_incrby(self, key, amount: int, limit: int, expire: timedelta = None):
-        keys_and_args = [key, amount, limit]
+    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None):
+        """return result increment"""
+        keys_and_args = [key, increment, limit]
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)
@@ -95,25 +116,35 @@ class Script:
         return self.redis.fcall('compare_set', 1, *keys_and_args)
 
     def compare_del(self, key, expected):
-        keys_and_args = [key, expected]
-        return self.redis.fcall('compare_del', 1, *keys_and_args)
+        return self.redis.fcall('compare_del', 1, key, expected)
 
-    def hget_set(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
-        keys_and_args = [key]
+    def compare_hset(self, key, field, expected, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False,
+                     fxx=False):
+        keys_and_args = [key, field, expected]
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        return self.redis.fcall('compare_hset', 1, *keys_and_args)
+
+    def compare_hdel(self, key, field, expected, *fields):
+        """empty fields to del key"""
+        return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
+
+    @staticmethod
+    def _hsetex_args(mapping, expire=None, keepttl=False, fnx=False, fxx=False):
+        args = []
         if fnx:
-            keys_and_args.append('FNX')
+            args.append('FNX')
         if fxx:
-            keys_and_args.append('FXX')
+            args.append('FXX')
         if expire:
-            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
+            args += ['PX', int(expire.total_seconds() * 1000)]
         if keepttl:
-            keys_and_args.append('KEEPTTL')
-        keys_and_args += ['FIELDS', 1]
+            args.append('KEEPTTL')
+        args += ['FIELDS', 1]
         for pair in mapping.items():
-            keys_and_args += pair
-        res = self.redis.fcall('hget_set', 1, *keys_and_args)
-        return dict(zip(res[::2], res[1::2]))
+            args += pair
+        return args
 
-    def hget_del(self, key):
-        res = self.redis.fcall('hget_del', 1, key)
-        return dict(zip(res[::2], res[1::2]))
+    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+        keys_and_args = [key]
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        return self.redis.fcall('hsetx', 1, *keys_and_args)

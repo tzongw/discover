@@ -7,13 +7,15 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
 from random import choice
-from typing import Any, Callable, Optional, Self, Union
+from collections import defaultdict
+from typing import Any, Callable, Optional, Self, Union, Iterable
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
+from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
@@ -87,6 +89,7 @@ def make_response(app, rv):
 class DocumentMixin:
     id: Any
     objects: Callable
+    _get_collection: Callable
     _fields: dict
     _data: dict
     __include__ = ()
@@ -127,15 +130,22 @@ class DocumentMixin:
         before = origin._data if origin else {self.__class__.id.name: self.id}
         return diff_dict(after, before)
 
+    def bulk_write(self, requests, ordered=True, **kwargs) -> BulkWriteResult:
+        return self._get_collection().bulk_write(requests, ordered, **kwargs)
+
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=1000):
+    def batch_range(cls, field, *, start, stop, batch=1000, query=None):
+        if not isinstance(field, str):
+            field = field.name
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
+        if query is None:
+            query = {}
         while True:
-            query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
+            range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
-            docs = list(cls.objects(**query).order_by(order_by).limit(batch))
+            docs = list(cls.objects(**query, **range_query).order_by(order_by).limit(batch))
             if not docs:
                 return
             last = docs[-1][field]
@@ -239,17 +249,17 @@ class Inventory:
                 pipe.bitfield(key).get(fmt='u32', offset=0).execute()
             return [values[0] for values in pipe.execute()]
 
-    def reset(self, key, total=0, expire=None):
-        assert total >= 0
+    def reset(self, key, value=0, expire=None):
+        assert value >= 0
         with self.redis.pipeline(transaction=True) as pipe:
-            pipe.bitfield(key).set(fmt='u32', offset=0, value=total).execute()
+            pipe.bitfield(key).set(fmt='u32', offset=0, value=value).execute()
             if expire is not None:
                 pipe.expire(key, expire)
             pipe.execute()
 
-    def incrby(self, key, total):
-        assert total >= 0
-        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=total).execute()[0]
+    def incrby(self, key, increment):
+        assert increment >= 0
+        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=increment).execute()[0]
 
     def try_lock(self, key, hint=None) -> bool:
         bitfield = self.redis.bitfield(key, default_overflow='FAIL')
@@ -349,17 +359,20 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=1000):
-        col = getattr(cls.__table__.columns, column)
+    def batch_range(cls, column, *, start, stop, batch=1000, query=()):
+        if isinstance(column, str):
+            col = getattr(cls, column)
+        else:
+            col, column = column, column.name
         pk = cls.__table__.primary_key.columns[0]
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
         while True:
             with cls.Session() as session:
-                query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
+                range_query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
                     [col <= start, col > stop, pk.not_in(seen_ids)]
-                rows = session.query(cls).filter(*query).order_by(order_by).limit(batch).all()
+                rows = session.query(cls).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
             last = getattr(rows[-1], column)
@@ -496,3 +509,41 @@ class SwitchTracer:
         g = args[0]
         if g in self._tracing:
             self._tracing[g] = True
+
+
+class UvCache:
+    def __init__(self, save: Callable[[dict[Any, set]], None]):
+        self._cache = defaultdict(set)
+        self._save = save
+
+    def cache(self, uid, views: Iterable) -> int:
+        for view in views:
+            self._cache[view].add(uid)
+        return len(self._cache)
+
+    def save(self):
+        if cache := self._cache:
+            self._cache = defaultdict(set)
+            self._save(cache)
+
+    def get(self, view) -> set:
+        return self._cache.get(view) or set()
+
+
+class PvCache:
+    def __init__(self, save: Callable[[dict[Any, int]], None]):
+        self._cache = defaultdict(int)
+        self._save = save
+
+    def cache(self, views: Iterable) -> int:
+        for view in views:
+            self._cache[view] += 1
+        return len(self._cache)
+
+    def save(self):
+        if cache := self._cache:
+            self._cache = defaultdict(int)
+            self._save(cache)
+
+    def get(self, view) -> int:
+        return self._cache.get(view) or 0

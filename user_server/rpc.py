@@ -2,6 +2,7 @@
 import logging
 from typing import Dict
 import gevent
+from redis.commands.core import HashDataPersistOptions
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -30,16 +31,18 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            sid = salt_hash(token, salt=uid)
-            if sid not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+            session_id = salt_hash(token, salt=uid)
+            if session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
                 raise ValueError('token error')
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
-                pipe.hsetex(key, conn_id, Online(session_id=sid, address=address), ex=const.ONLINE_TTL)
-                conns = pipe.execute()[0]
+                pipe.hsetex(key, conn_id, Online(session_id=session_id, address=address), ex=const.ONLINE_TTL,
+                            data_persist_option=HashDataPersistOptions.FNX)
+                conns, added = pipe.execute()
+                assert added, 'conn id conflicts or login twice'
             for _conn_id, online in conns.items():
-                if online.session_id != sid:
+                if online.session_id != session_id:
                     continue
                 logging.info(f'kick conn {uid} {_conn_id}')
                 with LogSuppress(), shared.gate_service.client(online.address) as client:
@@ -64,13 +67,15 @@ class Handler:
             logging.debug(f'{address} {conn_id} {context}')
             uid = int(context[const.CTX_UID])
             key = online_key(uid)
-            values = redis.hexpire(key, const.ONLINE_TTL, conn_id)
-            if values[0] != 1:
-                raise ValueError(f'invalid {conn_id}')
+            online = shared.parser.hgetex(key, [conn_id], Online, ex=const.ONLINE_TTL)[0]
+            if not online:
+                raise ValueError(f'conn invalid {conn_id}')
+            if online.session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+                raise ValueError(f'session expired {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
-                client.send_text(conn_id, f'not login')
+                client.send_text(conn_id, f'ping fail {e}')
                 client.remove_conn(conn_id)
 
     def disconnect(self, address: str, conn_id: str, context: Dict[str, str]):
@@ -125,7 +130,8 @@ def serve():
     server = TServer.TThreadedServer(processor, transport, tfactory, pfactory)
     g = gevent.spawn(server.serve)
     if not options.rpc_port:
-        gevent.sleep(0.01)
+        while not transport.handle:
+            gevent.sleep(0.01)
         options.rpc_port = transport.handle.getsockname()[1]
     logging.info(f'Starting rpc server {options.rpc_address} ...')
     return g

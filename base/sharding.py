@@ -260,19 +260,19 @@ class ShardingInventory(Inventory):
         shuffle(amounts)
         return amounts
 
-    def reset(self, key, total=0, expire=None):
-        assert total >= 0
+    def reset(self, key, value=0, expire=None):
+        assert value >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(value)):
                 pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
                 if expire is not None:
                     pipe.expire(sharded_key, expire)
             pipe.execute()
 
-    def incrby(self, key, total):
-        assert total >= 0
+    def incrby(self, key, increment):
+        assert increment >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(total)):
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(increment)):
                 pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
             return sum(values[0] for values in pipe.execute())
 
@@ -423,7 +423,8 @@ class ShardingHeavyTask(HeavyTask):
 
 class MigratingHeavyTask(ShardingHeavyTask):
     def __init__(self, redis: RedisCluster, biz: str, *, old_heavy_task: HeavyTask):
-        assert old_heavy_task.redis is not redis, 'same redis, use ShardingHeavyTask instead'
+        assert old_heavy_task.redis is not redis or not isinstance(old_heavy_task, ShardingHeavyTask), \
+            'same redis, use ShardingHeavyTask instead'
         super().__init__(redis, biz)
         self.old_heavy_task = old_heavy_task
 

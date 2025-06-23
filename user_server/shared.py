@@ -89,10 +89,10 @@ def dispatch_timeout(full_key, data):
         group, key = full_key.split(':', maxsplit=1)
         time_dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
-        now = int(time.time())
-        increment = script.limited_incrby('timestamp:tick', amount=now, limit=now)
+        ts = int(time.time())
+        increment = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
         offset = min(increment, 10)
-        for ts in range(now - offset + 1, now + 1):
+        for ts in range(ts - offset + 1, ts + 1):
             time_dispatcher.dispatch_tick(ts)
 
 

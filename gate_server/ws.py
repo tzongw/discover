@@ -2,6 +2,7 @@
 import os
 import logging
 import socket
+import atexit
 from urllib import parse
 from collections import defaultdict
 import gevent
@@ -34,16 +35,18 @@ def serve():
             pass
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.bind(sock_path)
-        os.chmod(sock_path, 0o777)
+        os.chmod(sock_path, 0o700)
         sock.listen()
         listener = sock
+        atexit.register(os.unlink, sock_path)
     else:
         listener = options.http_port
     logger = None if options.env == const.Environment.PROD else logging.getLogger()
     server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.unix_sock and not options.http_port:
-        gevent.sleep(0.01)
+        while not server.address[1]:
+            gevent.sleep(0.01)
         options.http_port = server.address[1]
     logging.info(f'Starting ws server {options.http_address} ...')
     return g

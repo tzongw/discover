@@ -4,11 +4,14 @@ from gevent import monkey
 monkey.patch_all()
 from config import options
 import os
+import signal
 import logging
+from datetime import timedelta
 import gevent
 from setproctitle import setproctitle
 from common import shared
 from base import ip_address, Addr
+from shared import scheduler
 
 service_addresses = {}
 changed = set()
@@ -25,23 +28,28 @@ def is_valid(addr: str):
         return not options.same_host or Addr(addr).host == options.host
 
 
+@scheduler(timedelta(milliseconds=100))
 def reload_nginx():
+    if not changed:
+        return
     prefix = options.host + '_' if options.same_host and options.host != ip_address() else ''
     for service in changed:
         addresses = sorted(service_addresses[service])
         logging.info(f'updating: {service} {addresses}')
-        with open(os.path.join(options.conf_d, prefix + service + '_upstream'), 'w', encoding='utf-8') as f:
+        path = os.path.join(options.conf_d, prefix + service + '_upstream')
+        temp_path = path + '.temp'
+        with open(temp_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join([f'server {addr};' for addr in addresses]))
             f.write('\n')
+        os.rename(temp_path, path)  # atomic
     changed.clear()
-    if status := os.system('nginx -s reload'):
-        logging.error(f'nginx reload fail: {status}')
-    else:
-        logging.info('nginx reload success')
+    with open(options.pid_file, 'r') as f:
+        pid = int(f.readline().strip())
+    os.kill(pid, signal.SIGHUP)
+    logging.info('nginx reload done')
 
 
 def update_upstreams():
-    empty = not changed
     # noinspection PyProtectedMember
     for service, addresses in shared.registry._addresses.items():
         if not is_api(service):
@@ -52,9 +60,6 @@ def update_upstreams():
             logging.info(f'{service} changed: {current} -> {addresses}')
             service_addresses[service] = addresses
             changed.add(service)
-    if empty and changed:
-        logging.info('spawn reload')
-        gevent.spawn_later(0.1, reload_nginx)
 
 
 def main():

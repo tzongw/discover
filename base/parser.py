@@ -19,7 +19,7 @@ def callback(response, convert=None):
     return convert(response) if convert else response
 
 
-def mget_callback(response, convert=None):
+def list_callback(response, convert=None):
     return [convert(value) for value in response] if convert else response
 
 
@@ -35,7 +35,8 @@ def patch_callbacks(callbacks):
         callbacks['GET'] = callback
         callbacks['GETDEL'] = callback
         callbacks['GETEX'] = callback
-        callbacks['MGET'] = mget_callback
+        callbacks['MGET'] = list_callback
+        callbacks['HGETEX'] = list_callback
         callbacks['HMGET'] = callback
         callbacks['HGET'] = callback
     if 'HGETALL_ORIG' not in callbacks and 'HGETALL' in callbacks:
@@ -90,6 +91,8 @@ class Parser:
         return self._redis.execute_command('MGET', *keys, convert=self._parser(cls))
 
     def hget(self, name, cls: Type[M], *, default=False) -> Optional[M]:
+        """hash as model"""
+
         def convert(values):
             json_fields = getattr(cls, '__json_fields__', [])
             mapping = {k: json.loads(v) if k in json_fields else v for k, v in zip(fields, values) if v is not None}
@@ -98,19 +101,29 @@ class Parser:
         fields = cls.__fields__
         return self._redis.execute_command('HMGET', name, *fields, convert=convert)
 
-    def hset(self, name: str, model: M) -> int:
+    def hset(self, name: str, model: M, **kwargs) -> int:
+        """hash as model"""
         json_fields = getattr(model, '__json_fields__', [])
         mapping = model.dict(exclude_unset=True)
         for k, v in mapping.items():
             if k in json_fields:
                 mapping[k] = json.dumps(v, cls=JSONEncoder)
-        return self._redis.hset(name, mapping=mapping)
+        return self._redis.hsetex(name, mapping=mapping, **kwargs)
 
     def hgetall(self, name, cls: Type[M]) -> dict[str, M]:
+        """field as model"""
         return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
 
-    def hgetone(self, name, field, cls: Type[M]) -> Optional[M]:
-        return self._redis.execute_command('HGET', name, field, convert=self._parser(cls))
+    def hgetex(self, name, keys, cls: Type[M], **kwargs) -> List[M]:
+        """field as model"""
+        response = self._redis.hgetex(name, *keys, **kwargs)
+        convert = self._parser(cls)
+        if response is self._redis:  # pipeline command staged
+            _, options = self._redis.command_stack[-1]
+            options['convert'] = convert
+        else:
+            response = [convert(value) for value in response]
+        return response
 
     mget_nonatomic = mget
 
@@ -124,7 +137,8 @@ class ParserCluster(Parser):
     def mget_nonatomic(self, keys, cls: Type[M]) -> List[M]:
         assert type(self._redis) is RedisCluster
         response = self._redis.mget_nonatomic(keys)
-        return mget_callback(response, convert=self._parser(cls))
+        convert = self._parser(cls)
+        return [convert(value) for value in response]
 
 
 def create_parser(redis):

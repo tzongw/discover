@@ -117,7 +117,7 @@ class RowChange(BaseModel):
 
 
 @table
-class Account(BaseModel, TableMixin):
+class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = ('hashed',)
@@ -131,19 +131,19 @@ class Account(BaseModel, TableMixin):
     Index('idx_last_active', last_active)
 
 
-class ConfigKey(IntEnum):
+class ConfigId(IntEnum):
     QUEUE = 1
     SMS = 2
 
 
 config_models = {
-    ConfigKey.QUEUE: QueueConfig,
-    ConfigKey.SMS: SmsConfig,
+    ConfigId.QUEUE: QueueConfig,
+    ConfigId.SMS: SmsConfig,
 }
 
 
 @table
-class Config(BaseModel, SqlCacheMixin):
+class Config(SqlCacheMixin, BaseModel):
     __tablename__ = 'configs'
 
     id = Column(Integer, primary_key=True)
@@ -166,7 +166,7 @@ class Config(BaseModel, SqlCacheMixin):
 
 
 def get_all_configs():
-    return tuple(config_cache.mget(ConfigKey)), None
+    return tuple(config_cache.mget(ConfigId)), None
 
 
 config_cache = FullCache[ConfigModels](mget=Config.mget, maxsize=None, make_key=Config.make_key,
@@ -225,15 +225,14 @@ class Permission(EmbeddedDocument):
 
 
 @collection
-class Role(Document, CacheMixin):
+class Role(CacheMixin, Document):
     meta = {'strict': False}
 
     id = StringField(primary_key=True)
-    admin = BooleanField(default=False)
     permissions = EmbeddedDocumentListField(Permission, required=True)
 
     def can_access(self, coll, op: CRUD):
-        return self.admin or any(permission.can_access(coll, op) for permission in self.permissions)
+        return any(permission.can_access(coll, op) for permission in self.permissions)
 
 
 role_cache = Cache[Role](mget=Role.mget, make_key=Role.make_key, maxsize=None)
@@ -242,7 +241,7 @@ Role.mget = role_cache.mget
 
 
 @collection
-class Profile(Document, CacheMixin):
+class Profile(CacheMixin, Document):
     __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
@@ -251,10 +250,11 @@ class Profile(Document, CacheMixin):
     addr = StringField(default='')
     rank = IntField()
     expire = DateTimeField()
+    root = BooleanField(default=False)
     roles = ListField(StringField())
 
     def can_access(self, coll, op: CRUD):
-        return any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
+        return self.root or any(role.can_access(coll, op) for role in Role.mget(self.roles) if role)
 
 
 def get_all_profiles():
@@ -284,7 +284,7 @@ def valid_profiles():
 
 
 @collection
-class Setting(Document, CacheMixin):
+class Setting(CacheMixin, Document):
     meta = {'strict': False, 'allow_inheritance': True}
 
     id = StringField(primary_key=True)
