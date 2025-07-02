@@ -1,56 +1,39 @@
 # -*- coding: utf-8 -*-
 import logging
 import random
-import bisect
 import time
 from datetime import timedelta, datetime
+from functools import lru_cache
 from typing import TypeVar, Generic, Generator
-from binascii import crc32
 from random import shuffle
 from typing import Union
-from collections import namedtuple
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
-from .utils import stream_name
+from .utils import stream_name, CHash
 from .misc import Inventory
 from .timer import Timer
 from .ztimer import ZTimer
 from .chunk import batched
 from .task import HeavyTask
 
-Node = namedtuple('Node', ['hash', 'shard'])
-
 
 class Sharding:
-    _ring_cache = {}
+    @staticmethod
+    @lru_cache
+    def get_chash(shards, replicas):
+        return CHash(range(shards), replicas)
 
-    @classmethod
-    def get_ring(cls, shards, replicas):
-        key = (shards, replicas)
-        ring = cls._ring_cache.get(key)
-        if ring is None:
-            ring = []  # consistent hash ring
-            for shard in range(shards):
-                for replica in range(replicas):
-                    ring.append(Node(crc32(f'{shard}_{replica}'.encode()), shard))
-            ring.sort()
-            cls._ring_cache[key] = ring
-        return ring
-
-    def __init__(self, shards, fixed_keys=(), replicas=5):
+    def __init__(self, shards, fixed_keys=(), replicas=10):
         self.shards = shards
         self.fixed_keys = fixed_keys  # keys fixed in shard 0
-        self.ring = self.get_ring(shards, replicas)
+        self.chash = self.get_chash(shards, replicas)
 
-    def get_shard(self, key):
+    def get_shard(self, key: str):
         if key in self.fixed_keys:
             return 0
-        i = bisect.bisect(self.ring, Node(crc32(key.encode()), 0))
-        if i >= len(self.ring):
-            i = 0
-        return self.ring[i].shard
+        return self.chash(key)
 
     def all_sharded_keys(self, key: str):
         assert not key.startswith('{')

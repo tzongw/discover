@@ -59,7 +59,7 @@ class CHash:
         ring.sort()
         self._ring = ring
 
-    def hash(self, key: str):
+    def __call__(self, key: str):
         node = _Node(crc32(key.encode()), self._ring[0].value)
         i = bisect.bisect(self._ring, node)
         if i >= len(self._ring):
