@@ -512,38 +512,38 @@ class SwitchTracer:
 
 
 class UvCache:
-    def __init__(self, save: Callable[[dict[Any, set]], None]):
+    def __init__(self):
         self._cache = defaultdict(set)
-        self._save = save
 
     def cache(self, uid, views: Iterable) -> int:
         for view in views:
             self._cache[view].add(uid)
         return len(self._cache)
 
-    def save(self):
+    def pick(self) -> dict[Any, set]:
         if cache := self._cache:
             self._cache = defaultdict(set)
-            self._save(cache)
+            return cache
+        return self._cache
 
     def get(self, view) -> set:
         return self._cache.get(view) or set()
 
 
 class PvCache:
-    def __init__(self, save: Callable[[dict[Any, int]], None]):
+    def __init__(self):
         self._cache = defaultdict(int)
-        self._save = save
 
     def cache(self, views: Iterable) -> int:
         for view in views:
             self._cache[view] += 1
         return len(self._cache)
 
-    def save(self):
+    def pick(self) -> dict[Any, int]:
         if cache := self._cache:
             self._cache = defaultdict(int)
-            self._save(cache)
+            return cache
+        return self._cache
 
     def get(self, view) -> int:
         return self._cache.get(view) or 0
