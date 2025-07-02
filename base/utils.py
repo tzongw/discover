@@ -3,10 +3,12 @@ import fcntl
 import logging
 import socket
 import string
+import bisect
 import hashlib
 import contextlib
+from binascii import crc32
 from random import choice
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
@@ -42,6 +44,27 @@ class Addr:
 
     def __hash__(self):
         return hash(str(self))
+
+
+_Node = namedtuple('Node', ['hash', 'value'])
+
+
+class CHash:
+    """consistent hash"""
+    def __init__(self, values, replicas=10):
+        ring = []
+        for value in values:
+            for replica in range(replicas):
+                ring.append(_Node(crc32(f'{value}_{replica}'.encode()), value))
+        ring.sort()
+        self._ring = ring
+
+    def hash(self, key: str):
+        node = _Node(crc32(key.encode()), self._ring[0].value)
+        i = bisect.bisect(self._ring, node)
+        if i >= len(self._ring):
+            i = 0
+        return self._ring[i].value
 
 
 @lru_cache(maxsize=None)

@@ -521,10 +521,9 @@ class UvCache:
         return len(self._cache)
 
     def pick(self) -> dict[Any, set]:
-        if cache := self._cache:
-            self._cache = defaultdict(set)
-            return cache
-        return self._cache
+        cache = self._cache
+        self._cache = defaultdict(set)
+        return cache
 
     def get(self, view) -> set:
         return self._cache.get(view) or set()
@@ -540,10 +539,9 @@ class PvCache:
         return len(self._cache)
 
     def pick(self) -> dict[Any, int]:
-        if cache := self._cache:
-            self._cache = defaultdict(int)
-            return cache
-        return self._cache
+        cache = self._cache
+        self._cache = defaultdict(int)
+        return cache
 
     def get(self, view) -> int:
         return self._cache.get(view) or 0
