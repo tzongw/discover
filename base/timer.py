@@ -41,12 +41,13 @@ redis.register_function('timer_tick', timer_tick)
 class Timer:
     loaded = set()
 
-    def __init__(self, redis: Union[Redis, RedisCluster], hint=None):
+    def __init__(self, redis: Union[Redis, RedisCluster], *, maxlen=4096, hint=None):
         name = redis_name(redis)
         if name not in self.loaded:
             redis.function_load(_SCRIPT, replace=True)
             self.loaded.add(name)
         self.redis = redis
+        self.maxlen = maxlen
         self.hint = hint
 
     def new(self, key: str, function: str, interval: timedelta, loop: bool, num_keys: int, keys_and_args):
@@ -70,14 +71,14 @@ class Timer:
             return
         return dict(zip(res[::2], res[1::2]))
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, stream=None):
         stream = stream or stream_name(message)
         data = message.json(exclude_defaults=True)
-        keys_and_args = [stream, data, maxlen]
+        keys_and_args = [stream, data, self.maxlen]
         if self.hint:
             keys_and_args.append(self.hint)
         return self.new(key, 'timer_xadd', interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
-        keys_and_args = [stream, offset, maxlen]
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
+        keys_and_args = [stream, offset, self.maxlen]
         return self.new(key, 'timer_tick', interval, loop=True, num_keys=1, keys_and_args=keys_and_args)

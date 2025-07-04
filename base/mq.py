@@ -10,13 +10,14 @@ from .executor import Executor
 
 
 class Publisher:
-    def __init__(self, redis: Redis, hint=None):
+    def __init__(self, redis: Redis, *, maxlen=4096, hint=None):
         self.redis = redis
         self.hint = hint
+        self.maxlen = maxlen
 
-    def publish(self, message: BaseModel, maxlen=4096, stream=None):
+    def publish(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
-        params = [stream, 'MAXLEN', '~', maxlen]
+        params = [stream, 'MAXLEN', '~', self.maxlen]
         if self.hint:
             params += ['HINT', self.hint]
         params += ['*', '', message.json(exclude_defaults=True)]

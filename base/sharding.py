@@ -59,14 +59,14 @@ class Sharding:
 
 
 class ShardingPublisher(Publisher):
-    def __init__(self, redis: Union[Redis, RedisCluster], *, hint=None):
-        super().__init__(redis, hint)
+    def __init__(self, redis: Union[Redis, RedisCluster], *, maxlen=4096, hint=None):
+        super().__init__(redis, maxlen=maxlen, hint=hint)
         self._sharding = Sharding(shards=len(redis.get_primaries()))
 
-    def publish(self, message: BaseModel, maxlen=4096, stream=None):
+    def publish(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
         stream = self._sharding.random_sharded_key(stream)
-        return super().publish(message, maxlen, stream)
+        return super().publish(message, stream)
 
 
 class NormalizedDispatcher(ProtoDispatcher):
@@ -112,14 +112,14 @@ class ShardingReceiver(Receiver):
 
 
 class ShardingTimer(Timer):
-    def __init__(self, redis, *, sharding: Sharding, hint=None):
-        super().__init__(redis, hint)
+    def __init__(self, redis, *, sharding: Sharding, maxlen=4096, hint=None):
+        super().__init__(redis, maxlen=maxlen, hint=hint)
         self._sharding = sharding
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, stream=None):
         stream = stream or stream_name(message)
         key, stream = self._sharding.sharded_keys(key, stream)
-        return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        return super().create(key, message, interval, loop=loop, stream=stream)
 
     def kill(self, key):
         key = self._sharding.sharded_key(key)
@@ -133,15 +133,15 @@ class ShardingTimer(Timer):
         key = self._sharding.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
         assert key in self._sharding.fixed_keys, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharding.sharded_keys(key, stream)
-        return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
+        return super().tick(key, stream, interval, offset=offset)
 
 
 class MigratingTimer(ShardingTimer):
-    def __init__(self, redis, *, sharding: Sharding, old_timer: Timer, start_time: datetime, hint=None):
-        super().__init__(redis, sharding=sharding, hint=hint)
+    def __init__(self, redis, *, sharding: Sharding, old_timer: Timer, start_time: datetime, maxlen=4096, hint=None):
+        super().__init__(redis, sharding=sharding, maxlen=maxlen, hint=hint)
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 
@@ -154,10 +154,10 @@ class MigratingTimer(ShardingTimer):
     def is_migrating(self):
         return datetime.now() >= self.start_time
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, stream=None):
         if not self.is_migrating:
-            return self.old_timer.create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
-        added = super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+            return self.old_timer.create(key, message, interval, loop=loop, stream=stream)
+        added = super().create(key, message, interval, loop=loop, stream=stream)
         if added and self.is_moved(key) and self.old_timer.kill(key):
             added = 0
         return added

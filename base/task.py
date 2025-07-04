@@ -53,13 +53,12 @@ class AsyncTask(_BaseTask):
     2. add new argument at the end and set a default value
     """
 
-    def __init__(self, timer: Timer, publisher: Publisher, receiver: Receiver, maxlen=4096):
+    def __init__(self, timer: Timer, publisher: Publisher, receiver: Receiver):
         assert timer.redis is publisher.redis is receiver.redis
         super().__init__()
         self.timer = timer
         self.receiver = receiver
         self.publisher = publisher
-        self.maxlen = maxlen
 
     @staticmethod
     def stream_name(task: Task):
@@ -88,7 +87,7 @@ class AsyncTask(_BaseTask):
 
     def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
         stream = self.stream_name(task)
-        return self.timer.create(task_id, task, interval, loop=loop, maxlen=self.maxlen, stream=stream)
+        return self.timer.create(task_id, task, interval, loop=loop, stream=stream)
 
     def cancel(self, task_id: str):
         return self.timer.kill(task_id)
@@ -106,7 +105,7 @@ class AsyncTask(_BaseTask):
 
     def publish(self, task):
         stream = self.stream_name(task)
-        self.publisher.publish(task, maxlen=self.maxlen, stream=stream)
+        self.publisher.publish(task, stream=stream)
 
 
 class HeavyTask(_BaseTask):
