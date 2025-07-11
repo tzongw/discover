@@ -525,9 +525,6 @@ class UvCache:
         self._cache = defaultdict(set)
         return cache
 
-    def get(self, view) -> set:
-        return self._cache.get(view) or set()
-
 
 class PvCache:
     def __init__(self):
@@ -544,4 +541,18 @@ class PvCache:
         return cache
 
     def get(self, view) -> int:
-        return self._cache.get(view) or 0
+        return self._cache.get(view, 0)
+
+
+class LogCache:
+    def __init__(self):
+        self._cache = []
+
+    def cache(self, log) -> int:
+        self._cache.append(log)
+        return len(self._cache)
+
+    def pick(self) -> list:
+        cache = self._cache
+        self._cache = []
+        return cache
