@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta, datetime, date
-from redis import Redis, RedisCluster
 from redis.connection import Encoder
 from redis._parsers.commands import CommandsParser
 from yaml.representer import SafeRepresenter
