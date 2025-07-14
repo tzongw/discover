@@ -37,7 +37,7 @@ class _WorkItem:
 
 
 class Executor:
-    def __init__(self, max_workers=128, queue_size=None, idle=60, slow_time=3, name='executor'):
+    def __init__(self, max_workers=128, queue_size=None, idle_time=60, slow_time=3, name='executor'):
         self._max_workers = max_workers
         self._workers = 0
         self._unfinished = 0
@@ -45,7 +45,7 @@ class Executor:
         self._done.set()
         assert queue_size is None or queue_size > 0
         self._items = queue.Queue(queue_size)
-        self._idle = idle
+        self._idle_time = idle_time
         self._slow_time = slow_time
         self._name = name
         self._overload = False
@@ -86,7 +86,7 @@ class Executor:
     def _worker(self):
         try:
             while True:
-                item = self._items.get(timeout=self._idle)  # type: _WorkItem
+                item = self._items.get(timeout=self._idle_time)  # type: _WorkItem
                 start = time.time()
                 try:
                     item.run()
@@ -110,5 +110,5 @@ class Executor:
 
 
 class WaitGroup(Executor):
-    def __init__(self, max_workers=10, queue_size=1, idle=5, slow_time=20, name='wait_group'):
-        super().__init__(max_workers, queue_size, idle, slow_time, name)
+    def __init__(self, max_workers=10, queue_size=1, idle_time=5, slow_time=20, name='wait_group'):
+        super().__init__(max_workers, queue_size, idle_time, slow_time, name)
