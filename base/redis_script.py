@@ -129,7 +129,7 @@ class Script:
         return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
 
     @staticmethod
-    def _hsetex_args(mapping, expire=None, keepttl=False, fnx=False, fxx=False):
+    def _hsetex_args(mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         args = []
         if fnx:
             args.append('FNX')
@@ -139,12 +139,12 @@ class Script:
             args += ['PX', int(expire.total_seconds() * 1000)]
         if keepttl:
             args.append('KEEPTTL')
-        args += ['FIELDS', 1]
+        args += ['FIELDS', len(mapping)]
         for pair in mapping.items():
             args += pair
         return args
 
-    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False):
         keys_and_args = [key]
-        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx)
         return self.redis.fcall('hsetx', 1, *keys_and_args)
