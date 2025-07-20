@@ -167,6 +167,10 @@ class CacheMixin(DocumentMixin):
     def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)
 
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.publish(cls.__name__, *keys)
+
     @staticmethod
     def fields_expire(*fields):
         def get_expire(values):
@@ -198,6 +202,10 @@ class RedisCacheMixin(CacheMixin):
     def invalidate(self, invalidator: Invalidator):
         key = self.make_key(self.id)
         invalidator.redis.delete(key)
+
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.redis.delete(*[cls.make_key(key) for key in keys])
 
 
 class Semaphore:
@@ -395,6 +403,10 @@ class SqlCacheMixin(TableMixin):
     def invalidate(self, invalidator: Invalidator):
         pk = self.__table__.primary_key.columns[0]
         invalidator.publish(self.__class__.__name__, getattr(self, pk.name))
+
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.publish(cls.__name__, *keys)
 
     @staticmethod
     def columns_expire(*columns):

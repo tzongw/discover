@@ -166,7 +166,7 @@ def create_row(table: str, **kwargs):
         session.add(row)
         session.commit()
         session.refresh(row)
-    if issubclass(row, SqlCacheMixin):
+    if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)  # notify full cache new row created
     return row.to_dict(exclude=[])
 
@@ -191,7 +191,7 @@ def update_row(table: str, row_id, **kwargs):
     with Session() as session:
         session.query(tb).filter(pk == row_id).update(kwargs)
     row = tb.get(row_id, ensure=True)
-    if issubclass(row, SqlCacheMixin):
+    if isinstance(tb, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
@@ -203,7 +203,7 @@ def delete_row(table: str, row_id):
     row = tb.get(row_id, ensure=True)
     with Session() as session:
         session.query(tb).filter(pk == row_id).delete()
-    if issubclass(row, SqlCacheMixin):
+    if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
@@ -232,8 +232,7 @@ def move_rows(table: str, row_id, column, **kwargs):
             row_ids = [getattr(row, pk.name) for row in rows]
             session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
             if issubclass(tb, SqlCacheMixin):
-                for row in rows:
-                    row.invalidate(invalidator)
+                tb.bulk_invalidate(invalidator, row_ids)
 
 
 @app.route('/tables/configs/rows/<int:row_id>')
@@ -299,7 +298,7 @@ def create_document(collection: str, **kwargs):
         raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
     Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff()).save()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
 
@@ -335,7 +334,7 @@ def update_document(collection: str, doc_id, **kwargs):
         doc = coll(**kwargs).save()
         origin = None
     Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff(origin)).save()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
@@ -345,7 +344,7 @@ def delete_document(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.delete()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
@@ -372,8 +371,7 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
         changes = [Change(coll_name=coll.__name__, doc_id=doc.id, diff={field: doc[field] + 1}) for doc in docs]
         Change.objects.insert(changes)
         if issubclass(coll, CacheMixin):
-            for doc in docs:
-                doc.invalidate(invalidator)
+            coll.bulk_invalidate(invalidator, doc_ids)
 
 
 @app.route('/eval', methods=['POST'])
