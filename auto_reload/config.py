@@ -14,3 +14,4 @@ options.app_name = const.APP_RELOAD
 options.parse_command_line()
 
 assert os.path.exists(options.pid_file) and os.path.exists(options.conf_d)
+assert options.same_host or options.host == utils.ip_address()

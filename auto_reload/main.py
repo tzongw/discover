@@ -32,7 +32,7 @@ def is_valid(addr: str):
 def reload_nginx():
     if not changed:
         return
-    prefix = options.host + '_' if options.same_host and options.host != ip_address() else ''
+    prefix = options.host + '_' if options.host != ip_address() else ''
     for service in changed:
         addresses = sorted(service_addresses[service])
         logging.info(f'updating: {service} {addresses}')
