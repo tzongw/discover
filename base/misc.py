@@ -13,7 +13,7 @@ from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
 from gevent.local import local
-from gevent import getcurrent
+from gevent import getcurrent, pywsgi
 from mongoengine import EmbeddedDocument, FloatField
 from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date
@@ -568,3 +568,9 @@ class LogCache:
         cache = self._cache
         self._cache = []
         return cache
+
+
+class WSGIHandler(pywsgi.WSGIHandler):
+    def finalize_headers(self):
+        self.provided_date = ''  # disable date header
+        return super().finalize_headers()

@@ -21,7 +21,7 @@ from base import singleflight
 from base.poller import PollStatus
 from base.utils import base62, salt_hash
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
-    SqlCacheMixin, JSONEncoder
+    SqlCacheMixin, JSONEncoder, WSGIHandler
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
@@ -35,7 +35,8 @@ cursor_filed.num_type = lambda v: int(v or 0)
 
 def serve():
     logger = None if options.env == Environment.PROD else logging.getLogger()
-    server = pywsgi.WSGIServer(options.http_port, app, log=logger, error_log=logging.getLogger())
+    server = pywsgi.WSGIServer(options.http_port, app, handler_class=WSGIHandler,
+                               log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
     if not options.http_port:
         while not server.address[1]:
