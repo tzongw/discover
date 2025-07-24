@@ -556,15 +556,29 @@ class PvCache:
         return self._cache.get(view, 0)
 
 
-class LogCache:
+class ListCache:
     def __init__(self):
         self._cache = []
 
-    def cache(self, log) -> int:
-        self._cache.append(log)
+    def cache(self, item) -> int:
+        self._cache.append(item)
         return len(self._cache)
 
     def pick(self) -> list:
         cache = self._cache
         self._cache = []
+        return cache
+
+
+class SetCache:
+    def __init__(self):
+        self._cache = set()
+
+    def cache(self, item) -> int:
+        self._cache.add(item)
+        return len(self._cache)
+
+    def pick(self) -> set:
+        cache = self._cache
+        self._cache = set()
         return cache
