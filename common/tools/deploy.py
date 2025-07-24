@@ -3,7 +3,6 @@ import os
 import sys
 import signal
 import subprocess
-import contextlib
 from dataclasses import dataclass
 from base.utils import flock
 
@@ -147,7 +146,7 @@ def main():
         raise RuntimeError('usage: python deploy.py [-y] <service>')
     all_yes = len(sys.argv) == 3
     service = sys.argv[-1]
-    with contextlib.closing(flock(f'/tmp/deploy-{service}.lock')):
+    with flock(f'deploy_{service}.lock'):
         deploy(service, all_yes)
 
 
