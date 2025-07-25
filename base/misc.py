@@ -527,7 +527,7 @@ class UvCache:
     def __init__(self):
         self._cache = defaultdict(set)
 
-    def cache(self, uid, views: Iterable) -> int:
+    def add(self, uid, views: Iterable) -> int:
         for view in views:
             self._cache[view].add(uid)
         return len(self._cache)
@@ -542,7 +542,7 @@ class PvCache:
     def __init__(self):
         self._cache = defaultdict(int)
 
-    def cache(self, views: Iterable) -> int:
+    def add(self, views: Iterable) -> int:
         for view in views:
             self._cache[view] += 1
         return len(self._cache)
@@ -560,7 +560,7 @@ class ListCache:
     def __init__(self):
         self._cache = []
 
-    def cache(self, item) -> int:
+    def add(self, item) -> int:
         self._cache.append(item)
         return len(self._cache)
 
@@ -574,7 +574,7 @@ class SetCache:
     def __init__(self):
         self._cache = set()
 
-    def cache(self, item) -> int:
+    def add(self, item) -> int:
         self._cache.add(item)
         return len(self._cache)
 
