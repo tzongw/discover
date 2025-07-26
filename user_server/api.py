@@ -220,16 +220,15 @@ def move_rows(table: str, row_id, column, **kwargs):
     rank = getattr(row, column)
     kwargs[f'{column}__gte'] = rank
     kwargs[f'{pk.name}__ne'] = row_id
-    rows = []
+    row_ids = []
     with Session() as session:
         cond = build_condition(tb, kwargs)
         for row in session.query(tb).filter(cond).order_by(col.asc()):
             if getattr(row, column) != rank:
                 break
-            rows.append(row)
+            row_ids.append(getattr(row, pk.name))
             rank += 1
-        if rows:
-            row_ids = [getattr(row, pk.name) for row in rows]
+        if row_ids:
             session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
             if issubclass(tb, SqlCacheMixin):
                 tb.bulk_invalidate(invalidator, row_ids)
