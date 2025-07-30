@@ -74,7 +74,7 @@ def ip_address(ipv6=False):
         return sock.getsockname()[0]
 
 
-def var_args(f: Callable):
+def variadic_args(f: Callable):
     params = signature(f).parameters
     var_positional = any(p.kind == Parameter.VAR_POSITIONAL for p in params.values())
     var_keyword = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())

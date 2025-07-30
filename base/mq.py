@@ -4,7 +4,7 @@ import logging
 from typing import Dict
 from redis import Redis
 from pydantic import BaseModel
-from .utils import stream_name, var_args
+from .utils import stream_name, variadic_args
 from .dispatcher import Dispatcher
 from .executor import Executor
 
@@ -35,7 +35,7 @@ class ProtoDispatcher(Dispatcher):
         super_handler = super().__call__
 
         def decorator(f):
-            vf = var_args(f)
+            vf = variadic_args(f)
 
             @super_handler(key)
             def inner(data: Dict, sid):

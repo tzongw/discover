@@ -15,7 +15,7 @@ from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .mq import Receiver, Publisher
 from .timer import Timer
-from .utils import var_args, func_desc, stream_name
+from .utils import variadic_args, func_desc, stream_name
 
 
 class Task(BaseModel):
@@ -42,7 +42,7 @@ class _BaseTask:
         path = func_desc(f)
         assert '<' not in path, 'CAN NOT be lambda or local function'
         assert path not in self.paths, 'duplicated path'
-        self.paths[path] = var_args(f)
+        self.paths[path] = variadic_args(f)
         return path
 
 
