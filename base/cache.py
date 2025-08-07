@@ -129,7 +129,7 @@ class FullMixin(Generic[T]):
         self._get_values = get_values
         self._values = ()
         self._version = 0
-        self._expire_at = float('-inf')
+        self._expire_at = 0
 
     @property
     def values(self) -> Sequence[T] | LazySequence[T]:
@@ -154,7 +154,7 @@ class FullMixin(Generic[T]):
                 return f(*args, **kwargs)
 
             cache_version = 0
-            cache_expire_at = float('-inf')
+            cache_expire_at = 0
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
