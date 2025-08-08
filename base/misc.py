@@ -498,20 +498,26 @@ def build_operation(tb, params: dict):
 class SwitchTracer:
     def __init__(self):
         self._tracing = {}
+        self._enable = False
 
     def enable(self):
+        self._enable = True
         Hub.settrace(self._trace)
 
     def __enter__(self):
-        g = getcurrent()
-        self._tracing[g] = False
+        if self._enable:
+            g = getcurrent()
+            self._tracing[g] = False
         return self
 
     def __exit__(self, exctype, excinst, exctb):
-        g = getcurrent()
-        self._tracing.pop(g)
+        if self._enable:
+            g = getcurrent()
+            self._tracing.pop(g)
 
     def is_switched(self):
+        if not self._enable:
+            return False
         g = getcurrent()
         return self._tracing[g]
 
