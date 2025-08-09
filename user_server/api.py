@@ -164,8 +164,6 @@ def create_row(table: str, **kwargs):
     with Session() as session:
         row = tb(**kwargs)
         session.add(row)
-        session.commit()
-        session.refresh(row)
     if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)  # notify full cache new row created
     return row.to_dict(exclude=[])

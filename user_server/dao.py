@@ -16,7 +16,7 @@ from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
@@ -25,6 +25,13 @@ from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, Sql
 from config import options
 from shared import invalidator, id_generator, switch_tracer
 from models import QueueConfig, SmsConfig, ConfigModels
+
+
+class CommitSession(Session):
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.commit()
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
 
 class SessionMaker(sessionmaker):
@@ -45,7 +52,7 @@ if options.env in [const.Environment.DEV, const.Environment.TEST]:
 
 echo = options.env == const.Environment.DEV
 engine = create_engine(f'sqlite:///{options.sqlite}', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
-Session = SessionMaker(engine, expire_on_commit=False)
+Session = SessionMaker(engine, class_=CommitSession, expire_on_commit=False)
 
 
 @event.listens_for(engine, 'connect')
