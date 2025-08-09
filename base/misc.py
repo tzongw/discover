@@ -231,7 +231,7 @@ class Semaphore:
             keys = [key for key, value in zip(keys, values) if value is None]
         raise LockError('Unable to acquire lock')
 
-    def __exit__(self, exctype, excinst, exctb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         keys, args = [self.local.key], [self.local.token]
         del self.local.key, self.local.token
         self.lua_release(keys=keys, args=args)
@@ -510,7 +510,7 @@ class SwitchTracer:
             self._tracing[g] = False
         return self
 
-    def __exit__(self, exctype, excinst, exctb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         if self._enable:
             g = getcurrent()
             self._tracing.pop(g)

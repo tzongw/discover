@@ -23,8 +23,8 @@ class LogSuppress(contextlib.suppress):
             exceptions = [Exception]
         super().__init__(*exceptions)
 
-    def __exit__(self, exctype, excinst, exctb):
-        suppress = super().__exit__(exctype, excinst, exctb)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        suppress = super().__exit__(exc_type, exc_val, exc_tb)
         if suppress:
             logging.exception('suppressed')
         return suppress
@@ -51,6 +51,7 @@ _Node = namedtuple('Node', ['hash', 'value'])
 
 class CHash:
     """consistent hash"""
+
     def __init__(self, values, replicas=10):
         ring = []
         for value in values:
