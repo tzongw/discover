@@ -140,7 +140,7 @@ def streaming_response():
 
 @app.route('/tables/<table>/rows')
 @use_kwargs({'cursor': cursor_filed,
-             'count': fields.Int(validate=Range(min=1, max=50)),
+             'count': fields.Int(validate=Range(min=1, max=100)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
 def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
@@ -150,7 +150,13 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
         cond = build_condition(tb, kwargs)
         query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
         rows = [row.to_dict(exclude=[]) for row in query]
+        if cursor == 0:
+            pk = tb.__table__.primary_key.columns[0]
+            total = len(session.query(pk).filter(cond).limit(1000).all())
+        else:
+            total = -1
     return {
+        'total': total,
         'rows': rows,
         'cursor': '' if len(rows) < count else str(cursor + count),
     }
@@ -221,7 +227,7 @@ def move_rows(table: str, row_id, column, **kwargs):
     row_ids = []
     with Session() as session:
         cond = build_condition(tb, kwargs)
-        for row in session.query(tb).filter(cond).order_by(col.asc()):
+        for row in session.query(pk, col).filter(cond).order_by(col.asc()):
             if getattr(row, column) != rank:
                 break
             row_ids.append(getattr(row, pk.name))
@@ -270,7 +276,7 @@ def update_config(row_id, **kwargs):
 
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
-             'count': fields.Int(validate=Range(min=1, max=50)),
+             'count': fields.Int(validate=Range(min=1, max=100)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
 def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
@@ -280,7 +286,12 @@ def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
         if key.endswith('__in'):
             kwargs[key] = value.split(',')
     docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
+    if cursor == 0:
+        total = len(coll.objects(**kwargs).only(coll.id.name).as_pymongo().limit(1000))
+    else:
+        total = -1
     return {
+        'total': total,
         'documents': docs,
         'cursor': '' if len(docs) < count else str(cursor + count),
     }
