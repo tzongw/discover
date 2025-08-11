@@ -151,8 +151,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
         query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
         rows = [row.to_dict(exclude=[]) for row in query]
         if cursor == 0:
-            pk = tb.__table__.primary_key.columns[0]
-            total = len(session.query(pk).filter(cond).limit(1000).all())
+            total = len(session.query(tb.pk).filter(cond).limit(1000).all())
         else:
             total = -1
     return {
@@ -186,7 +185,7 @@ def get_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
+    pk = tb.pk
     kwargs = build_operation(tb, kwargs)
     for key in kwargs:
         if key == pk.name or key in tb.__exclude__:
@@ -203,10 +202,9 @@ def update_row(table: str, row_id, **kwargs):
 @app.route('/tables/<table>/rows/<row_id>', methods=['DELETE'])
 def delete_row(table: str, row_id):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
     row = tb.get(row_id, ensure=True)
     with Session() as session:
-        session.query(tb).filter(pk == row_id).delete()
+        session.query(tb).filter(tb.pk == row_id).delete()
     if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
@@ -216,7 +214,7 @@ def delete_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
+    pk = tb.pk
     if column == pk.name or column in tb.__exclude__:
         raise Forbidden(column)
     col = getattr(tb, column)

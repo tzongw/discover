@@ -326,10 +326,15 @@ class TableMixin:
     __exclude__ = ()
 
     @classmethod
+    @property
+    def pk(cls):
+        return cls.__table__.primary_key.columns[0]
+
+    @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
-        pk = cls.__table__.primary_key.columns[0]
+        pk = cls.pk
         with cls.Session() as session:
             objects = session.query(cls).filter(pk.in_(keys)).all()
             mapping = {getattr(o, pk.name): o for o in objects}
@@ -340,7 +345,7 @@ class TableMixin:
         value = cls.mget([key])[0]
         if value is None:
             if default:
-                pk = cls.__table__.primary_key.columns[0]
+                pk = cls.pk
                 value = cls(**{pk.name: pk.type.python_type(key)})
             elif ensure:
                 raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
@@ -356,13 +361,13 @@ class TableMixin:
             include = self.__include__
         d = {k: v for k, v in self.__dict__.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
-            pk = self.__table__.primary_key.columns[0]
+            pk = self.pk
             d['create_time'] = extract_datetime(getattr(self, pk.name))
         return d
 
     def diff(self, origin: Self = None):
         after = self.__dict__
-        pk = self.__table__.primary_key.columns[0]
+        pk = self.pk
         before = origin.__dict__ if origin else {pk.name: getattr(self, pk.name)}
         return diff_dict(after, before)
 
@@ -372,7 +377,7 @@ class TableMixin:
             col = getattr(cls, column)
         else:
             col, column = column, column.name
-        pk = cls.__table__.primary_key.columns[0]
+        pk = cls.pk
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
@@ -397,12 +402,10 @@ class TableMixin:
 class SqlCacheMixin(TableMixin):
     @classmethod
     def make_key(cls, key):
-        pk = cls.__table__.primary_key.columns[0]
-        return pk.type.python_type(key)
+        return cls.pk.type.python_type(key)
 
     def invalidate(self, invalidator: Invalidator):
-        pk = self.__table__.primary_key.columns[0]
-        invalidator.publish(self.__class__.__name__, getattr(self, pk.name))
+        invalidator.publish(self.__class__.__name__, getattr(self, self.pk.name))
 
     @classmethod
     def bulk_invalidate(cls, invalidator: Invalidator, keys):
@@ -418,10 +421,9 @@ class SqlCacheMixin(TableMixin):
         return get_expire
 
 
-def build_order_by(tb, keys):
+def build_order_by(tb: TableMixin, keys):
     if not keys:
-        pk = tb.__table__.primary_key.columns[0]
-        return [pk.desc()]
+        return [tb.pk.desc()]
     order_by = []
     for key in keys:  # type: str
         asc = True
