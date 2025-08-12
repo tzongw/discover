@@ -8,7 +8,7 @@ from functools import wraps
 from inspect import signature
 from random import choice
 from collections import defaultdict
-from typing import Any, Callable, Optional, Self, Union, Iterable
+from typing import Any, Callable, Optional, Self, Union, Iterable, Type
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
@@ -421,7 +421,7 @@ class SqlCacheMixin(TableMixin):
         return get_expire
 
 
-def build_order_by(tb: TableMixin, keys):
+def build_order_by(tb: Type[TableMixin], keys):
     if not keys:
         return [tb.pk.desc()]
     order_by = []
