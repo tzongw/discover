@@ -244,7 +244,7 @@ class Semaphore:
         raise LockError('Lock not owned')
 
 
-class Inventory:
+class Stock:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 

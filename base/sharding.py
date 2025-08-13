@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
 from .utils import stream_name, CHash
-from .misc import Inventory
+from .misc import Stock
 from .timer import Timer
 from .ztimer import ZTimer
 from .chunk import batched
@@ -221,7 +221,7 @@ class MigratingReceiver(ShardingReceiver):
         return decorator
 
 
-class ShardingInventory(Inventory):
+class ShardingStock(Stock):
     def __init__(self, redis: RedisCluster):
         super().__init__(redis)
         self.sharding = Sharding(shards=len(redis.get_primaries()))
