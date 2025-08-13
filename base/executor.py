@@ -13,7 +13,7 @@ from .utils import func_desc
 class _WorkItem:
     __slots__ = ['future', 'fn', 'args', 'kwargs']
 
-    def __init__(self, fut: Future, fn, *args, **kwargs):
+    def __init__(self, fut: Future, fn, args, kwargs):
         self.future = fut
         self.fn = fn
         self.args = args
@@ -56,7 +56,7 @@ class Executor:
         self._done.clear()
         self._adjust_workers()
         fut = Future()
-        item = _WorkItem(fut, fn, *args, **kwargs)
+        item = _WorkItem(fut, fn, args, kwargs)
         self._items.put(item)
         if not self._overload and self._unfinished >= self._max_workers * 2:
             self._overload = True
