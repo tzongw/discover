@@ -590,3 +590,20 @@ class SetCache:
         cache = self._cache
         self._cache = set()
         return cache
+
+
+class DictCache:
+    def __init__(self):
+        self._cache = {}
+
+    def add(self, key, value) -> int:
+        self._cache[key] = value
+        return len(self._cache)
+
+    def pop(self, key):
+        return self._cache.pop(key, None)
+
+    def pick(self) -> dict:
+        cache = self._cache
+        self._cache = {}
+        return cache
