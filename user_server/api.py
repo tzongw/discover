@@ -150,14 +150,16 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
         cond = build_condition(tb, kwargs)
         query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
         rows = [row.to_dict(exclude=[]) for row in query]
-        if cursor == 0:
-            total = len(session.query(tb.pk).filter(cond).limit(1000).all())
-        else:
+        if cursor:
             total = -1
+        elif len(rows) < count:
+            total = len(rows)
+        else:
+            total = len(session.query(tb.pk).filter(cond).limit(1000).all())
     return {
         'total': total,
         'rows': rows,
-        'cursor': '' if len(rows) < count else str(cursor + count),
+        'cursor': '' if len(rows) < count or total == count else str(cursor + count),
     }
 
 
@@ -283,15 +285,18 @@ def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
     for key, value in kwargs.items():
         if key.endswith('__in'):
             kwargs[key] = value.split(',')
-    docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
-    if cursor == 0:
-        total = len(coll.objects(**kwargs).only(coll.id.name).as_pymongo().limit(1000))
-    else:
+    query = coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)
+    docs = [doc.to_dict(exclude=[]) for doc in query]
+    if cursor:
         total = -1
+    elif len(docs) < count:
+        total = len(docs)
+    else:
+        total = len(coll.objects(**kwargs).only(coll.id.name).as_pymongo().limit(1000))
     return {
         'total': total,
         'documents': docs,
-        'cursor': '' if len(docs) < count else str(cursor + count),
+        'cursor': '' if len(docs) < count or total == count else str(cursor + count),
     }
 
 
