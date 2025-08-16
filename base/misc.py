@@ -319,16 +319,17 @@ class Exclusion:
         return decorator
 
 
+class PrimaryKey:
+    def __get__(self, instance, owner):
+        return owner.__table__.primary_key.columns[0]
+
+
 class TableMixin:
     Session: Callable
     __table__: Any
     __include__ = ()
     __exclude__ = ()
-
-    @classmethod
-    @property
-    def pk(cls):
-        return cls.__table__.primary_key.columns[0]
+    pk = PrimaryKey()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
