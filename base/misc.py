@@ -16,7 +16,7 @@ from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
 from pymongo.results import BulkWriteResult
-from sqlalchemy import and_, DateTime, Date
+from sqlalchemy import and_, DateTime, Date, Column
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -332,7 +332,7 @@ class TableMixin:
     __include__ = ()
     __exclude__ = ()
     __readonly__ = ()
-    id = PrimaryKey()
+    id = PrimaryKey()  # type: PrimaryKey | Column | int
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
