@@ -94,6 +94,7 @@ class DocumentMixin:
     _data: dict
     __include__ = ()
     __exclude__ = ()
+    __readonly__ = ()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
@@ -330,6 +331,7 @@ class TableMixin:
     __table__: Any
     __include__ = ()
     __exclude__ = ()
+    __readonly__ = ()
     id = PrimaryKey()
 
     @classmethod

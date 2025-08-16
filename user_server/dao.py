@@ -128,7 +128,7 @@ class RowChange(BaseModel):
 class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
-    __exclude__ = ('hashed',)
+    __exclude__ = __readonly__ = ('hashed',)
 
     id = Column(Integer, primary_key=True, default=id_generator.gen)
     username = Column(String(40), unique=True, nullable=False)
