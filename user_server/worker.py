@@ -6,7 +6,7 @@ from base import WaitGroup
 import shared
 
 define('concurrency', 10, int, 'number of workers')
-define('slow_time', 600, int, 'time threshold for slow task')
+define('slow_time', 60, int, 'time threshold for slow task')
 
 
 def handle_task(task):

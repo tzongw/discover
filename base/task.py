@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import time
 import uuid
 import logging
 import functools
@@ -188,11 +187,7 @@ class HeavyTask(_BaseTask):
         return func
 
     def exec(self, task: Task):
-        logging.info(f'doing task {task}')
         func = self._get_func(task.path)
         args = loads(task.args)
         kwargs = loads(task.kwargs)
-        start = time.time()
-        r = func(*args, **kwargs)
-        logging.info(f'done task {task} {time.time() - start}')
-        return r
+        return func(*args, **kwargs)
