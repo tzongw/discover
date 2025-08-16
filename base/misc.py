@@ -321,7 +321,8 @@ class Exclusion:
 
 class PrimaryKey:
     def __get__(self, instance, owner):
-        return owner.__table__.primary_key.columns[0]
+        pk = owner.__table__.primary_key.columns[0]
+        return getattr(instance, pk.name) if instance else pk
 
 
 class TableMixin:
@@ -329,25 +330,23 @@ class TableMixin:
     __table__: Any
     __include__ = ()
     __exclude__ = ()
-    pk = PrimaryKey()
+    id = PrimaryKey()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
-        pk = cls.pk
         with cls.Session() as session:
-            objects = session.query(cls).filter(pk.in_(keys)).all()
-            mapping = {getattr(o, pk.name): o for o in objects}
-            return [mapping.get(pk.type.python_type(k)) for k in keys]
+            objects = session.query(cls).filter(cls.id.in_(keys)).all()
+            mapping = {o.id: o for o in objects}
+            return [mapping.get(cls.id.type.python_type(k)) for k in keys]
 
     @classmethod
     def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
         value = cls.mget([key])[0]
         if value is None:
             if default:
-                pk = cls.pk
-                value = cls(**{pk.name: pk.type.python_type(key)})
+                value = cls(**{cls.id.name: cls.id.type.python_type(key)})
             elif ensure:
                 raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
         return value
@@ -362,14 +361,12 @@ class TableMixin:
             include = self.__include__
         d = {k: v for k, v in self.__dict__.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
-            pk = self.pk
-            d['create_time'] = extract_datetime(getattr(self, pk.name))
+            d['create_time'] = extract_datetime(self.id)
         return d
 
     def diff(self, origin: Self = None):
         after = self.__dict__
-        pk = self.pk
-        before = origin.__dict__ if origin else {pk.name: getattr(self, pk.name)}
+        before = origin.__dict__ if origin else {self.__class__.id.name: self.id}
         return diff_dict(after, before)
 
     @classmethod
@@ -378,14 +375,13 @@ class TableMixin:
             col = getattr(cls, column)
         else:
             col, column = column, column.name
-        pk = cls.pk
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
         while True:
             with cls.Session() as session:
-                range_query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
-                    [col <= start, col > stop, pk.not_in(seen_ids)]
+                range_query = [col >= start, col < stop, cls.id.not_in(seen_ids)] if asc else \
+                    [col <= start, col > stop, cls.id.not_in(seen_ids)]
                 rows = session.query(cls).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
@@ -396,17 +392,17 @@ class TableMixin:
             for row in reversed(rows):
                 if getattr(row, column) != last:
                     break
-                seen_ids.append(getattr(row, pk.name))
+                seen_ids.append(row.id)
             yield rows
 
 
 class SqlCacheMixin(TableMixin):
     @classmethod
     def make_key(cls, key):
-        return cls.pk.type.python_type(key)
+        return cls.id.type.python_type(key)
 
     def invalidate(self, invalidator: Invalidator):
-        invalidator.publish(self.__class__.__name__, getattr(self, self.pk.name))
+        invalidator.publish(self.__class__.__name__, self.id)
 
     @classmethod
     def bulk_invalidate(cls, invalidator: Invalidator, keys):
@@ -424,7 +420,7 @@ class SqlCacheMixin(TableMixin):
 
 def build_order_by(tb: Type[TableMixin], keys):
     if not keys:
-        return [tb.pk.desc()]
+        return [tb.id.desc()]
     order_by = []
     for key in keys:  # type: str
         asc = True

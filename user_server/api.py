@@ -155,7 +155,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
         elif len(rows) < count:
             total = len(rows)
         else:
-            total = len(session.query(tb.pk).filter(cond).limit(1000).all())
+            total = len(session.query(tb.id).filter(cond).limit(1000).all())
     return {
         'total': total,
         'rows': rows,
@@ -187,14 +187,13 @@ def get_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
-    pk = tb.pk
     kwargs = build_operation(tb, kwargs)
     for key in kwargs:
-        if key == pk.name or key in tb.__exclude__:
+        if key == tb.id.name or key in tb.__exclude__:
             raise Forbidden(key)
     convert_type(tb, kwargs)
     with Session() as session:
-        session.query(tb).filter(pk == row_id).update(kwargs)
+        session.query(tb).filter(tb.id == row_id).update(kwargs)
     row = tb.get(row_id, ensure=True)
     if isinstance(tb, SqlCacheMixin):
         row.invalidate(invalidator)
@@ -206,7 +205,7 @@ def delete_row(table: str, row_id):
     tb = tables[table]
     row = tb.get(row_id, ensure=True)
     with Session() as session:
-        session.query(tb).filter(tb.pk == row_id).delete()
+        session.query(tb).filter(tb.id == row_id).delete()
     if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
@@ -216,24 +215,23 @@ def delete_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
-    pk = tb.pk
-    if column == pk.name or column in tb.__exclude__:
+    if column == tb.id.name or column in tb.__exclude__:
         raise Forbidden(column)
     col = getattr(tb, column)
     row = tb.get(row_id, ensure=True)
     rank = getattr(row, column)
     kwargs[f'{column}__gte'] = rank
-    kwargs[f'{pk.name}__ne'] = row_id
+    kwargs[f'{tb.id.name}__ne'] = row_id
     row_ids = []
     with Session() as session:
         cond = build_condition(tb, kwargs)
-        for row in session.query(pk, col).filter(cond).order_by(col.asc()):
+        for row in session.query(tb).filter(cond).order_by(col.asc()):
             if getattr(row, column) != rank:
                 break
-            row_ids.append(getattr(row, pk.name))
+            row_ids.append(row.id)
             rank += 1
         if row_ids:
-            session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
+            session.query(tb).filter(tb.id.in_(row_ids)).update({col: col + 1})
             if issubclass(tb, SqlCacheMixin):
                 tb.bulk_invalidate(invalidator, row_ids)
 
