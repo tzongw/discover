@@ -101,8 +101,7 @@ def echo(message):
     tick = redis.incr('tick')
     logging.info(f'tick {tick}')
     response = current_app.make_response(f'say hello {message} {tick}')
-    response.headers['Cache-Control'] = 'max-age=10'
-    response.headers['ETag'] = f'W/"{tick}"'
+    response.headers['ETag'] = tick
     return response
 
 
