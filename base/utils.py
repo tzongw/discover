@@ -9,7 +9,7 @@ import contextlib
 from binascii import crc32
 from random import choice
 from collections import defaultdict, namedtuple
-from functools import lru_cache, wraps
+from functools import lru_cache, wraps, total_ordering
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 from pydantic import BaseModel
@@ -39,11 +39,39 @@ class Addr:
     def __str__(self):
         return f'{self.host}:{self.port}'
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.host == other.host and self.port == other.port
 
     def __hash__(self):
         return hash(str(self))
+
+
+@total_ordering
+class Version:
+    def __init__(self, value='0.0.0'):
+        version = [int(s) for s in value.split('.')]
+        if len(version) != 3 or not all(0 <= v <= 65535 for v in version):
+            raise ValueError(value)
+        self.value = value
+        self.int = sum(v << 16 * i for i, v in enumerate(reversed(version)))
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.int == other.int
+
+    def __lt__(self, other):
+        return self.int < other.int
+
+    def __hash__(self):
+        return self.int
 
 
 _Node = namedtuple('Node', ['hash', 'value'])
@@ -169,6 +197,12 @@ class base62:
         for c in s:
             n = n * cls.base + cls.mapping[c]
         return n
+
+
+class base36(base62):
+    charset = string.digits + string.ascii_uppercase
+    base = 36
+    mapping = {c: index for index, c in enumerate(charset)}
 
 
 def redis_name(redis: Union[Redis, RedisCluster]):
