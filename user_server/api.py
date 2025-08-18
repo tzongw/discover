@@ -12,6 +12,7 @@ from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
 from redis.commands.core import HashDataPersistOptions
+from sqlalchemy import Column
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -216,7 +217,7 @@ def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
     if column == tb.id.name or column in tb.__readonly__:
         raise Forbidden(column)
-    col = getattr(tb, column)
+    col = getattr(tb, column)  # type: Column
     row = tb.get(row_id, ensure=True)
     rank = getattr(row, column)
     kwargs[f'{column}__gte'] = rank
@@ -333,7 +334,7 @@ def get_snapshot(collection: str, doc_id, change_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     for key in kwargs:
-        if key in coll.__readonly__:
+        if key == coll.id.name or key in coll.__readonly__:
             raise Forbidden(key)
     doc = coll.get(doc_id, ensure=True)
     origin = coll.from_json(doc.to_json())  # clone
@@ -361,7 +362,7 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    if field in coll.__readonly__:
+    if field == coll.id.name or field in coll.__readonly__:
         raise Forbidden(field)
     doc = coll.get(doc_id, ensure=True)
     rank = doc[field]
