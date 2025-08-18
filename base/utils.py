@@ -181,7 +181,7 @@ class base62:
     mapping = {c: index for index, c in enumerate(charset)}
 
     @classmethod
-    def encode(cls, n):
+    def encode(cls, n: int):
         assert n >= 0
         chars = []
         while True:
@@ -192,11 +192,15 @@ class base62:
         return ''.join(chars[::-1])
 
     @classmethod
-    def decode(cls, s):
+    def decode(cls, s: str):
         n = 0
         for c in s:
             n = n * cls.base + cls.mapping[c]
         return n
+
+    @classmethod
+    def random(cls, n: int):
+        return ''.join(choice(cls.charset) for _ in range(n))
 
 
 class base36(base62):
