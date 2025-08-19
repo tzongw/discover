@@ -77,6 +77,11 @@ class Cache(Singleflight[T]):
                     self._set_value(made_key, value)
         return results
 
+    def invalidate(self, key, *args, **kwargs):
+        self.invalids += 1
+        made_key = self._make_key(key, *args, **kwargs)
+        self.lru.pop(made_key, None)
+
     def listen(self, invalidator: Invalidator, group: str):
         @invalidator(group)
         def invalidate(key: str):
