@@ -4,7 +4,7 @@ import logging
 import traceback
 from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
-from typing import Type, Self
+from typing import Type, Self, ContextManager
 from contextlib import contextmanager
 from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -23,14 +23,22 @@ from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
 from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
 from config import options
-from shared import invalidator, id_generator, switch_tracer
+from shared import invalidator, id_generator, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
 
 
 class CommitSession(Session):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._defers = []
+
+    def defer(self, f):
+        self._defers.append(f)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
             self.commit()
+            executor.gather(self._defers)
         return super().__exit__(exc_type, exc_val, exc_tb)
 
 
@@ -40,7 +48,7 @@ class SessionMaker(sessionmaker):
         self.tx_lock = RLock()
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> ContextManager[CommitSession]:
         with self.tx_lock, self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN IMMEDIATE')
             yield session
