@@ -480,9 +480,10 @@ def authorize():
         return
     # refresh last active & token ttl
     logging.info(f'user active: {uid}')
-    user_actives[uid] = time.time()
+    now = datetime.now()
+    user_actives[uid] = now.timestamp()
     with Session() as session:
-        session.query(Account).filter(Account.id == uid).update({Account.last_active: datetime.now()})
+        session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
     if redis.httl(key, session_id)[0] < 0.9 * ttl:

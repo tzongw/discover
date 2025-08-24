@@ -119,10 +119,10 @@ def _cleanup():  # call once
 def spawn_worker(f, *args, **kwargs):
     def worker():
         ctx.trace = base62.encode(id_generator.gen())
-        start = time.time()
+        start = time.monotonic()
         with LogSuppress():
             f(*args, **kwargs)
-        t = time.time() - start
+        t = time.monotonic() - start
         if t > 30:
             logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
         _workers.discard(g)

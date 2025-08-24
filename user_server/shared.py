@@ -60,7 +60,7 @@ def user_limiter(*, cooldown, threshold=1):
             uid = g.uid
             if uid in doing:  # not reentrant
                 raise TooManyRequests
-            now = time.time()
+            now = time.monotonic()
             while limiters:  # expire sorted
                 uid, limiter = next(iter(limiters.items()))
                 if limiter.expire > now:
