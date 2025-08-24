@@ -13,6 +13,7 @@ from gevent import pywsgi
 from marshmallow.validate import Range
 from redis.commands.core import HashDataPersistOptions
 from sqlalchemy import Column
+from sqlalchemy.exc import OperationalError
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -20,7 +21,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Co
 import models
 from base import singleflight
 from base.poller import PollStatus
-from base.utils import base62, salt_hash
+from base.utils import base62, salt_hash, LogSuppress
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
@@ -482,7 +483,7 @@ def authorize():
     logging.info(f'user active: {uid}')
     now = datetime.now()
     user_actives[uid] = now.timestamp()
-    with Session() as session:
+    with LogSuppress(OperationalError), Session() as session:
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
