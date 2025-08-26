@@ -13,4 +13,6 @@ UNIX_EPOCH = '1970-01-01 00:00:00.000000'
 
 # common status
 DELETED = -1
-NORMAL = INIT = 0
+ALL = -1
+NORMAL = 0
+INIT = 0
