@@ -48,11 +48,11 @@ class SessionMaker(sessionmaker):
         self.tx_lock = RLock()
 
     @contextmanager
-    def transaction(self) -> ContextManager[CommitSession]:
+    def transaction(self, readonly=False) -> ContextManager[CommitSession]:
         with self.tx_lock, self() as session, session.begin(), switch_tracer:
-            session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+            session.connection().exec_driver_sql('BEGIN' if readonly else 'BEGIN IMMEDIATE')
             yield session
-            assert not switch_tracer.is_switched(), 'transaction switched'
+            assert readonly or not switch_tracer.is_switched(), 'transaction switched'
 
 
 if options.env in [const.Environment.DEV, const.Environment.TEST]:
