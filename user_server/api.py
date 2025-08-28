@@ -483,7 +483,7 @@ def authorize():
     logging.info(f'user active: {uid}')
     now = datetime.now()
     user_actives[uid] = now.timestamp()
-    with LogSuppress(OperationalError), Session() as session:
+    with LogSuppress(OperationalError), Session() as session:  # ignore db locked error, when creating indexes
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
