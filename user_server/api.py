@@ -394,13 +394,13 @@ def eval_code():
 
 
 @app.errorhandler(UnprocessableEntity)
-def args_error(e: UnprocessableEntity):
-    return e.data['messages']
+def unprocessable_entity_error(e: UnprocessableEntity):
+    return e.data['messages'], e.code
 
 
 @app.errorhandler(DoesNotExist)
-def args_error(e: DoesNotExist):
-    return e.args[0]
+def does_not_exist_error(e: DoesNotExist):
+    return e.args[0], 400
 
 
 @app.route('/login', methods=['POST'])
