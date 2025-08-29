@@ -167,7 +167,8 @@ class Config(SqlCacheMixin, BaseModel):
     update_time = Column(DateTime, nullable=False, default=datetime.now)
 
     @classmethod
-    def mget(cls, keys) -> list[ConfigModels]:
+    def mget(cls, keys, *, ensure=False, default=True) -> list[ConfigModels]:
+        assert not ensure and default
         values = []
         for key, config in zip(keys, super().mget(keys)):
             model = config_models[key]
@@ -177,7 +178,6 @@ class Config(SqlCacheMixin, BaseModel):
 
     @classmethod
     def get(cls, key, *, ensure=False, default=True) -> ConfigModels:
-        assert default
         return super().get(key, ensure=ensure, default=default)
 
 

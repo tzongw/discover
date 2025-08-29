@@ -165,7 +165,7 @@ class DocumentMixin:
 
 class CacheMixin(DocumentMixin):
     @classmethod
-    def make_key(cls, key):
+    def make_key(cls, key, *_, **__):
         return cls.id.to_python(key)
 
     def invalidate(self, invalidator: Invalidator):
@@ -197,7 +197,7 @@ class RedisCacheMixin(CacheMixin):
     __fields_version__: str = None
 
     @classmethod
-    def make_key(cls, key):
+    def make_key(cls, key, *_, **__):
         v = cls.__fields_version__
         if v is None:
             v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
@@ -406,7 +406,7 @@ class TableMixin:
 
 class SqlCacheMixin(TableMixin):
     @classmethod
-    def make_key(cls, key):
+    def make_key(cls, key, *_, **__):
         return cls.id.type.python_type(key)
 
     def invalidate(self, invalidator: Invalidator):
