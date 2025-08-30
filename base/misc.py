@@ -97,25 +97,22 @@ class DocumentMixin:
     __readonly__ = ()
 
     @classmethod
-    def mget(cls, keys, *, ensure=False, default=False) -> list[Optional[Self]]:
+    def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
         query = {f'{cls.id.name}__in': keys}
         mapping = {o.id: o for o in cls.objects(**query)}
-        values = []
-        for key in keys:
-            value = mapping.get(cls.id.to_python(key))
-            if value is None:
-                if default:
-                    value = cls(**{cls.id.name: cls.id.to_python(key)})
-                elif ensure:
-                    raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
-            values.append(value)
-        return values
+        return [mapping.get(cls.id.to_python(k)) for k in keys]
 
     @classmethod
     def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
-        return cls.mget([key], ensure=ensure, default=default)[0]
+        value = cls.mget([key])[0]
+        if value is None:
+            if default:
+                value = cls(**{cls.id.name: cls.id.to_python(key)})
+            elif ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
+        return value
 
     def to_dict(self, include=(), exclude=None):
         if exclude is not None:
@@ -165,7 +162,7 @@ class DocumentMixin:
 
 class CacheMixin(DocumentMixin):
     @classmethod
-    def make_key(cls, key, *_, **__):
+    def make_key(cls, key):
         return cls.id.to_python(key)
 
     def invalidate(self, invalidator: Invalidator):
@@ -197,7 +194,7 @@ class RedisCacheMixin(CacheMixin):
     __fields_version__: str = None
 
     @classmethod
-    def make_key(cls, key, *_, **__):
+    def make_key(cls, key):
         v = cls.__fields_version__
         if v is None:
             v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
@@ -338,26 +335,23 @@ class TableMixin:
     id = PrimaryKey()  # type: PrimaryKey | Column | int
 
     @classmethod
-    def mget(cls, keys, *, ensure=False, default=False) -> list[Optional[Self]]:
+    def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
         with cls.Session() as session:
             objects = session.query(cls).filter(cls.id.in_(keys)).all()
             mapping = {o.id: o for o in objects}
-            values = []
-            for key in keys:
-                value = mapping.get(cls.id.type.python_type(key))
-                if value is None:
-                    if default:
-                        value = cls(**{cls.id.name: cls.id.type.python_type(key)})
-                    elif ensure:
-                        raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
-                values.append(value)
-            return values
+            return [mapping.get(cls.id.type.python_type(k)) for k in keys]
 
     @classmethod
     def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
-        return cls.mget([key], ensure=ensure, default=default)[0]
+        value = cls.mget([key])[0]
+        if value is None:
+            if default:
+                value = cls(**{cls.id.name: cls.id.type.python_type(key)})
+            elif ensure:
+                raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
+        return value
 
     def to_dict(self, include=(), exclude=None):
         if exclude is not None:
@@ -406,7 +400,7 @@ class TableMixin:
 
 class SqlCacheMixin(TableMixin):
     @classmethod
-    def make_key(cls, key, *_, **__):
+    def make_key(cls, key):
         return cls.id.type.python_type(key)
 
     def invalidate(self, invalidator: Invalidator):
