@@ -16,7 +16,7 @@ from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
 from pymongo.results import BulkWriteResult
-from sqlalchemy import and_, DateTime, Date, Column
+from sqlalchemy import and_, DateTime, Date, Column, Integer, TypeDecorator
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -418,6 +418,22 @@ class SqlCacheMixin(TableMixin):
             return min(expires) if expires else None
 
         return get_expire
+
+
+class EnumType(TypeDecorator):
+    impl = Integer
+
+    def __init__(self, choices, **kwargs):
+        super().__init__(**kwargs)
+        self.choices = set(choices)
+
+    def process_bind_param(self, value, dialect):
+        if value not in self.choices:
+            raise ValueError(f'Invalid value: {value}, Valid choices: {self.choices}')
+        return value
+
+    def process_result_value(self, value, dialect):
+        return value
 
 
 def build_order_by(tb: Type[TableMixin], keys):
