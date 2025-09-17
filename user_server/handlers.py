@@ -103,6 +103,9 @@ def init():
         task_id = 'task:hello'
         async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=5), loop=True)
         at_exit(lambda: async_task.cancel(task_id))
-        logging.info(timer.info(task_id))
+        logging.info(async_task.info(task_id))
+        if options.tick_timer:
+            ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+            at_exit(lambda: ztimer.kill(const.TICK_TIMER))
         pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
         at_exit(pc.stop)
