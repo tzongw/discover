@@ -4,7 +4,7 @@ import logging
 import traceback
 from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
-from typing import Type, Self
+from typing import Type, Self, ContextManager
 from contextlib import contextmanager
 from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
@@ -16,15 +16,30 @@ from sqlalchemy import String, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy import event
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 import const
 from base import FullCache, Cache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
 from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
 from config import options
-from shared import invalidator, id_generator, switch_tracer
+from shared import invalidator, id_generator, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
+
+
+class CommitSession(Session):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._defers = []
+
+    def defer(self, f):
+        self._defers.append(f)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.commit()
+            executor.gather(self._defers)
+        return super().__exit__(exc_type, exc_val, exc_tb)
 
 
 class SessionMaker(sessionmaker):
@@ -33,19 +48,19 @@ class SessionMaker(sessionmaker):
         self.tx_lock = RLock()
 
     @contextmanager
-    def transaction(self):
+    def transaction(self, readonly=False) -> ContextManager[CommitSession]:
         with self.tx_lock, self() as session, session.begin(), switch_tracer:
-            session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+            session.connection().exec_driver_sql('BEGIN' if readonly else 'BEGIN IMMEDIATE')
             yield session
-            assert not switch_tracer.is_switched(), 'transaction switched'
+            assert readonly or not switch_tracer.is_switched(), 'transaction switched'
 
 
 if options.env in [const.Environment.DEV, const.Environment.TEST]:
     switch_tracer.enable()
 
 echo = options.env == const.Environment.DEV
-engine = create_engine('sqlite:///db.sqlite3', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.2})
-Session = SessionMaker(engine, expire_on_commit=False)
+engine = create_engine(f'sqlite:///{options.sqlite}', echo=echo, connect_args={'isolation_level': None, 'timeout': 0.1})
+Session = SessionMaker(engine, class_=CommitSession, expire_on_commit=False)
 
 
 @event.listens_for(engine, 'connect')
@@ -53,18 +68,19 @@ def sqlite_connect(conn, rec):
     cur = conn.cursor()
     cur.execute('PRAGMA journal_mode = WAL')
     cur.execute('PRAGMA synchronous = NORMAL')
+    cur.execute('PRAGMA temp_store = MEMORY')
     cur.close()
 
 
 if slow_log := options.slow_log:
     @event.listens_for(engine, 'before_cursor_execute')
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        context.query_start_time = time.time()
+        context.query_start_time = time.monotonic()
 
 
     @event.listens_for(engine, 'after_cursor_execute')
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        elapsed = time.time() - context.query_start_time
+        elapsed = time.monotonic() - context.query_start_time
         if elapsed > slow_log:
             logging.warning(f'elapsed: {elapsed:.2f}s slow query: {statement} parameters: {parameters}\n' +
                             ''.join(traceback.format_stack()))
@@ -120,7 +136,7 @@ class RowChange(BaseModel):
 class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
-    __exclude__ = ('hashed',)
+    __exclude__ = __readonly__ = ('hashed',)
 
     id = Column(Integer, primary_key=True, default=id_generator.gen)
     username = Column(String(40), unique=True, nullable=False)
@@ -161,7 +177,7 @@ class Config(SqlCacheMixin, BaseModel):
 
     @classmethod
     def get(cls, key, *, ensure=False, default=True) -> ConfigModels:
-        assert default
+        assert not ensure and default
         return super().get(key, ensure=ensure, default=default)
 
 

@@ -12,24 +12,24 @@ local function limited_incrby(keys, args)
     local limit = tonumber(args[2])
     if increment > 0 then
         if cur >= limit then
-            return 0
+            return {0, cur}
         end
         if limit - cur < increment then
             increment = limit - cur
         end
     else
         if cur <= limit then
-            return 0
+            return {0, cur}
         end
         if limit - cur > increment then
             increment = limit - cur
         end
     end 
-    redis.call('INCRBY', keys[1], increment)
+    cur = redis.call('INCRBY', keys[1], increment)
     if not val and args[3] then
         redis.call('PEXPIRE', keys[1], args[3])
     end
-    return increment
+    return {increment, cur}
 end
 
 local function compare_set(keys, args)
@@ -100,8 +100,8 @@ class Script:
             self.loaded.add(name)
         self.redis = redis
 
-    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None):
-        """return result increment"""
+    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None) -> list[int]:
+        """return [increment, value]"""
         keys_and_args = [key, increment, limit]
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
@@ -129,7 +129,7 @@ class Script:
         return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
 
     @staticmethod
-    def _hsetex_args(mapping, expire=None, keepttl=False, fnx=False, fxx=False):
+    def _hsetex_args(mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
         args = []
         if fnx:
             args.append('FNX')
@@ -139,12 +139,12 @@ class Script:
             args += ['PX', int(expire.total_seconds() * 1000)]
         if keepttl:
             args.append('KEEPTTL')
-        args += ['FIELDS', 1]
+        args += ['FIELDS', len(mapping)]
         for pair in mapping.items():
             args += pair
         return args
 
-    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
+    def hsetx(self, key, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False):
         keys_and_args = [key]
-        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx, fxx)
+        keys_and_args += self._hsetex_args(mapping, expire, keepttl, fnx)
         return self.redis.fcall('hsetx', 1, *keys_and_args)

@@ -23,10 +23,10 @@ def main():
     setproctitle(f'{app_name}-{app_id}-{entry}')
     module = import_module(entry)
     options.parse_command_line(remaining, final=False)
-    start = time.time()
+    start = time.monotonic()
     logging.info(f'doing module {entry}')
     module.main()
-    logging.info(f'done module {entry} {time.time() - start}')
+    logging.info(f'done module {entry} {time.monotonic() - start}')
 
 
 if __name__ == '__main__':

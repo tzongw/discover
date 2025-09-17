@@ -9,7 +9,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from .task import AsyncTask, Task
-from .utils import var_args
+from .utils import variadic_args
 
 
 @dataclass
@@ -78,10 +78,10 @@ class Poller:
         if self.async_task.post(task_id, task, config.interval, loop=True):
             self.async_task.fire(task_id)
 
-    def __call__(self, group: str, *, interval=timedelta(seconds=3), spawn=None):
+    def __call__(self, group: str, *, interval=timedelta(seconds=5), spawn=None):
         def decorator(poll):
             assert group not in self.configs
-            self.configs[group] = Config(var_args(poll), interval, spawn)
+            self.configs[group] = Config(variadic_args(poll), interval, spawn)
             return poll
 
         return decorator

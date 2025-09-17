@@ -8,7 +8,7 @@ from functools import wraps
 from inspect import signature
 from random import choice
 from collections import defaultdict
-from typing import Any, Callable, Optional, Self, Union, Iterable
+from typing import Any, Callable, Optional, Self, Union, Iterable, Type
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
@@ -16,7 +16,7 @@ from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField
 from pymongo.results import BulkWriteResult
-from sqlalchemy import and_, DateTime, Date
+from sqlalchemy import and_, DateTime, Date, Column, Integer, TypeDecorator
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from redis.lock import Lock
@@ -94,6 +94,7 @@ class DocumentMixin:
     _data: dict
     __include__ = ()
     __exclude__ = ()
+    __readonly__ = ()
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
@@ -134,7 +135,7 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=1000, query=None):
+    def batch_range(cls, field, *, start, stop, batch=100, query=None):
         if not isinstance(field, str):
             field = field.name
         asc = start < stop
@@ -166,6 +167,10 @@ class CacheMixin(DocumentMixin):
 
     def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)
+
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.publish(cls.__name__, *keys)
 
     @staticmethod
     def fields_expire(*fields):
@@ -199,6 +204,10 @@ class RedisCacheMixin(CacheMixin):
         key = self.make_key(self.id)
         invalidator.redis.delete(key)
 
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.redis.delete(*[cls.make_key(key) for key in keys])
+
 
 class Semaphore:
     def __init__(self, redis: Union[Redis, RedisCluster], name, value: int, timeout=timedelta(minutes=1)):
@@ -223,7 +232,7 @@ class Semaphore:
             keys = [key for key, value in zip(keys, values) if value is None]
         raise LockError('Unable to acquire lock')
 
-    def __exit__(self, exctype, excinst, exctb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         keys, args = [self.local.key], [self.local.token]
         del self.local.key, self.local.token
         self.lua_release(keys=keys, args=args)
@@ -236,7 +245,7 @@ class Semaphore:
         raise LockError('Lock not owned')
 
 
-class Inventory:
+class Stock:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 
@@ -311,29 +320,35 @@ class Exclusion:
         return decorator
 
 
+class PrimaryKey:
+    def __get__(self, instance, owner):
+        pk = owner.__table__.primary_key.columns[0]
+        return getattr(instance, pk.name) if instance else pk
+
+
 class TableMixin:
     Session: Callable
     __table__: Any
     __include__ = ()
     __exclude__ = ()
+    __readonly__ = ()
+    id = PrimaryKey()  # type: PrimaryKey | Column | int
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
         if not keys:
             return []
-        pk = cls.__table__.primary_key.columns[0]
         with cls.Session() as session:
-            objects = session.query(cls).filter(pk.in_(keys)).all()
-            mapping = {getattr(o, pk.name): o for o in objects}
-            return [mapping.get(pk.type.python_type(k)) for k in keys]
+            objects = session.query(cls).filter(cls.id.in_(keys)).all()
+            mapping = {o.id: o for o in objects}
+            return [mapping.get(cls.id.type.python_type(k)) for k in keys]
 
     @classmethod
     def get(cls, key, *, ensure=False, default=False) -> Optional[Self]:
         value = cls.mget([key])[0]
         if value is None:
             if default:
-                pk = cls.__table__.primary_key.columns[0]
-                value = cls(**{pk.name: pk.type.python_type(key)})
+                value = cls(**{cls.id.name: cls.id.type.python_type(key)})
             elif ensure:
                 raise DoesNotExist(f'`{cls.__name__}` `{key}` does not exist')
         return value
@@ -348,30 +363,27 @@ class TableMixin:
             include = self.__include__
         d = {k: v for k, v in self.__dict__.items() if k in include and k not in self.__exclude__}
         if 'create_time' in include and 'create_time' not in d:
-            pk = self.__table__.primary_key.columns[0]
-            d['create_time'] = extract_datetime(getattr(self, pk.name))
+            d['create_time'] = extract_datetime(self.id)
         return d
 
     def diff(self, origin: Self = None):
         after = self.__dict__
-        pk = self.__table__.primary_key.columns[0]
-        before = origin.__dict__ if origin else {pk.name: getattr(self, pk.name)}
+        before = origin.__dict__ if origin else {self.__class__.id.name: self.id}
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=1000, query=()):
+    def batch_range(cls, column, *, start, stop, batch=100, query=()):
         if isinstance(column, str):
             col = getattr(cls, column)
         else:
             col, column = column, column.name
-        pk = cls.__table__.primary_key.columns[0]
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
         while True:
             with cls.Session() as session:
-                range_query = [col >= start, col < stop, pk.not_in(seen_ids)] if asc else \
-                    [col <= start, col > stop, pk.not_in(seen_ids)]
+                range_query = [col >= start, col < stop, cls.id.not_in(seen_ids)] if asc else \
+                    [col <= start, col > stop, cls.id.not_in(seen_ids)]
                 rows = session.query(cls).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
@@ -382,19 +394,21 @@ class TableMixin:
             for row in reversed(rows):
                 if getattr(row, column) != last:
                     break
-                seen_ids.append(getattr(row, pk.name))
+                seen_ids.append(row.id)
             yield rows
 
 
 class SqlCacheMixin(TableMixin):
     @classmethod
     def make_key(cls, key):
-        pk = cls.__table__.primary_key.columns[0]
-        return pk.type.python_type(key)
+        return cls.id.type.python_type(key)
 
     def invalidate(self, invalidator: Invalidator):
-        pk = self.__table__.primary_key.columns[0]
-        invalidator.publish(self.__class__.__name__, getattr(self, pk.name))
+        invalidator.publish(self.__class__.__name__, self.id)
+
+    @classmethod
+    def bulk_invalidate(cls, invalidator: Invalidator, keys):
+        invalidator.publish(cls.__name__, *keys)
 
     @staticmethod
     def columns_expire(*columns):
@@ -406,10 +420,25 @@ class SqlCacheMixin(TableMixin):
         return get_expire
 
 
-def build_order_by(tb, keys):
+class EnumType(TypeDecorator):
+    impl = Integer
+
+    def __init__(self, choices, **kwargs):
+        super().__init__(**kwargs)
+        self.choices = set(choices)
+
+    def process_bind_param(self, value, dialect):
+        if value not in self.choices:
+            raise ValueError(f'Invalid value: {value}, Valid choices: {self.choices}')
+        return value
+
+    def process_result_value(self, value, dialect):
+        return value
+
+
+def build_order_by(tb: Type[TableMixin], keys):
     if not keys:
-        pk = tb.__table__.primary_key.columns[0]
-        return [pk.desc()]
+        return [tb.id.desc()]
     order_by = []
     for key in keys:  # type: str
         asc = True
@@ -486,20 +515,26 @@ def build_operation(tb, params: dict):
 class SwitchTracer:
     def __init__(self):
         self._tracing = {}
+        self._enable = False
 
     def enable(self):
+        self._enable = True
         Hub.settrace(self._trace)
 
     def __enter__(self):
-        g = getcurrent()
-        self._tracing[g] = False
+        if self._enable:
+            g = getcurrent()
+            self._tracing[g] = False
         return self
 
-    def __exit__(self, exctype, excinst, exctb):
-        g = getcurrent()
-        self._tracing.pop(g)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._enable:
+            g = getcurrent()
+            self._tracing.pop(g)
 
     def is_switched(self):
+        if not self._enable:
+            return False
         g = getcurrent()
         return self._tracing[g]
 
@@ -512,38 +547,78 @@ class SwitchTracer:
 
 
 class UvCache:
-    def __init__(self, save: Callable[[dict[Any, set]], None]):
+    def __init__(self):
         self._cache = defaultdict(set)
-        self._save = save
 
-    def cache(self, uid, views: Iterable) -> int:
+    def add(self, uid, views: Iterable) -> int:
         for view in views:
             self._cache[view].add(uid)
         return len(self._cache)
 
-    def save(self):
-        if cache := self._cache:
-            self._cache = defaultdict(set)
-            self._save(cache)
-
-    def get(self, view) -> set:
-        return self._cache.get(view) or set()
+    def pick(self) -> dict[Any, set]:
+        cache = self._cache
+        self._cache = defaultdict(set)
+        return cache
 
 
 class PvCache:
-    def __init__(self, save: Callable[[dict[Any, int]], None]):
+    def __init__(self):
         self._cache = defaultdict(int)
-        self._save = save
 
-    def cache(self, views: Iterable) -> int:
+    def add(self, views: Iterable) -> int:
         for view in views:
             self._cache[view] += 1
         return len(self._cache)
 
-    def save(self):
-        if cache := self._cache:
-            self._cache = defaultdict(int)
-            self._save(cache)
+    def pick(self) -> dict[Any, int]:
+        cache = self._cache
+        self._cache = defaultdict(int)
+        return cache
 
     def get(self, view) -> int:
-        return self._cache.get(view) or 0
+        return self._cache.get(view, 0)
+
+
+class ListCache:
+    def __init__(self):
+        self._cache = []
+
+    def add(self, item) -> int:
+        self._cache.append(item)
+        return len(self._cache)
+
+    def pick(self) -> list:
+        cache = self._cache
+        self._cache = []
+        return cache
+
+
+class SetCache:
+    def __init__(self):
+        self._cache = set()
+
+    def add(self, item) -> int:
+        self._cache.add(item)
+        return len(self._cache)
+
+    def pick(self) -> set:
+        cache = self._cache
+        self._cache = set()
+        return cache
+
+
+class DictCache:
+    def __init__(self):
+        self._cache = {}
+
+    def add(self, key, value) -> int:
+        self._cache[key] = value
+        return len(self._cache)
+
+    def pop(self, key):
+        return self._cache.pop(key, None)
+
+    def pick(self) -> dict:
+        cache = self._cache
+        self._cache = {}
+        return cache

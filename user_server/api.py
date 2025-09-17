@@ -12,6 +12,8 @@ from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
 from redis.commands.core import HashDataPersistOptions
+from sqlalchemy import Column
+from sqlalchemy.exc import OperationalError
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -19,7 +21,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Co
 import models
 from base import singleflight
 from base.poller import PollStatus
-from base.utils import base62, salt_hash
+from base.utils import base62, salt_hash, LogSuppress
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
@@ -101,8 +103,7 @@ def echo(message):
     tick = redis.incr('tick')
     logging.info(f'tick {tick}')
     response = current_app.make_response(f'say hello {message} {tick}')
-    response.headers['Cache-Control'] = 'max-age=10'
-    response.headers['ETag'] = f'W/"{tick}"'
+    response.headers['ETag'] = tick
     return response
 
 
@@ -140,7 +141,7 @@ def streaming_response():
 
 @app.route('/tables/<table>/rows')
 @use_kwargs({'cursor': cursor_filed,
-             'count': fields.Int(validate=Range(min=1, max=50)),
+             'count': fields.Int(validate=Range(min=1, max=100)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
 def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
@@ -150,9 +151,16 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
         cond = build_condition(tb, kwargs)
         query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
         rows = [row.to_dict(exclude=[]) for row in query]
+        if cursor:
+            total = -1
+        elif len(rows) < count:
+            total = len(rows)
+        else:
+            total = len(session.query(tb.id).filter(cond).limit(1000).all())
     return {
+        'total': total,
         'rows': rows,
-        'cursor': '' if len(rows) < count else str(cursor + count),
+        'cursor': '' if len(rows) < count or total == count else str(cursor + count),
     }
 
 
@@ -164,9 +172,7 @@ def create_row(table: str, **kwargs):
     with Session() as session:
         row = tb(**kwargs)
         session.add(row)
-        session.commit()
-        session.refresh(row)
-    if issubclass(row, SqlCacheMixin):
+    if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)  # notify full cache new row created
     return row.to_dict(exclude=[])
 
@@ -182,16 +188,15 @@ def get_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
     kwargs = build_operation(tb, kwargs)
     for key in kwargs:
-        if key == pk.name or key in tb.__exclude__:
+        if key == tb.id.name or key in tb.__readonly__:
             raise Forbidden(key)
     convert_type(tb, kwargs)
     with Session() as session:
-        session.query(tb).filter(pk == row_id).update(kwargs)
+        session.query(tb).filter(tb.id == row_id).update(kwargs)
     row = tb.get(row_id, ensure=True)
-    if issubclass(row, SqlCacheMixin):
+    if isinstance(tb, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
@@ -199,11 +204,10 @@ def update_row(table: str, row_id, **kwargs):
 @app.route('/tables/<table>/rows/<row_id>', methods=['DELETE'])
 def delete_row(table: str, row_id):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
     row = tb.get(row_id, ensure=True)
     with Session() as session:
-        session.query(tb).filter(pk == row_id).delete()
-    if issubclass(row, SqlCacheMixin):
+        session.query(tb).filter(tb.id == row_id).delete()
+    if isinstance(row, SqlCacheMixin):
         row.invalidate(invalidator)
     return row.to_dict(exclude=[])
 
@@ -212,28 +216,25 @@ def delete_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
-    pk = tb.__table__.primary_key.columns[0]
-    if column == pk.name or column in tb.__exclude__:
+    if column == tb.id.name or column in tb.__readonly__:
         raise Forbidden(column)
-    col = getattr(tb, column)
+    col = getattr(tb, column)  # type: Column
     row = tb.get(row_id, ensure=True)
     rank = getattr(row, column)
     kwargs[f'{column}__gte'] = rank
-    kwargs[f'{pk.name}__ne'] = row_id
-    rows = []
+    kwargs[f'{tb.id.name}__ne'] = row_id
+    row_ids = []
     with Session() as session:
         cond = build_condition(tb, kwargs)
         for row in session.query(tb).filter(cond).order_by(col.asc()):
             if getattr(row, column) != rank:
                 break
-            rows.append(row)
+            row_ids.append(row.id)
             rank += 1
-        if rows:
-            row_ids = [getattr(row, pk.name) for row in rows]
-            session.query(tb).filter(pk.in_(row_ids)).update({col: col + 1})
+        if row_ids:
+            session.query(tb).filter(tb.id.in_(row_ids)).update({col: col + 1})
             if issubclass(tb, SqlCacheMixin):
-                for row in rows:
-                    row.invalidate(invalidator)
+                tb.bulk_invalidate(invalidator, row_ids)
 
 
 @app.route('/tables/configs/rows/<int:row_id>')
@@ -274,7 +275,7 @@ def update_config(row_id, **kwargs):
 
 @app.route('/collections/<collection>/documents')
 @use_kwargs({'cursor': cursor_filed,
-             'count': fields.Int(validate=Range(min=1, max=50)),
+             'count': fields.Int(validate=Range(min=1, max=100)),
              'order_by': fields.DelimitedList(fields.Str())},
             location='query', unknown='include')
 def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
@@ -283,10 +284,18 @@ def get_documents(collection: str, cursor=0, count=20, order_by=None, **kwargs):
     for key, value in kwargs.items():
         if key.endswith('__in'):
             kwargs[key] = value.split(',')
-    docs = [doc.to_dict(exclude=[]) for doc in coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)]
+    query = coll.objects(**kwargs).order_by(*order_by).skip(cursor).limit(count)
+    docs = [doc.to_dict(exclude=[]) for doc in query]
+    if cursor:
+        total = -1
+    elif len(docs) < count:
+        total = len(docs)
+    else:
+        total = len(coll.objects(**kwargs).only(coll.id.name).as_pymongo().limit(1000))
     return {
+        'total': total,
         'documents': docs,
-        'cursor': '' if len(docs) < count else str(cursor + count),
+        'cursor': '' if len(docs) < count or total == count else str(cursor + count),
     }
 
 
@@ -299,7 +308,7 @@ def create_document(collection: str, **kwargs):
         raise Conflict(f'document `{doc_id}` already exists')
     doc = coll(**kwargs).save()
     Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff()).save()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)  # notify full cache new document created
     return doc.to_dict(exclude=[])
 
@@ -326,7 +335,7 @@ def get_snapshot(collection: str, doc_id, change_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     for key in kwargs:
-        if key in coll.__exclude__:
+        if key == coll.id.name or key in coll.__readonly__:
             raise Forbidden(key)
     doc = coll.get(doc_id, ensure=True)
     origin = coll.from_json(doc.to_json())  # clone
@@ -335,7 +344,7 @@ def update_document(collection: str, doc_id, **kwargs):
         doc = coll(**kwargs).save()
         origin = None
     Change(coll_name=coll.__name__, doc_id=doc.id, diff=doc.diff(origin)).save()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
@@ -345,7 +354,7 @@ def delete_document(collection: str, doc_id):
     coll = collections[collection]
     doc = coll.get(doc_id, ensure=True)
     doc.delete()
-    if issubclass(coll, CacheMixin):
+    if isinstance(doc, CacheMixin):
         doc.invalidate(invalidator)
     return doc.to_dict(exclude=[])
 
@@ -354,7 +363,7 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    if field in coll.__exclude__:
+    if field == coll.id.name or field in coll.__readonly__:
         raise Forbidden(field)
     doc = coll.get(doc_id, ensure=True)
     rank = doc[field]
@@ -372,8 +381,7 @@ def move_documents(collection: str, doc_id, field: str, **kwargs):
         changes = [Change(coll_name=coll.__name__, doc_id=doc.id, diff={field: doc[field] + 1}) for doc in docs]
         Change.objects.insert(changes)
         if issubclass(coll, CacheMixin):
-            for doc in docs:
-                doc.invalidate(invalidator)
+            coll.bulk_invalidate(invalidator, doc_ids)
 
 
 @app.route('/eval', methods=['POST'])
@@ -386,13 +394,13 @@ def eval_code():
 
 
 @app.errorhandler(UnprocessableEntity)
-def args_error(e: UnprocessableEntity):
-    return e.data['messages']
+def unprocessable_entity_error(e: UnprocessableEntity):
+    return e.data['messages'], e.code
 
 
 @app.errorhandler(DoesNotExist)
-def args_error(e: DoesNotExist):
-    return e.args[0]
+def does_not_exist_error(e: DoesNotExist):
+    return e.args[0], 400
 
 
 @app.route('/login', methods=['POST'])
@@ -473,9 +481,10 @@ def authorize():
         return
     # refresh last active & token ttl
     logging.info(f'user active: {uid}')
-    user_actives[uid] = time.time()
-    with Session() as session:
-        session.query(Account).filter(Account.id == uid).update({Account.last_active: datetime.now()})
+    now = datetime.now()
+    user_actives[uid] = now.timestamp()
+    with LogSuppress(OperationalError), Session() as session:  # ignore db locked error, like creating indexes
+        session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
     if redis.httl(key, session_id)[0] < 0.9 * ttl:

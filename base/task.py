@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import time
 import uuid
 import logging
 import functools
@@ -15,7 +14,7 @@ from yaml import safe_dump as dumps
 from yaml import safe_load as loads
 from .ztimer import ZTimer
 from .dispatcher import TimeDispatcher
-from .utils import var_args, func_desc
+from .utils import variadic_args, func_desc
 
 
 class Task(BaseModel):
@@ -42,7 +41,7 @@ class _BaseTask:
         path = func_desc(f)
         assert '<' not in path, 'CAN NOT be lambda or local function'
         assert path not in self.paths, 'duplicated path'
-        self.paths[path] = var_args(f)
+        self.paths[path] = variadic_args(f)
         return path
 
 
@@ -189,11 +188,7 @@ class HeavyTask(_BaseTask):
         return func
 
     def exec(self, task: Task):
-        logging.info(f'doing task {task}')
         func = self._get_func(task.path)
         args = loads(task.args)
         kwargs = loads(task.kwargs)
-        start = time.time()
-        r = func(*args, **kwargs)
-        logging.info(f'done task {task} {time.time() - start}')
-        return r
+        return func(*args, **kwargs)

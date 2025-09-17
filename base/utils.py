@@ -3,11 +3,13 @@ import fcntl
 import logging
 import socket
 import string
+import bisect
 import hashlib
 import contextlib
+from binascii import crc32
 from random import choice
-from collections import defaultdict
-from functools import lru_cache, wraps
+from collections import defaultdict, namedtuple
+from functools import lru_cache, wraps, total_ordering
 from inspect import signature, Parameter
 from typing import Callable, Type, Union
 from pydantic import BaseModel
@@ -21,8 +23,8 @@ class LogSuppress(contextlib.suppress):
             exceptions = [Exception]
         super().__init__(*exceptions)
 
-    def __exit__(self, exctype, excinst, exctb):
-        suppress = super().__exit__(exctype, excinst, exctb)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        suppress = super().__exit__(exc_type, exc_val, exc_tb)
         if suppress:
             logging.exception('suppressed')
         return suppress
@@ -37,11 +39,61 @@ class Addr:
     def __str__(self):
         return f'{self.host}:{self.port}'
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.host == other.host and self.port == other.port
 
     def __hash__(self):
         return hash(str(self))
+
+
+@total_ordering
+class Version:
+    def __init__(self, value='0.0.0'):
+        version = [int(s) for s in value.split('.')]
+        if len(version) != 3 or not all(0 <= v <= 65535 for v in version):
+            raise ValueError(value)
+        self.value = value
+        self.int = sum(v << 16 * i for i, v in enumerate(reversed(version)))
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.int == other.int
+
+    def __lt__(self, other):
+        return self.int < other.int
+
+    def __hash__(self):
+        return self.int
+
+
+_Node = namedtuple('Node', ['hash', 'value'])
+
+
+class CHash:
+    """consistent hash"""
+
+    def __init__(self, values, replicas=10):
+        ring = []
+        for value in values:
+            for replica in range(replicas):
+                ring.append(_Node(crc32(f'{value}_{replica}'.encode()), value))
+        ring.sort()
+        self._ring = ring
+
+    def __call__(self, key: str):
+        node = _Node(crc32(key.encode()), self._ring[0].value)
+        i = bisect.bisect(self._ring, node)
+        if i >= len(self._ring):
+            i = 0
+        return self._ring[i].value
 
 
 @lru_cache(maxsize=None)
@@ -51,7 +103,7 @@ def ip_address(ipv6=False):
         return sock.getsockname()[0]
 
 
-def var_args(f: Callable):
+def variadic_args(f: Callable):
     params = signature(f).parameters
     var_positional = any(p.kind == Parameter.VAR_POSITIONAL for p in params.values())
     var_keyword = any(p.kind == Parameter.VAR_KEYWORD for p in params.values())
@@ -129,7 +181,7 @@ class base62:
     mapping = {c: index for index, c in enumerate(charset)}
 
     @classmethod
-    def encode(cls, n):
+    def encode(cls, n: int):
         assert n >= 0
         chars = []
         while True:
@@ -140,11 +192,21 @@ class base62:
         return ''.join(chars[::-1])
 
     @classmethod
-    def decode(cls, s):
+    def decode(cls, s: str):
         n = 0
         for c in s:
             n = n * cls.base + cls.mapping[c]
         return n
+
+    @classmethod
+    def random(cls, n: int):
+        return ''.join(choice(cls.charset) for _ in range(n))
+
+
+class base36(base62):
+    charset = string.digits + string.ascii_uppercase
+    base = 36
+    mapping = {c: index for index, c in enumerate(charset)}
 
 
 def redis_name(redis: Union[Redis, RedisCluster]):

@@ -36,7 +36,7 @@ class LazyProxy:
         self._create = singleflight(create)
 
     def __getattr__(self, name):
-        if self._target is None:
+        if self._create:
             self._target = self._create()
             self._create = None
         return getattr(self._target, name)

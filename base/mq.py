@@ -4,19 +4,20 @@ import logging
 from typing import Dict
 from redis import Redis
 from pydantic import BaseModel
-from .utils import stream_name, var_args
+from .utils import stream_name, variadic_args
 from .dispatcher import Dispatcher
 from .executor import Executor
 
 
 class Publisher:
-    def __init__(self, redis: Redis, hint=None):
+    def __init__(self, redis: Redis, *, maxlen=4096, hint=None):
         self.redis = redis
         self.hint = hint
+        self.maxlen = maxlen
 
-    def publish(self, message: BaseModel, maxlen=4096, stream=None):
+    def publish(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
-        params = [stream, 'MAXLEN', '~', maxlen]
+        params = [stream, 'MAXLEN', '~', self.maxlen]
         if self.hint:
             params += ['HINT', self.hint]
         params += ['*', '', message.json(exclude_defaults=True)]
@@ -34,7 +35,7 @@ class ProtoDispatcher(Dispatcher):
         super_handler = super().__call__
 
         def decorator(f):
-            vf = var_args(f)
+            vf = variadic_args(f)
 
             @super_handler(key)
             def inner(data: Dict, sid):

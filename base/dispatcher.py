@@ -6,7 +6,7 @@ from calendar import MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUN
 from typing import Iterable, Union
 from binascii import crc32
 from .executor import Executor
-from .utils import var_args
+from .utils import variadic_args
 
 WEEKDAY = [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
 WEEKEND = [SATURDAY, SUNDAY]
@@ -47,7 +47,7 @@ class Dispatcher:
 
     def __call__(self, key):
         def decorator(f):
-            self._handlers[key].append(var_args(f))
+            self._handlers[key].append(variadic_args(f))
             return f
 
         return decorator
@@ -92,7 +92,7 @@ class TimeDispatcher(Dispatcher):
         def decorator(f):
             # scatter handlers with same period, `remain` consistent across different processes
             remain = crc32(f.__name__.encode()) % period
-            self._periodic_handlers.append([period, remain, var_args(f)])
+            self._periodic_handlers.append([period, remain, variadic_args(f)])
             return f
 
         return decorator
@@ -103,7 +103,7 @@ class TimeDispatcher(Dispatcher):
             assert value is None or isinstance(value, int) or -1 not in value  # supports `in`
 
         def decorator(f):
-            self._crontab_handlers.append([cron, var_args(f)])
+            self._crontab_handlers.append([cron, variadic_args(f)])
             return f
 
         return decorator

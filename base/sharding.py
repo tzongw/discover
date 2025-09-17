@@ -1,56 +1,39 @@
 # -*- coding: utf-8 -*-
 import logging
 import random
-import bisect
 import time
 from datetime import timedelta, datetime
+from functools import lru_cache
 from typing import TypeVar, Generic, Generator
-from binascii import crc32
 from random import shuffle
 from typing import Union
-from collections import namedtuple
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 from .mq import Publisher, Receiver, ProtoDispatcher
-from .utils import stream_name
-from .misc import Inventory
+from .utils import stream_name, CHash
+from .misc import Stock
 from .timer import Timer
 from .ztimer import ZTimer
 from .chunk import batched
 from .task import HeavyTask
 
-Node = namedtuple('Node', ['hash', 'shard'])
-
 
 class Sharding:
-    _ring_cache = {}
+    @staticmethod
+    @lru_cache
+    def get_chash(shards, replicas):
+        return CHash(range(shards), replicas)
 
-    @classmethod
-    def get_ring(cls, shards, replicas):
-        key = (shards, replicas)
-        ring = cls._ring_cache.get(key)
-        if ring is None:
-            ring = []  # consistent hash ring
-            for shard in range(shards):
-                for replica in range(replicas):
-                    ring.append(Node(crc32(f'{shard}_{replica}'.encode()), shard))
-            ring.sort()
-            cls._ring_cache[key] = ring
-        return ring
-
-    def __init__(self, shards, fixed_keys=(), replicas=5):
+    def __init__(self, shards, fixed_keys=(), replicas=10):
         self.shards = shards
         self.fixed_keys = fixed_keys  # keys fixed in shard 0
-        self.ring = self.get_ring(shards, replicas)
+        self.chash = self.get_chash(shards, replicas)
 
-    def get_shard(self, key):
+    def get_shard(self, key: str):
         if key in self.fixed_keys:
             return 0
-        i = bisect.bisect(self.ring, Node(crc32(key.encode()), 0))
-        if i >= len(self.ring):
-            i = 0
-        return self.ring[i].shard
+        return self.chash(key)
 
     def all_sharded_keys(self, key: str):
         assert not key.startswith('{')
@@ -76,14 +59,14 @@ class Sharding:
 
 
 class ShardingPublisher(Publisher):
-    def __init__(self, redis: Union[Redis, RedisCluster], *, hint=None):
-        super().__init__(redis, hint)
+    def __init__(self, redis: Union[Redis, RedisCluster], *, maxlen=4096, hint=None):
+        super().__init__(redis, maxlen=maxlen, hint=hint)
         self._sharding = Sharding(shards=len(redis.get_primaries()))
 
-    def publish(self, message: BaseModel, maxlen=4096, stream=None):
+    def publish(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
         stream = self._sharding.random_sharded_key(stream)
-        return super().publish(message, maxlen, stream)
+        return super().publish(message, stream)
 
 
 class NormalizedDispatcher(ProtoDispatcher):
@@ -129,14 +112,14 @@ class ShardingReceiver(Receiver):
 
 
 class ShardingTimer(Timer):
-    def __init__(self, redis, *, sharding: Sharding, hint=None):
-        super().__init__(redis, hint)
+    def __init__(self, redis, *, sharding: Sharding, maxlen=4096, hint=None):
+        super().__init__(redis, maxlen=maxlen, hint=hint)
         self._sharding = sharding
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, stream=None):
         stream = stream or stream_name(message)
         key, stream = self._sharding.sharded_keys(key, stream)
-        return super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+        return super().create(key, message, interval, loop=loop, stream=stream)
 
     def kill(self, key):
         key = self._sharding.sharded_key(key)
@@ -150,15 +133,15 @@ class ShardingTimer(Timer):
         key = self._sharding.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10, maxlen=1024):
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
         assert key in self._sharding.fixed_keys, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharding.sharded_keys(key, stream)
-        return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
+        return super().tick(key, stream, interval, offset=offset)
 
 
 class MigratingTimer(ShardingTimer):
-    def __init__(self, redis, *, sharding: Sharding, old_timer: Timer, start_time: datetime, hint=None):
-        super().__init__(redis, sharding=sharding, hint=hint)
+    def __init__(self, redis, *, sharding: Sharding, old_timer: Timer, start_time: datetime, maxlen=4096, hint=None):
+        super().__init__(redis, sharding=sharding, maxlen=maxlen, hint=hint)
         self.old_timer = old_timer
         self.start_time = start_time  # migration start time, after deployment
 
@@ -171,10 +154,10 @@ class MigratingTimer(ShardingTimer):
     def is_migrating(self):
         return datetime.now() >= self.start_time
 
-    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, maxlen=4096, stream=None):
+    def create(self, key: str, message: BaseModel, interval: timedelta, *, loop=False, stream=None):
         if not self.is_migrating:
-            return self.old_timer.create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
-        added = super().create(key, message, interval, loop=loop, maxlen=maxlen, stream=stream)
+            return self.old_timer.create(key, message, interval, loop=loop, stream=stream)
+        added = super().create(key, message, interval, loop=loop, stream=stream)
         if added and self.is_moved(key) and self.old_timer.kill(key):
             added = 0
         return added
@@ -238,7 +221,7 @@ class MigratingReceiver(ShardingReceiver):
         return decorator
 
 
-class ShardingInventory(Inventory):
+class ShardingStock(Stock):
     def __init__(self, redis: RedisCluster):
         super().__init__(redis)
         self.sharding = Sharding(shards=len(redis.get_primaries()))

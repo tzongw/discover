@@ -77,6 +77,11 @@ class Cache(Singleflight[T]):
                     self._set_value(made_key, value)
         return results
 
+    def invalidate(self, key, *args, **kwargs):
+        self.invalids += 1
+        made_key = self._make_key(key, *args, **kwargs)
+        self.lru.pop(made_key, None)
+
     def listen(self, invalidator: Invalidator, group: str):
         @invalidator(group)
         def invalidate(key: str):
@@ -129,7 +134,7 @@ class FullMixin(Generic[T]):
         self._get_values = get_values
         self._values = ()
         self._version = 0
-        self._expire_at = float('-inf')
+        self._expire_at = 0
 
     @property
     def values(self) -> Sequence[T] | LazySequence[T]:
@@ -154,7 +159,7 @@ class FullMixin(Generic[T]):
                 return f(*args, **kwargs)
 
             cache_version = 0
-            cache_expire_at = float('-inf')
+            cache_expire_at = 0
 
             @functools.wraps(f)
             def wrapper(*args, **kwargs):

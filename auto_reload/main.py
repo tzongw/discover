@@ -32,13 +32,13 @@ def is_valid(addr: str):
 def reload_nginx():
     if not changed:
         return
-    prefix = options.host + '_' if options.same_host and options.host != ip_address() else ''
+    prefix = options.host + '_' if options.host != ip_address() else ''
     for service in changed:
         addresses = sorted(service_addresses[service])
         logging.info(f'updating: {service} {addresses}')
         path = os.path.join(options.conf_d, prefix + service + '_upstream')
         temp_path = path + '.temp'
-        with open(temp_path, 'w', encoding='utf-8') as f:
+        with open(temp_path, 'w') as f:
             f.write('\n'.join([f'server {addr};' for addr in addresses]))
             f.write('\n')
         os.rename(temp_path, path)  # atomic

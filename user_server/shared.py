@@ -60,7 +60,7 @@ def user_limiter(*, cooldown, threshold=1):
             uid = g.uid
             if uid in doing:  # not reentrant
                 raise TooManyRequests
-            now = time.time()
+            now = time.monotonic()
             while limiters:  # expire sorted
                 uid, limiter = next(iter(limiters.items()))
                 if limiter.expire > now:
@@ -90,7 +90,7 @@ def dispatch_timeout(full_key, data):
         time_dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
         ts = int(time.time())
-        increment = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
+        increment, _ = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
         offset = min(increment, 10)
         for ts in range(ts - offset + 1, ts + 1):
             time_dispatcher.dispatch_tick(ts)

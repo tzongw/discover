@@ -37,9 +37,17 @@ class Invalidator:
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
 
-    def publish(self, group, key):
-        full_key = self.full_key(group, key)
-        self.redis.publish('__redis__:invalidate', full_key)
+    def publish(self, group, *keys):
+        if isinstance(self.redis, RedisCluster):
+            node = self.redis.get_node_from_key(keys[0])
+            redis = self.redis.get_redis_connection(node)
+        else:
+            redis = self.redis
+        with redis.pipeline(transaction=False) as pipe:
+            for key in keys:
+                full_key = self.full_key(group, key)
+                pipe.publish('__redis__:invalidate', full_key)
+            pipe.execute()
 
     def future(self, group, key):
         assert group in self.getters
