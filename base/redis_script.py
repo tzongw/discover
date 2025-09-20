@@ -50,6 +50,15 @@ local function compare_del(keys, args)
     end
 end
 
+local function compare_expire(keys, args)
+    if redis.call('GET', keys[1]) == args[1] then
+        redis.call('PEXPIRE', keys[1], unpack(args, 2))
+        return 1
+    else
+        return 0
+    end
+end
+
 local function compare_hset(keys, args)
     if redis.call('HGET', keys[1], args[1]) == args[2] then
         redis.call('HSETEX', keys[1], unpack(args, 3))
@@ -61,11 +70,16 @@ end
 
 local function compare_hdel(keys, args)
     if redis.call('HGET', keys[1], args[1]) == args[2] then
-        if args[3] then
-            redis.call('HDEL', keys[1], unpack(args, 3))
-        else
-            redis.call('DEL', keys[1])
-        end
+        redis.call('HDEL', keys[1], unpack(args, 3))
+        return 1
+    else
+        return 0
+    end
+end
+
+local function compare_hexpire(keys, args)
+    if redis.call('HGET', keys[1], args[1]) == args[2] then
+        redis.call('HPEXPIRE', keys[1], unpack(args, 3))
         return 1
     else
         return 0
@@ -84,8 +98,10 @@ end
 redis.register_function('limited_incrby', limited_incrby)
 redis.register_function('compare_set', compare_set)
 redis.register_function('compare_del', compare_del)
+redis.register_function('compare_expire', compare_expire)
 redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
+redis.register_function('compare_hexpire', compare_hexpire)
 redis.register_function('hsetx', hsetx)
 """
 
@@ -118,6 +134,24 @@ class Script:
     def compare_del(self, key, expected):
         return self.redis.fcall('compare_del', 1, key, expected)
 
+    def compare_expire(self, key, expected, expire: timedelta, *, nx=False, xx=False, gt=False, lt=False):
+        keys_and_args = [key, expected, int(expire.total_seconds() * 1000)]
+        keys_and_args += self._expire_args(nx, xx, gt, lt)
+        return self.redis.fcall('compare_expire', 1, *keys_and_args)
+
+    @staticmethod
+    def _expire_args(nx=False, xx=False, gt=False, lt=False):
+        args = []
+        if nx:
+            args.append('NX')
+        if xx:
+            args.append('XX')
+        if gt:
+            args.append('GT')
+        if lt:
+            args.append('LT')
+        return args
+
     def compare_hset(self, key, field, expected, mapping: dict, expire: timedelta = None, keepttl=False, fnx=False,
                      fxx=False):
         keys_and_args = [key, field, expected]
@@ -125,8 +159,13 @@ class Script:
         return self.redis.fcall('compare_hset', 1, *keys_and_args)
 
     def compare_hdel(self, key, field, expected, *fields):
-        """empty fields to del key"""
         return self.redis.fcall('compare_hdel', 1, key, field, expected, *fields)
+
+    def compare_hexpire(self, key, field, expected, expire: timedelta, *fields, nx=False, xx=False, gt=False, lt=False):
+        keys_and_args = [key, field, expected, int(expire.total_seconds() * 1000)]
+        keys_and_args += self._expire_args(nx, xx, gt, lt)
+        keys_and_args += ['FIELDS', len(fields), *fields]
+        return self.redis.fcall('compare_hexpire', 1, *keys_and_args)
 
     @staticmethod
     def _hsetex_args(mapping: dict, expire: timedelta = None, keepttl=False, fnx=False, fxx=False):
