@@ -14,7 +14,7 @@ from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
-from mongoengine import EmbeddedDocument, FloatField
+from mongoengine import EmbeddedDocument, FloatField, Q
 from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date, Column, Integer, TypeDecorator
 from pydantic import BaseModel
@@ -141,12 +141,11 @@ class DocumentMixin:
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
-        if query is None:
-            query = {}
+        q = Q(**query) if query else Q()
         while True:
             range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
-            docs = list(cls.objects(**query, **range_query).order_by(order_by).limit(batch))
+            docs = list(cls.objects(q, **range_query).order_by(order_by).limit(batch))
             if not docs:
                 return
             last = docs[-1][field]
