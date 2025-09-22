@@ -105,6 +105,7 @@ class SlidingWindow:
         self._last_tick = 0
 
     def acquire(self, cur_tick: int, count: int):
+        assert cur_tick >= self._last_tick, 'clock backwards'
         steps = min(cur_tick - self._last_tick, self._windows)
         for step in range(steps):
             index = (self._last_tick + step + 1) % self._windows
