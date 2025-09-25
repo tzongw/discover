@@ -136,7 +136,7 @@ def streaming_response():
             yield f'{json.dumps(line)}'
             gevent.sleep(1)
 
-    return app.response_class(stream_with_context(generate()))
+    return app.response_class(stream_with_context(generate()), headers={'X-Accel-Buffering': 'no'})
 
 
 @app.route('/tables/<table>/rows')

@@ -26,13 +26,13 @@ class Pool(metaclass=abc.ABCMeta):
 
     def close_all(self):
         self._maxsize = 0  # _return_conn will close using conns
-        while not self._idle.empty():
+        while self._idle.qsize():
             conn = self._idle.get_nowait()
             with LogSuppress():
                 self._close_conn(conn)
 
     def _get_conn(self):
-        if not self._idle.empty() or self._size >= self._maxsize:
+        if self._idle.qsize() or self._size >= self._maxsize:
             return self._idle.get(timeout=self._timeout)
 
         self._size += 1

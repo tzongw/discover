@@ -96,6 +96,26 @@ class CHash:
         return self._ring[i].value
 
 
+class SlidingWindow:
+    def __init__(self, windows: int, limit: int):
+        assert windows > 0 and limit > 0
+        self._windows = windows
+        self._limit = limit
+        self._counters = [0] * windows
+        self._last_tick = 0
+
+    def acquire(self, cur_tick: int, count: int):
+        assert cur_tick >= self._last_tick, 'clock backwards'
+        steps = min(cur_tick - self._last_tick, self._windows)
+        for step in range(steps):
+            index = (self._last_tick + step + 1) % self._windows
+            self._counters[index] = 0
+        count = min(count, self._limit - sum(self._counters))
+        self._counters[cur_tick % self._windows] += count
+        self._last_tick = cur_tick
+        return count
+
+
 @lru_cache(maxsize=None)
 def ip_address(ipv6=False):
     with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
