@@ -53,10 +53,10 @@ class Addr:
 class Version:
     def __init__(self, value='0.0.0'):
         version = [int(s) for s in value.split('.')]
-        if len(version) != 3 or not all(0 <= v <= 65535 for v in version):
+        if len(version) != 3 or not all(0 <= v < 1000 for v in version):
             raise ValueError(value)
         self.value = value
-        self.int = sum(v << 16 * i for i, v in enumerate(reversed(version)))
+        self.int = version[0] * 1000 * 1000 + version[1] * 1000 + version[2]
 
     def __str__(self):
         return self.value
