@@ -7,8 +7,7 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
 from random import choice
-from collections import defaultdict
-from typing import Any, Callable, Optional, Self, Union, Iterable, Type
+from typing import Any, Callable, Optional, Self, Union, Type
 from types import MappingProxyType
 from flask.app import DefaultJSONProvider, Flask
 from gevent.hub import Hub
@@ -543,81 +542,3 @@ class SwitchTracer:
         g = args[0]
         if g in self._tracing:
             self._tracing[g] = True
-
-
-class UvCache:
-    def __init__(self):
-        self._cache = defaultdict(set)
-
-    def add(self, uid, views: Iterable) -> int:
-        for view in views:
-            self._cache[view].add(uid)
-        return len(self._cache)
-
-    def pick(self) -> dict[Any, set]:
-        cache = self._cache
-        self._cache = defaultdict(set)
-        return cache
-
-
-class PvCache:
-    def __init__(self):
-        self._cache = defaultdict(int)
-
-    def add(self, views: Iterable) -> int:
-        for view in views:
-            self._cache[view] += 1
-        return len(self._cache)
-
-    def pick(self) -> dict[Any, int]:
-        cache = self._cache
-        self._cache = defaultdict(int)
-        return cache
-
-    def get(self, view) -> int:
-        return self._cache.get(view, 0)
-
-
-class ListCache:
-    def __init__(self):
-        self._cache = []
-
-    def add(self, item) -> int:
-        self._cache.append(item)
-        return len(self._cache)
-
-    def pick(self) -> list:
-        cache = self._cache
-        self._cache = []
-        return cache
-
-
-class SetCache:
-    def __init__(self):
-        self._cache = set()
-
-    def add(self, item) -> int:
-        self._cache.add(item)
-        return len(self._cache)
-
-    def pick(self) -> set:
-        cache = self._cache
-        self._cache = set()
-        return cache
-
-
-class DictCache:
-    def __init__(self):
-        self._cache = {}
-
-    def add(self, key, value) -> int:
-        self._cache[key] = value
-        return len(self._cache)
-
-    def pop(self, key):
-        return self._cache.pop(key, None)
-
-    def pick(self) -> dict:
-        cache = self._cache
-        self._cache = {}
-        return cache

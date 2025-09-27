@@ -11,7 +11,7 @@ from random import choice
 from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
 from inspect import signature, Parameter
-from typing import Callable, Type, Union
+from typing import Callable, Type, Union, Iterable, Any
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 import gevent
@@ -303,3 +303,81 @@ def apply_diff(origin: dict, diff: dict):
             apply_diff(vo, value)
         else:
             origin[key] = value
+
+
+class UvCache:
+    def __init__(self):
+        self._cache = defaultdict(set)
+
+    def add(self, uid, views: Iterable) -> int:
+        for view in views:
+            self._cache[view].add(uid)
+        return len(self._cache)
+
+    def pick(self) -> dict[Any, set]:
+        cache = self._cache
+        self._cache = defaultdict(set)
+        return cache
+
+
+class PvCache:
+    def __init__(self):
+        self._cache = defaultdict(int)
+
+    def add(self, views: Iterable) -> int:
+        for view in views:
+            self._cache[view] += 1
+        return len(self._cache)
+
+    def pick(self) -> dict[Any, int]:
+        cache = self._cache
+        self._cache = defaultdict(int)
+        return cache
+
+    def get(self, view) -> int:
+        return self._cache.get(view, 0)
+
+
+class ListCache:
+    def __init__(self):
+        self._cache = []
+
+    def add(self, item) -> int:
+        self._cache.append(item)
+        return len(self._cache)
+
+    def pick(self) -> list:
+        cache = self._cache
+        self._cache = []
+        return cache
+
+
+class SetCache:
+    def __init__(self):
+        self._cache = set()
+
+    def add(self, item) -> int:
+        self._cache.add(item)
+        return len(self._cache)
+
+    def pick(self) -> set:
+        cache = self._cache
+        self._cache = set()
+        return cache
+
+
+class DictCache:
+    def __init__(self):
+        self._cache = {}
+
+    def add(self, key, value) -> int:
+        self._cache[key] = value
+        return len(self._cache)
+
+    def pop(self, key):
+        return self._cache.pop(key, None)
+
+    def pick(self) -> dict:
+        cache = self._cache
+        self._cache = {}
+        return cache
