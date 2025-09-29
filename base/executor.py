@@ -92,9 +92,10 @@ class Executor:
                     item.run()
                 except Exception:
                     logging.exception(f'run error {self} {item}')
-                t = time.monotonic() - start
-                if t > self._slow_time:
-                    logging.warning(f'+ slow task {t} {self} {item}')
+                else:
+                    t = time.monotonic() - start
+                    if t > self._slow_time:
+                        logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
                 if self._unfinished == 0:
                     self._done.set()
