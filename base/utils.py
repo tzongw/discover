@@ -262,6 +262,10 @@ def flock(path):
     f = open(path, 'a+')
     try:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        f.truncate(0)
+        f.write(str(os.getpid()))
+        f.flush()
+        return f
     except BlockingIOError:
         f.seek(0)
         pid = f.readline()
@@ -270,11 +274,6 @@ def flock(path):
     except Exception:
         f.close()
         raise
-    f.seek(0)
-    f.truncate(0)
-    f.write(str(os.getpid()))
-    f.flush()
-    return f
 
 
 def diff_dict(after: dict, before: dict):
