@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # noinspection PyUnresolvedReferences
 from common.const import *
+from enum import IntEnum
 
 CTX_UID = 'uid'
 CTX_TOKEN = 'token'
@@ -10,12 +11,13 @@ ROOM = 'room'
 
 MAX_SESSIONS = 3
 
-# common status
-INIT = 0
-NORMAL = 0
 
-DISABLED = 0
-ENABLED = 1
+class ProcessStatus(IntEnum):
+    INIT = 0
+    FAIL = -1
+    SUCCESS = 1
 
-DELETED = -1
-BANNED = -2
+
+class SwitchStatus(IntEnum):
+    OFF = 0
+    ON = 1
