@@ -25,8 +25,6 @@ def rolling_update(running, all_yes):
     batch = 1
     while start_index < total:
         actions = ['y', 'NO', '<batch>']
-        if start_index:
-            actions += ['REST']
         prompt = '/'.join(actions)
         while True:
             print(f'restart {start_index + 1}/{total}, continue? ({prompt})')
@@ -42,10 +40,6 @@ def rolling_update(running, all_yes):
             if answer in actions and answer != '<batch>':
                 break
             print('unrecognized action')
-        if answer == 'REST':  # restart all rest
-            for info in running[start_index:]:
-                os.kill(info.pid, signal.SIGHUP)
-            exit(0)
         if answer == 'NO':
             print('user aborted')
             exit(0)
