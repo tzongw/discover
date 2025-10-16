@@ -22,6 +22,15 @@ class ProcessStatus(IntEnum):
     FAIL = -3
 
 
+ReviewStatus = (ProcessStatus.INIT, ProcessStatus.APPROVE, ProcessStatus.REJECT)
+ExecuteStatus = (ProcessStatus.INIT, ProcessStatus.PROCESSING, ProcessStatus.SUCCESS, ProcessStatus.FAIL)
+
+
 class SwitchStatus(IntEnum):
+    BAN = -1
     OFF = 0
     ON = 1
+    COND = 2
+
+
+ToggleStatus = (SwitchStatus.OFF, SwitchStatus.ON)
