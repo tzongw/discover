@@ -75,12 +75,12 @@ def sqlite_connect(conn, rec):
 if slow_log := options.slow_log:
     @event.listens_for(engine, 'before_cursor_execute')
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        context.query_start_time = time.monotonic()
+        context.query_begin_time = time.monotonic()
 
 
     @event.listens_for(engine, 'after_cursor_execute')
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        elapsed = time.monotonic() - context.query_start_time
+        elapsed = time.monotonic() - context.query_begin_time
         if elapsed > slow_log:
             logging.warning(f'elapsed: {elapsed:.2f}s slow query: {statement} parameters: {parameters}\n' +
                             ''.join(traceback.format_stack()))
