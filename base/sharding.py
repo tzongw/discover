@@ -77,7 +77,7 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 class ShardingReceiver(Receiver):
     def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=32):
-        super().__init__(redis, group, consumer, workers, dispatcher=NormalizedDispatcher)
+        super().__init__(redis, group, consumer, workers, dispatcher_cls=NormalizedDispatcher)
         self._sharding = Sharding(shards=len(redis.get_primaries()))
 
     def start(self):

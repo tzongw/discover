@@ -52,14 +52,16 @@ class ProtoDispatcher(Dispatcher):
 
 
 class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, workers=32, dispatcher=ProtoDispatcher):
+    def __init__(self, redis: Redis, group: str, consumer: str, workers=32, dispatcher_cls=ProtoDispatcher):
         self.redis = redis
         self._group = group
         self._consumer = consumer
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = True
         self._workers = workers
-        self._dispatcher = dispatcher(executor=Executor(max_workers=workers, queue_size=1, name='receiver'))
+        executor = Executor(max_workers=workers, queue_size=1, name='receiver')
+        self.join = executor.join
+        self._dispatcher = dispatcher_cls(executor=executor)
 
         @self._dispatcher(self._waker)
         def _wakeup(data, sid):
