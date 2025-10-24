@@ -142,16 +142,19 @@ def async_worker(f):
 
 
 def _sig_handler(sig, frame):
-    def graceful_exit():
-        logging.info(f'exit {sig}')
-        _cleanup()
-        if sig == signal.SIGUSR1 or not status.sysexit:
-            return
-        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
-        gevent.sleep(seconds)  # wait for requests & messages
-        sys.exit(0)
+    logging.info(f'received signal {sig}')
+    if status.exiting:  # signal again
+        if sig == signal.SIGINT:
+            sys.exit(1)
+    else:
+        def graceful_exit():
+            _cleanup()
+            if sig == signal.SIGUSR1 or not status.sysexit:
+                return
+            seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
+            gevent.sleep(seconds)  # wait for requests & messages
+            sys.exit(0)
 
-    if not status.exiting:
         status.exiting = True
         gevent.spawn(graceful_exit)
 
