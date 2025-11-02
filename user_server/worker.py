@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from config import define, options, ctx
 import gevent
-from base import base62
+from base import Base62
 from base import WaitGroup
 import shared
 
@@ -10,7 +10,7 @@ define('slow_time', 60, int, 'time threshold for slow task')
 
 
 def handle_task(task):
-    ctx.trace = base62.encode(shared.id_generator.gen())
+    ctx.trace = Base62.encode(shared.id_generator.gen())
     shared.heavy_task.exec(task)
 
 

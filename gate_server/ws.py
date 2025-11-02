@@ -9,7 +9,7 @@ import gevent
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
-from base.utils import base62
+from base.utils import Base62
 from base.sharding import ShardingDict, ShardingSet
 import shared
 import const
@@ -145,7 +145,7 @@ def remove_from_group(client: Client, group):
 
 
 def client_serve(ws: WebSocket):
-    conn_id = base62.encode(shared.id_generator.gen())
+    conn_id = Base62.encode(shared.id_generator.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
     environ = ws.environ

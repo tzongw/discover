@@ -17,7 +17,7 @@ from base import Dispatcher, TimeDispatcher
 from base.utils import create_redis
 from base.sharding import Sharding, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
     ShardingZTimer
-from base import func_desc, base62, once
+from base import func_desc, Base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
@@ -119,7 +119,7 @@ def _cleanup():  # call once
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = base62.encode(id_generator.gen())
+        ctx.trace = Base62.encode(id_generator.gen())
         start = time.monotonic()
         with LogSuppress():
             f(*args, **kwargs)

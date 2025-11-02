@@ -21,7 +21,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Co
 import models
 from base import singleflight
 from base.poller import PollStatus
-from base.utils import base62, salt_hash, LogSuppress
+from base.utils import Base62, salt_hash, LogSuppress
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
@@ -49,7 +49,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = base62.encode(id_generator.gen())
+    ctx.trace = Base62.encode(id_generator.gen())
 
 
 @async_task

@@ -195,7 +195,7 @@ class PascalCaseDict(dict):
         return super().__getitem__(item)
 
 
-class base62:
+class Base62:
     charset = string.digits + string.ascii_uppercase + string.ascii_lowercase
     base = 62
     mapping = {c: index for index, c in enumerate(charset)}
@@ -223,7 +223,7 @@ class base62:
         return ''.join(choice(cls.charset) for _ in range(n))
 
 
-class base36(base62):
+class Base36(Base62):
     charset = string.digits + string.ascii_uppercase
     base = 36
     mapping = {c: index for index, c in enumerate(charset)}

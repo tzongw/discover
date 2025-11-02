@@ -21,7 +21,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import base62, diff_dict
+from .utils import Base62, diff_dict
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -195,7 +195,7 @@ class RedisCacheMixin(CacheMixin):
     def make_key(cls, key):
         v = cls.__fields_version__
         if v is None:
-            v = cls.__fields_version__ = base62.encode(crc32(' '.join(cls._fields).encode()))
+            v = cls.__fields_version__ = Base62.encode(crc32(' '.join(cls._fields).encode()))
         return f'{cls.__name__}:{v}:{cls.id.to_python(key)}'
 
     def invalidate(self, invalidator: Invalidator):
