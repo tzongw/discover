@@ -17,7 +17,7 @@ from setproctitle import setproctitle
 from pydantic import BaseModel
 from service.timer import Processor
 from service.timeout import Client
-from base.scheduler import PeriodicCallback
+from base.scheduler import Handle
 from base.service import Service
 from base import LogSuppress, batched
 from base.utils import DefaultDict
@@ -37,7 +37,7 @@ class Info(BaseModel):
 @dataclass
 class Timer:
     info: Info
-    cancel: Callable
+    handle: Handle
 
 
 class Handler:
@@ -87,9 +87,9 @@ class Handler:
             self._delete_timer(service, key)
             self._fire_timer(service, key, data)
 
-        handle = shared.scheduler.call_at(callback, deadline)
         self._delete_timer(service, key)
-        self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
+        handle = shared.scheduler.call_at(callback, deadline)
+        self._timers[full_key] = Timer(info=info, handle=handle)
 
     def call_repeat(self, service, key, data, interval):
         assert interval > 0
@@ -99,9 +99,9 @@ class Handler:
         old_info = shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
-        pc = PeriodicCallback(shared.scheduler, lambda: self._fire_timer(service, key, data), interval)
         self._delete_timer(service, key)
-        self._timers[full_key] = Timer(info=info, cancel=pc.stop)
+        handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
+        self._timers[full_key] = Timer(info=info, handle=handle)
 
     def remove_timer(self, service, key):
         logging.debug(f'{service} {key}')
@@ -115,7 +115,7 @@ class Handler:
         full_key = self._full_key(service, key)
         if timer := self._timers.pop(full_key, None):
             logging.debug(f'delete {full_key}')
-            timer.cancel()
+            timer.handle.cancel()
 
     @staticmethod
     def _rpc_delete(info: Info):
@@ -129,7 +129,7 @@ class Handler:
         while self._timers and addr in shared.timer_service.addresses():
             full_key, timer = self._timers.popitem()
             logging.debug(f'retreating timer: {full_key}')
-            timer.cancel()
+            timer.handle.cancel()
             info = timer.info
             with LogSuppress():
                 shared.redis.delete(full_key)

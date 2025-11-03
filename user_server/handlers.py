@@ -4,7 +4,6 @@ import logging
 import const
 from datetime import timedelta, datetime
 from base import LogSuppress
-from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
 from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
     time_dispatcher, async_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
@@ -97,8 +96,8 @@ def init():
         if options.tick_timer:
             ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
             at_exit(lambda: ztimer.kill(const.TICK_TIMER))
-        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
-        at_exit(pc.stop)
+        handle = scheduler.call_repeat(poll_timeouts, timedelta(seconds=1))
+        at_exit(handle.cancel)
     elif options.init_timer == 'task':
         oneshot_id = 'timer:oneshot'
         timer.create(oneshot_id, Alarm(tip='oneshot'), timedelta(seconds=2))
