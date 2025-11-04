@@ -39,6 +39,7 @@ class CommitSession(Session):
         if exc_type is None:
             self.commit()
             executor.gather(self._defers)
+        self._defers.clear()
         return super().__exit__(exc_type, exc_val, exc_tb)
 
 
