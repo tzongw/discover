@@ -6,7 +6,7 @@ from config import options
 import time
 import atexit
 import logging
-from typing import Dict, Callable
+from typing import Dict
 from dataclasses import dataclass
 import gevent
 from thrift.transport import TSocket
