@@ -149,8 +149,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
     with Session() as session:
         order_by = build_order_by(tb, order_by)
         cond = build_condition(tb, kwargs)
-        query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
-        rows = [row.to_dict(exclude=[]) for row in query]
+        rows = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count).all()
         if cursor:
             total = -1
         elif len(rows) < count:
@@ -159,7 +158,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
             total = len(session.query(tb.id).filter(cond).limit(1000).all())
     return {
         'total': total,
-        'rows': rows,
+        'rows': [row.to_dict(exclude=[]) for row in rows],
         'cursor': '' if len(rows) < count or total == count else str(cursor + count),
     }
 
