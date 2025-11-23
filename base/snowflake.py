@@ -61,7 +61,7 @@ def from_datetime(dt: datetime):
     return make(timestamp_ms, 0, 0, 0)
 
 
-class IdGenerator:
+class Snowflake:
     def __init__(self, datacenter_id: int, worker_id: int):
         assert 0 <= datacenter_id < max_datacenter_id and 0 <= worker_id < max_worker_id
         self._datacenter_id = datacenter_id
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     print(local_datetime(t0))
     args = (t0, 12, 23, 34)
     assert melt(make(*args)) == args
-    g = IdGenerator(datacenter_id=1, worker_id=2)
+    g = Snowflake(datacenter_id=1, worker_id=2)
     for _ in range(1000):
         uid = g.gen()
         args = melt(uid)

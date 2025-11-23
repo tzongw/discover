@@ -10,7 +10,7 @@ define('slow_time', 60, int, 'time threshold for slow task')
 
 
 def handle_task(task):
-    ctx.trace = Base62.encode(shared.id_generator.gen())
+    ctx.trace = Base62.encode(shared.snowflake.gen())
     shared.heavy_task.exec(task)
 
 

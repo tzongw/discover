@@ -23,7 +23,7 @@ from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
 from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
 from config import options
-from shared import invalidator, id_generator, switch_tracer, executor
+from shared import invalidator, snowflake, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
 
 
@@ -114,7 +114,7 @@ def table(tb):
 class RowChange(BaseModel):
     __tablename__ = 'row_changes'
 
-    id = Column(Integer, primary_key=True, default=id_generator.gen)
+    id = Column(Integer, primary_key=True, default=snowflake.gen)
     table_name = Column(String, nullable=False)
     row_id = Column(Integer, nullable=False)
     diff = Column(JSON, nullable=False)
@@ -139,7 +139,7 @@ class Account(TableMixin, BaseModel):
     __include__ = ('id', 'create_time', 'age', 'last_active')
     __exclude__ = __readonly__ = ('hashed',)
 
-    id = Column(Integer, primary_key=True, default=id_generator.gen)
+    id = Column(Integer, primary_key=True, default=snowflake.gen)
     username = Column(String(40), unique=True, nullable=False)
     hashed = Column(String(40), nullable=False)
     age = Column(Integer, nullable=False, default=20, server_default='20')
@@ -209,7 +209,7 @@ class Change(Document):
         ]
     }
 
-    id = IntField(primary_key=True, default=id_generator.gen)
+    id = IntField(primary_key=True, default=snowflake.gen)
     coll_name = StringField(required=True)
     doc_id = DynamicField(required=True)
     diff = DictField(required=True)
@@ -262,7 +262,7 @@ class Profile(CacheMixin, Document):
     __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
-    id = IntField(primary_key=True, default=id_generator.gen)
+    id = IntField(primary_key=True, default=snowflake.gen)
     name = StringField(default='')
     addr = StringField(default='')
     rank = IntField()

@@ -35,7 +35,7 @@ redis = create_redis(options.redis)
 registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
-id_generator = snowflake.IdGenerator(options.datacenter, app_id)
+snowflake = snowflake.Snowflake(options.datacenter, app_id)
 hint = f'{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
@@ -119,7 +119,7 @@ def _cleanup():  # call once
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = Base62.encode(id_generator.gen())
+        ctx.trace = Base62.encode(snowflake.gen())
         start = time.monotonic()
         with LogSuppress():
             f(*args, **kwargs)

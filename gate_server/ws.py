@@ -145,7 +145,7 @@ def remove_from_group(client: Client, group):
 
 
 def client_serve(ws: WebSocket):
-    conn_id = Base62.encode(shared.id_generator.gen())
+    conn_id = Base62.encode(shared.snowflake.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
     environ = ws.environ
