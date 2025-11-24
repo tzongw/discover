@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from random import randrange
 
 # twitter's snowflake parameters
 twepoch = 1288834974657
@@ -67,19 +68,17 @@ class Snowflake:
         self._datacenter_id = datacenter_id
         self._worker_id = worker_id
         self._last_ms = 0
-        self._sequence_id = 0
+        self._sequence_id = randrange(max_sequence_id)
 
     def gen(self) -> int:
         cur_ms = time.time_ns() // 1_000_000
         if cur_ms < self._last_ms:  # clock backwards
             cur_ms = self._last_ms
-        if cur_ms == self._last_ms:
-            self._sequence_id += 1
-            if self._sequence_id >= max_sequence_id:
-                self._last_ms = cur_ms = cur_ms + 1  # borrow next ms
-                self._sequence_id = 0
-        else:
+        elif cur_ms > self._last_ms:
             self._last_ms = cur_ms
+        self._sequence_id += 1
+        if self._sequence_id >= max_sequence_id:
+            self._last_ms = cur_ms = cur_ms + 1  # borrow next ms
             self._sequence_id = 0
         return make(cur_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
@@ -90,7 +89,11 @@ if __name__ == '__main__':
     args = (t0, 12, 23, 34)
     assert melt(make(*args)) == args
     g = Snowflake(datacenter_id=1, worker_id=2)
+    last_uid = 0
     for _ in range(1000):
         uid = g.gen()
+        assert uid > last_uid
+        last_uid = uid
         args = melt(uid)
         print(uid, local_datetime(args[0]), args)
+        # time.sleep(0.001)
