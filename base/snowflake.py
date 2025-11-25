@@ -72,7 +72,7 @@ class Snowflake:
 
     def gen(self) -> int:
         cur_ms = time.time_ns() // 1_000_000
-        if cur_ms < self._last_ms:  # clock backwards
+        if cur_ms < self._last_ms:  # ms borrowed or clock backwards
             cur_ms = self._last_ms
         elif cur_ms > self._last_ms:
             self._last_ms = cur_ms
