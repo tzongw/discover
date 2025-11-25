@@ -133,8 +133,8 @@ class Client:
             self.context.pop(key, None)
 
 
-clients = ShardingDict[str, Client](shards=64)
-groups = defaultdict(lambda: ShardingSet(shards=8))  # type: dict[str, ShardingSet[Client]]
+clients = ShardingDict[str, Client](shards=256)
+groups = defaultdict(lambda: ShardingSet(shards=32))  # type: dict[str, ShardingSet[Client]]
 
 
 def remove_from_group(client: Client, group):
