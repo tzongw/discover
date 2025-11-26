@@ -7,6 +7,7 @@ from urllib import parse
 from collections import defaultdict
 import gevent
 from gevent import pywsgi
+from gevent.queue import Queue
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
 from base.utils import Base62
@@ -61,30 +62,26 @@ WebSocket.handle_ping = handle_ping
 
 
 class Client:
-    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
+    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'step']
     PONG_MESSAGE = object()
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
         self.context = {}
         self.ws = ws
-        self.messages = []
+        self.messages = Queue()
         self.groups = set()
-        self.writing = False
         self.step = 0
 
     def __str__(self):
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
-        self.messages.append(message)
-        if self.writing:
-            return
-        self.writing = True
-        gevent.spawn(self._writer)
+        self.messages.put_nowait(message)
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
+        gevent.spawn(self._writer)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
             with shared.user_service.client(addr) as client:
@@ -105,22 +102,17 @@ class Client:
             client.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
-        assert self.writing
         try:
-            while self.messages:
-                messages = self.messages
-                self.messages = []
-                for message in messages:
-                    if message is None:
-                        raise StopIteration
-                    elif message is self.PONG_MESSAGE:
-                        self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
-                    else:
-                        self.ws.send(message)
-            else:
-                self.writing = False
+            while True:
+                message = self.messages.get()
+                if message is None:
+                    raise StopIteration
+                elif message is self.PONG_MESSAGE:
+                    self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
+                else:
+                    self.ws.send(message)
         except Exception:
-            self.ws.close()  # keep writing status true
+            self.ws.close()
 
     def stop(self):
         self.send(None)
