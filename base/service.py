@@ -61,7 +61,7 @@ class Service:
         for removing in holding - available:
             logging.info(f'clean {self._name} {removing}')
             pool = self._pools.pop(removing)
-            pool.close_all()
+            pool.shutdown()
 
     def _update_addresses(self):
         self._clean_pools()

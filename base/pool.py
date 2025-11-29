@@ -24,8 +24,11 @@ class Pool(metaclass=abc.ABCMeta):
     def biz_exception(e: Exception):
         return False
 
-    def close_all(self):
+    def shutdown(self):
         self._maxsize = 0  # _return_conn will close using conns
+        self.reset()
+
+    def reset(self):
         while self._idle.qsize():
             conn = self._idle.get_nowait()
             with LogSuppress():
