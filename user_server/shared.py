@@ -101,3 +101,8 @@ if options.tick_timer:
     def on_tick(_, sid):
         ts = int(sid[:-2])
         time_dispatcher.dispatch_tick(ts)
+
+
+def delay_delete(op):
+    for delay in [1, 3, 10]:
+        scheduler.call_later(op, delay)
