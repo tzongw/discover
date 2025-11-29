@@ -7,6 +7,7 @@ import bisect
 import hashlib
 import contextlib
 from binascii import crc32
+from datetime import timedelta
 from random import choice
 from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
@@ -114,6 +115,22 @@ class SlidingWindow:
         self._counters[cur_tick % self._windows] += count
         self._last_tick = cur_tick
         return count
+
+
+class Limiter:
+    def __init__(self, redis: Redis | RedisCluster, limit: int, expire: timedelta):
+        self._redis = redis
+        self._limit = limit
+        self._expire = expire
+
+    def can_pass(self, key):
+        with self._redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, self._expire, nx=True)
+            count = pipe.execute()[0]
+        if count == self._limit:
+            logging.warning(f'{key} reach limit {self._limit}')
+        return count <= self._limit
 
 
 @lru_cache(maxsize=None)
