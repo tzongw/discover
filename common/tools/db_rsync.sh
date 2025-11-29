@@ -13,6 +13,7 @@ if [[ $(uname -s) == "Darwin" ]]; then
 else
   stat_arg='-c%Y'
   date_arg='-d'
+  date_prefix='@'
 fi
 
 last_ts=
@@ -20,7 +21,7 @@ while true; do
     ts=$(stat "$stat_arg" "$wal_file")
     if [[ "$ts" != "$last_ts" ]]; then
       last_ts="$ts"
-      echo "ts change", $(date "$date_arg" "$ts")
+      echo "ts change", $(date "$date_arg" "${date_prefix}${ts}")
       # sqlite3-rsync "$db_file" "$remote_file"
     else
       sleep 0.1
