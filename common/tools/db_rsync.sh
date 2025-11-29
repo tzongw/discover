@@ -17,6 +17,7 @@ last_ts=
 while true; do
     if [[ ! -f "$wal_file" ]]; then
       sleep 1
+      continue
     fi
     ts=$(stat "$stat_arg" "$wal_file")
     if [[ "$ts" != "$last_ts" ]]; then
