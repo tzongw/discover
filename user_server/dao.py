@@ -70,6 +70,7 @@ def sqlite_connect(conn, rec):
     cur.execute('PRAGMA journal_mode = WAL')
     cur.execute('PRAGMA synchronous = NORMAL')
     cur.execute('PRAGMA temp_store = MEMORY')
+    # cur.execute('PRAGMA query_only = ON')
     cur.close()
 
 
