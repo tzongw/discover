@@ -20,13 +20,15 @@ while true; do
       continue
     fi
     ts=$(stat "$stat_arg" "$wal_file")
-    if [[ "$ts" != "$last_ts" ]]; then
-      last_ts="$ts"
-      echo "ts change: $ts"
-      if ! sqlite3-rsync "$db_file" "$remote_file"; then
-        sleep 1
-      fi
-    else
+    if [[ "$ts" == "$last_ts" ]]; then
       sleep 0.1
+      continue
+    fi
+    echo "ts changed: $last_ts -> $ts"
+    if sqlite3-rsync "$db_file" "$remote_file"; then
+      last_ts="$ts"
+    else
+      echo "rsync fail: $last_ts -> $ts"
+      sleep 1
     fi
 done
