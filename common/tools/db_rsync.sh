@@ -23,9 +23,9 @@ while true; do
     if [[ "$ts" != "$last_ts" ]]; then
       last_ts="$ts"
       echo "ts change: $ts"
-#      if ! sqlite3-rsync "$db_file" "$remote_file"; then
-#        sleep 1
-#      fi
+      if ! sqlite3-rsync "$db_file" "$remote_file"; then
+        sleep 1
+      fi
     else
       sleep 0.1
     fi
