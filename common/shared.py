@@ -87,7 +87,7 @@ def at_main(func):
     return func
 
 
-def at_exit(func):
+def to_exit(func):
     assert callable(func) and not status.exiting
     _exits.append(func)
     return func

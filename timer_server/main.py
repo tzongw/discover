@@ -178,7 +178,7 @@ def main():
     shared.init_main()
     shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     handler.load_timers()
-    shared.at_exit(handler.retreat_timers)
+    shared.to_exit(handler.retreat_timers)
     atexit.register(handler.retreat_timers)  # double check
     gevent.joinall(workers, raise_error=True)
 
