@@ -19,6 +19,9 @@ class Manager:
     def handle(self, key, *args, **kwargs):
         return self._handlers[key](*args, **kwargs)
 
+    def can_handle(self, key):
+        return key in self._handlers
+
     def __call__(self, key):
         def decorator(f):
             assert key not in self._handlers
