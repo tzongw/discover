@@ -72,15 +72,16 @@ class Snowflake:
 
     def gen(self) -> int:
         cur_ms = time.time_ns() // 1_000_000
-        if cur_ms < self._last_ms:  # ms borrowed or clock backwards
-            cur_ms = self._last_ms
-        elif cur_ms > self._last_ms:
+        new_ms = False
+        if cur_ms > self._last_ms:
             self._last_ms = cur_ms
+            new_ms = True
         self._sequence_id += 1
         if self._sequence_id >= max_sequence_id:
-            self._last_ms = cur_ms = cur_ms + 1  # borrow next ms
             self._sequence_id = 0
-        return make(cur_ms, self._datacenter_id, self._worker_id, self._sequence_id)
+            if not new_ms:  # borrow next ms, gen always increase
+                self._last_ms += 1
+        return make(self._last_ms, self._datacenter_id, self._worker_id, self._sequence_id)
 
 
 if __name__ == '__main__':
