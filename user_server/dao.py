@@ -6,7 +6,6 @@ from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
 from typing import Type, Self, ContextManager
 from contextlib import contextmanager
-from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
@@ -44,13 +43,9 @@ class CommitSession(Session):
 
 
 class SessionMaker(sessionmaker):
-    def __init__(self, bind, **kwargs):
-        super().__init__(bind, **kwargs)
-        self.tx_lock = RLock()
-
     @contextmanager
     def transaction(self, readonly=False) -> ContextManager[CommitSession]:
-        with self.tx_lock, self() as session, session.begin(), switch_tracer:
+        with self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN' if readonly else 'BEGIN IMMEDIATE')
             yield session
             assert readonly or not switch_tracer.is_switched(), 'transaction switched'
