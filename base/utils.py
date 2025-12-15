@@ -266,9 +266,9 @@ def create_redis(addr: str):
         return Redis.from_url(f'{proto}://{addr}', decode_responses=True)
 
 
-def string_hash64(s: str):
-    digest = hashlib.md5(s.encode()).digest()
-    return int.from_bytes(digest[:8], signed=True)
+def string_hash(s: str):
+    h = hashlib.blake2b(s.encode(), digest_size=8)
+    return int.from_bytes(h.digest(), signed=True)
 
 
 def salt_hash(value, *, salt):
