@@ -67,9 +67,9 @@ if __name__ == '__main__':
         global last_id
         if last_id >= 10:
             return
-        print('loading', last_id)
         values = range(last_id, min(last_id + 3, 10))
         last_id += 3
+        print('loading', last_id, values)
         return values
 
 
