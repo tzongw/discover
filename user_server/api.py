@@ -426,6 +426,7 @@ def login(username: str, password: str):
         if account is None:  # register
             account = Account(username=username, hashed=hash_password(password))
             session.add(account)  # username unique index
+            session.defer(lambda: dispatcher.signal(account))
         elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
     flask.session[CTX_UID] = account.id
