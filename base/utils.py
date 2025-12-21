@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
 from inspect import signature, Parameter
 from typing import Callable, Type, Union, Iterable, Any
+import bcrypt
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 import gevent
@@ -195,6 +196,18 @@ def native_worker(f):
     return wrapper
 
 
+@native_worker
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode(), salt)
+    return hashed.decode()
+
+
+@native_worker
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+
 class DefaultDict(defaultdict):
     def __missing__(self, key):
         if not self.default_factory:
@@ -269,10 +282,6 @@ def create_redis(addr: str):
 def string_hash(s: str):
     h = hashlib.blake2b(s.encode(), digest_size=8)
     return int.from_bytes(h.digest(), signed=True)
-
-
-def salt_hash(value, *, salt):
-    return hashlib.sha1(f'{salt}{value}'.encode()).hexdigest()
 
 
 def flock(path):

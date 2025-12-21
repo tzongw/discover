@@ -20,7 +20,7 @@ from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Co
 import models
 from base import singleflight, create_parser
 from base.poller import PollStatus
-from base.utils import Base62, salt_hash, LogSuppress
+from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
@@ -421,14 +421,12 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    with Session.transaction() as session:
+    with Session() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
-            account = Account(username=username)
-            account.hashed = salt_hash(password, salt=account.id)
-            session.add(account)
-            dispatcher.signal(account)
-        elif account.hashed != salt_hash(password, salt=account.id):
+            account = Account(username=username, hashed=hash_password(password))
+            session.add(account)  # username unique index
+        elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())

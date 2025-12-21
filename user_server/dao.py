@@ -136,8 +136,8 @@ class Account(TableMixin, BaseModel):
     __exclude__ = __readonly__ = ('hashed',)
 
     id = Column(Integer, primary_key=True, default=snowflake.gen)
-    username = Column(String(40), unique=True, nullable=False)
-    hashed = Column(String(40), nullable=False)
+    username = Column(String, unique=True, nullable=False)
+    hashed = Column(String, nullable=False)
     age = Column(Integer, nullable=False, default=20, server_default='20')
     last_active = Column(DateTime, nullable=False, default=datetime.now)
 

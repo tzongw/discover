@@ -16,3 +16,4 @@ Werkzeug==3.0.6
 pymongo==4.6.3
 marshmallow==3.19.0
 alembic==1.13.3
+bcrypt==4.2.0
