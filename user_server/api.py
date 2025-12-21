@@ -11,7 +11,6 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
-from redis.commands.core import HashDataPersistOptions
 from sqlalchemy import Column
 from sqlalchemy.exc import OperationalError
 from webargs import fields
@@ -19,7 +18,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
-from base import singleflight
+from base import singleflight, create_parser
 from base.poller import PollStatus
 from base.utils import Base62, salt_hash, LogSuppress
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
@@ -437,19 +436,18 @@ def login(username: str, password: str):
     flask.session.permanent = True
     key = session_key(account.id)
     with redis.pipeline(transaction=True) as pipe:
-        pipe.hkeys(key)
-        session_id = salt_hash(token, salt=account.id)
-        pipe.hsetex(key, session_id, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime,
-                    data_persist_option=HashDataPersistOptions.FNX)
-        session_ids, added = pipe.execute()
-        assert added, 'session id conflicts'
-    if len(session_ids) >= MAX_SESSIONS:
-        ttls = {sid: ttl for sid, ttl in zip(session_ids, redis.httl(key, *session_ids))}
-        session_ids.sort(key=lambda x: ttls[x])
-        to_delete = session_ids[:len(session_ids) - MAX_SESSIONS + 1]
+        create_parser(pipe).hgetall(key, models.Session)
+        pipe.hsetex(key, token, models.Session(session_id=snowflake.gen()), ex=app.permanent_session_lifetime)
+        user_sessions: dict[str, models.Session] = pipe.execute()[0]
+    if len(user_sessions) >= MAX_SESSIONS:
+        tokens = user_sessions.keys()
+        ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
+        tokens = sorted(tokens, key=lambda x: ttls[x])
+        to_delete = tokens[:len(user_sessions) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
-        for sid in to_delete:  # normally, len(to_delete) == 1
-            push.kick(account.id, 'token expired', session_id=sid)
+        for token in to_delete:  # normally, len(to_delete) == 1
+            session_id = user_sessions[token].session_id
+            push.kick(account.id, 'token expired', session_id=session_id)
     return account
 
 
@@ -472,10 +470,10 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
         raise Unauthorized
-    session_id = salt_hash(token, salt=uid)
-    if session_id not in sessions.get(uid):
+    user_session = sessions.get(uid).get(token)
+    if not user_session:
         raise Unauthorized
-    g.uid, g.session_id = uid, session_id
+    g.uid, g.session_id = uid, user_session.session_id
     if uid in user_actives:
         return
     # refresh last active & token ttl
@@ -486,8 +484,7 @@ def authorize():
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    if redis.httl(key, session_id)[0] < 0.9 * ttl:
-        redis.hexpire(key, int(ttl), session_id)  # will invalidate local cache
+    redis.hexpire(key, int(ttl), token)
 
 
 @bp.route('/whoami')

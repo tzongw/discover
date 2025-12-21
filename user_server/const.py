@@ -9,7 +9,7 @@ CTX_GROUP = 'group'
 
 ROOM = 'room'
 
-MAX_SESSIONS = 3
+MAX_SESSIONS = 1
 
 
 class ProcessStatus(IntEnum):

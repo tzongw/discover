@@ -9,14 +9,13 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from base import create_parser
 from base import LogSuppress
-from base.utils import salt_hash
 import const
 from config import options
 from models import Online
 from service import user
 from common.messages import Connect, Disconnect
 import shared
-from shared import app, online_key, redis, dispatch_timeout
+from shared import app, online_key, redis, dispatch_timeout, sessions
 import push
 
 
@@ -31,9 +30,10 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            session_id = salt_hash(token, salt=uid)
-            if session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+            user_session = sessions.get(uid).get(token)
+            if not user_session:
                 raise ValueError('token error')
+            session_id = user_session.session_id
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
