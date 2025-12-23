@@ -59,9 +59,7 @@ class Receiver:
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = True
         self._workers = workers
-        executor = Executor(max_workers=workers, queue_size=1, name='receiver')
-        self.join = executor.join
-        self._dispatcher = dispatcher_cls(executor=executor)
+        self._dispatcher = dispatcher_cls(Executor(max_workers=workers, queue_size=1, name='receiver'))
 
         @self._dispatcher(self._waker)
         def _wakeup(data, sid):

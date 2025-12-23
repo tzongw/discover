@@ -101,7 +101,6 @@ def init_main():
 
 atexit.register(unique_id.stop)  # at last
 atexit.register(executor.join)  # wait tasks
-atexit.register(receiver.join)  # wait messages
 atexit.register(lambda: gevent.joinall(_workers))  # wait workers
 
 
