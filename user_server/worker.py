@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from config import define, options, ctx
 import gevent
 from base import Base62
 from base import WaitGroup
+from config import define, options, ctx
 import shared
 
 define('concurrency', 10, int, 'number of workers')
