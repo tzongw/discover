@@ -134,17 +134,18 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=100, query=None):
+    def batch_range(cls, field, *, start, stop, batch=100, query=None, only_id=False):
         if not isinstance(field, str):
             field = field.name
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
         q = Q(**query) if query else Q()
+        fields = {cls.id.name, field} if only_id else []
         while True:
             range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
-            docs = list(cls.objects(q, **range_query).order_by(order_by).limit(batch))
+            docs = list(cls.objects(q, **range_query).order_by(order_by).limit(batch).only(*fields))
             if not docs:
                 return
             last = docs[-1][field]
@@ -155,7 +156,7 @@ class DocumentMixin:
                 if doc[field] != last:
                     break
                 seen_ids.append(doc.id)
-            yield docs
+            yield [doc.id for doc in docs] if only_id else docs
 
 
 class CacheMixin(DocumentMixin):
@@ -370,7 +371,7 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=100, query=()):
+    def batch_range(cls, column, *, start, stop, batch=100, query=(), only_id=False):
         if isinstance(column, str):
             col = getattr(cls, column)
         else:
@@ -378,11 +379,12 @@ class TableMixin:
         asc = start < stop
         order_by = col.asc() if asc else col.desc()
         seen_ids = []
+        entities = {cls.id, col} if only_id else [cls]
         while True:
             with cls.Session() as session:
                 range_query = [col >= start, col < stop, cls.id.not_in(seen_ids)] if asc else \
                     [col <= start, col > stop, cls.id.not_in(seen_ids)]
-                rows = session.query(cls).filter(*query, *range_query).order_by(order_by).limit(batch).all()
+                rows = session.query(*entities).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
             last = getattr(rows[-1], column)
@@ -393,7 +395,7 @@ class TableMixin:
                 if getattr(row, column) != last:
                     break
                 seen_ids.append(row.id)
-            yield rows
+            yield [row.id for row in rows] if only_id else rows
 
 
 class SqlCacheMixin(TableMixin):
