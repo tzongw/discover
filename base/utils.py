@@ -284,10 +284,19 @@ def string_hash(s: str):
     return int.from_bytes(h.digest(), signed=True)
 
 
+def try_flock(path):
+    return _flock(path, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+@native_worker
 def flock(path):
+    return _flock(path, fcntl.LOCK_EX)
+
+
+def _flock(path, mode):
     f = open(path, 'a+')
     try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(f, mode)
         f.truncate(0)
         f.write(str(os.getpid()))
         f.flush()

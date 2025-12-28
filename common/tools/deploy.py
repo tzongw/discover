@@ -4,7 +4,7 @@ import sys
 import signal
 import subprocess
 from dataclasses import dataclass
-from base.utils import flock
+from base.utils import try_flock
 
 
 @dataclass
@@ -140,7 +140,7 @@ def main():
         raise RuntimeError('usage: python deploy.py [-y] <service>')
     all_yes = len(sys.argv) == 3
     service = sys.argv[-1]
-    with flock(f'deploy_{service}.lock'):
+    with try_flock(f'deploy_{service}.lock'):
         deploy(service, all_yes)
 
 
