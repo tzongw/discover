@@ -150,7 +150,7 @@ def _sig_handler(sig, frame):
             _cleanup()
             if sig == signal.SIGUSR1 or not status.sysexit:
                 return
-            seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
+            seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)
             gevent.sleep(seconds)  # wait for requests & messages
             sys.exit(0)
 
