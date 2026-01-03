@@ -59,7 +59,8 @@ class Receiver:
         self._waker = f'waker:{self._group}:{self._consumer}'
         self._stopped = True
         self._workers = workers
-        self._dispatcher = dispatcher_cls(Executor(max_workers=workers, queue_size=1, name='receiver'))
+        self._executor = Executor(max_workers=workers, queue_size=1, name='receiver')
+        self._dispatcher = dispatcher_cls(self._executor)
 
         @self._dispatcher(self._waker)
         def _wakeup(data, sid):
@@ -67,6 +68,9 @@ class Receiver:
 
     def __call__(self, key_or_cls, *, stream=None):
         return self._dispatcher(key_or_cls, stream=stream)
+
+    def join(self, timeout=None):
+        return self._executor.join(timeout)
 
     def start(self):
         logging.info(f'start {self._group} {self._consumer}')

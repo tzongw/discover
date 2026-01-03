@@ -107,12 +107,13 @@ class AsyncTask(_BaseTask):
         self.publisher.publish(task, stream=stream)
 
 
-class HeavyTask(_BaseTask):
-    class Priority(StrEnum):
-        HIGH = 'high'
-        DEFAULT = 'default'
-        LOW = 'low'
+class Priority(StrEnum):
+    HIGH = 'high'
+    DEFAULT = 'default'
+    LOW = 'low'
 
+
+class HeavyTask(_BaseTask):
     def __init__(self, redis: Redis | RedisCluster, biz: str):
         super().__init__()
         self.redis = redis
