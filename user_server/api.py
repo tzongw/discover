@@ -18,7 +18,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
-from base import singleflight, create_parser
+from base import singleflight, create_parser, CriticalSection, Priority
 from base.poller import PollStatus
 from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
@@ -27,7 +27,7 @@ from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, script, scheduler, exclusion
+from shared import session_key, async_task, heavy_task, script, scheduler
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -52,8 +52,8 @@ def init_trace():
 
 
 @async_task
-@heavy_task(priority=heavy_task.Priority.HIGH)
-@exclusion('lock:{message}', timedelta(seconds=30))
+@heavy_task(priority=Priority.HIGH)
+@CriticalSection(redis, 'lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')

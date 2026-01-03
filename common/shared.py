@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Union
 import gevent
 from redis import RedisCluster
-from base import Registry, LogSuppress, Exclusion, ZTimer
+from base import Registry, LogSuppress, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Publisher, Receiver, Timer
@@ -40,7 +40,6 @@ hint = f'{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
 invalidator = create_invalidator(redis)
-exclusion = Exclusion(redis)
 
 if isinstance(redis, RedisCluster):
     ztimer = ShardingZTimer(redis, app_name, sharding=Sharding(shards=3))

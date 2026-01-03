@@ -298,25 +298,25 @@ class TimeDeltaField(FloatField):
         return super().validate(value)
 
 
-class Exclusion:
-    def __init__(self, redis: Union[Redis, RedisCluster]):
+class CriticalSection:
+    def __init__(self, redis: Union[Redis, RedisCluster], pattern: str, timeout=timedelta(minutes=1)):
         self.redis = redis
+        self.pattern = pattern
+        self.timeout = timeout
 
-    def __call__(self, pattern: str, timeout=timedelta(minutes=1)):
-        def decorator(f):
-            params = signature(f).parameters
-            names = {index: param.name for index, param in enumerate(params.values())}
+    def __call__(self, f):
+        params = signature(f).parameters
+        names = {index: param.name for index, param in enumerate(params.values())}
 
-            @wraps(f)
-            def wrapper(*args, **kwargs):
-                values = {names[index]: value for index, value in enumerate(args)}
-                key = pattern.format(*args, **values, **kwargs)
-                with contextlib.suppress(LockError), Lock(self.redis, key, timeout.total_seconds(), blocking=False):
-                    f(*args, **kwargs)
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            values = {names[index]: value for index, value in enumerate(args)}
+            key = self.pattern.format(*args, **values, **kwargs)
+            lock = Lock(self.redis, key, self.timeout.total_seconds(), blocking=False)
+            with contextlib.suppress(LockError), lock:
+                f(*args, **kwargs)
 
-            return wrapper
-
-        return decorator
+        return wrapper
 
 
 class PrimaryKey:

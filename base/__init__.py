@@ -6,7 +6,7 @@ from yaml.representer import SafeRepresenter
 from yaml.constructor import SafeConstructor
 from pydantic import BaseModel
 from .utils import LogSuppress, Addr, ip_address, stream_name, Base62, func_desc
-from .misc import ListConverter, Exclusion
+from .misc import ListConverter, CriticalSection
 from .singleflight import Singleflight, singleflight, once
 from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, Snowflake
@@ -24,7 +24,7 @@ from .service import Service
 from .timer import Timer
 from .unique import UniqueId
 from .cache import Cache, TtlCache, FullCache, FullTtlCache
-from .task import AsyncTask, HeavyTask
+from .task import AsyncTask, HeavyTask, Priority
 from .poller import Poller
 from .redis_script import Script
 from .ztimer import ZTimer
