@@ -166,7 +166,7 @@ class HeavyTask(_BaseTask):
             pipe.execute()
 
     def _run(self, exec_func, key, waker):
-        queues = [f'{key}:{priority}' for priority in self.Priority] + [waker]
+        queues = [f'{key}:{priority}' for priority in Priority] + [waker]
         while not self._stopped:
             try:
                 r = self.redis.blpop(queues)
