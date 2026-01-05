@@ -1,3 +1,4 @@
+import gc
 import sys
 import time
 import signal
@@ -96,6 +97,11 @@ def init_main():
     assert not status.inited
     status.inited = True
     executor.gather(_mains)
+    # optimize gc STW
+    start = time.monotonic()
+    gc.collect()
+    gc.freeze()
+    logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.monotonic() - start}')
 
 
 atexit.register(unique_id.stop)  # at last
