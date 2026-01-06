@@ -23,7 +23,7 @@ class Task(BaseModel):
     kwargs: str = dumps({})
 
 
-@dataclass
+@dataclass(frozen=True)
 class Info:
     remaining: timedelta
     interval: timedelta

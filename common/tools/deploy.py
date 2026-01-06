@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from base.utils import try_flock
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProcessInfo:
     name: str
     status: str

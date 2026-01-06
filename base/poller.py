@@ -12,7 +12,7 @@ from .task import AsyncTask, Task
 from .utils import variadic_args
 
 
-@dataclass
+@dataclass(frozen=True)
 class Config:
     poll: Callable
     interval: timedelta

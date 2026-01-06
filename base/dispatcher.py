@@ -53,7 +53,7 @@ class Dispatcher:
         return decorator
 
 
-@dataclass
+@dataclass(frozen=True)
 class _Crontab:
     year: Union[None, int, Iterable]
     month: Union[None, int, Iterable]

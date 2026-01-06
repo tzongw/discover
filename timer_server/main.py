@@ -34,7 +34,7 @@ class Info(BaseModel):
     interval: float = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Timer:
     info: Info
     handle: Handle
