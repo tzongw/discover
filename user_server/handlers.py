@@ -5,7 +5,7 @@ import const
 from datetime import timedelta, datetime
 from base import LogSuppress
 from common.messages import Connect, Disconnect, Alarm
-from shared import dispatcher, receiver, timer_service, to_exit, timer, invalidator, async_task, at_main, \
+from shared import dispatcher, consumer, timer_service, to_exit, timer, invalidator, async_task, at_main, \
     time_dispatcher, async_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
@@ -33,17 +33,17 @@ def on_register(account: Account):
     logging.info(f'{account}')
 
 
-@receiver(Connect)
+@consumer(Connect)
 def on_connect(data: Connect):
     logging.info(f'{data}')
 
 
-@receiver(Disconnect)
+@consumer(Disconnect)
 def on_disconnect(data: Disconnect):
     logging.info(f'{data}')
 
 
-@receiver(Alarm)
+@consumer(Alarm)
 def on_alarm(data: Alarm):
     logging.info(f'{data}')
 
@@ -106,7 +106,7 @@ def init():
         timer.create(loop_id, Alarm(tip='loop'), timedelta(seconds=8), loop=True)
         to_exit(lambda: timer.kill(loop_id))
         task_id = 'task:hello'
-        async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
+        async_task.create(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=3), loop=True)
         to_exit(lambda: async_task.cancel(task_id))
         logging.info(timer.info(oneshot_id))
         logging.info(timer.info(loop_id))

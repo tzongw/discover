@@ -52,7 +52,7 @@ class Poller:
             lock = Lock(redis, key, timeout=timeout.total_seconds(), blocking=False)
             with ExitStack() as stack, suppress(LockError), lock:
                 status = PollStatus(config.poll(queue))
-                stack.callback(lambda: status == PollStatus.ASAP and async_task.publish(task))  # without lock
+                stack.callback(lambda: status == PollStatus.ASAP and async_task.post(task))  # without lock
                 if status != PollStatus.DONE:
                     return
                 logging.debug(f'no jobs, stop {group} {queue}')
@@ -61,7 +61,7 @@ class Poller:
                 status = PollStatus(config.poll(queue))  # double check
                 if status != PollStatus.DONE:  # race
                     logging.info(f'new jobs, restart {group} {queue}')
-                    async_task.post(task_id, task, config.interval, loop=True)
+                    async_task.create(task_id, task, config.interval, loop=True)
 
         self.poll_task = poll_task
 
@@ -75,8 +75,8 @@ class Poller:
             return
         config = self.configs[group]
         task = self.poll_task(group, queue)
-        if self.async_task.post(task_id, task, config.interval, loop=True):
-            self.async_task.publish(task)
+        if self.async_task.create(task_id, task, config.interval, loop=True):
+            self.async_task.post(task)
 
     def __call__(self, group: str, *, interval=timedelta(seconds=5), spawn=None):
         def decorator(poll):

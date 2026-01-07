@@ -27,7 +27,7 @@ def main():
     workers += shared.registry.start()
     workers += shared.invalidator.start()
     init_main()
-    workers += shared.receiver.start()
+    workers += shared.consumer.start()
     shared.registry.register({http_service: options.http_address, rpc_service: options.rpc_address})
     gevent.joinall(workers, raise_error=True)
 

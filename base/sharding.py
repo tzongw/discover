@@ -10,7 +10,7 @@ from typing import Union
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
-from .mq import Publisher, Receiver, ProtoDispatcher
+from .mq import Producer, Consumer, ProtoDispatcher
 from .utils import stream_name, CHash
 from .misc import Stock
 from .timer import Timer
@@ -58,15 +58,15 @@ class Sharding:
         return key[key.index(':') + 1:]
 
 
-class ShardingPublisher(Publisher):
+class ShardingProducer(Producer):
     def __init__(self, redis: Union[Redis, RedisCluster], *, maxlen=4096, hint=None):
         super().__init__(redis, maxlen=maxlen, hint=hint)
         self._sharding = Sharding(shards=len(redis.get_primaries()))
 
-    def publish(self, message: BaseModel, stream=None):
+    def post(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
         stream = self._sharding.random_sharded_key(stream)
-        return super().publish(message, stream)
+        return super().post(message, stream)
 
 
 class NormalizedDispatcher(ProtoDispatcher):
@@ -75,13 +75,13 @@ class NormalizedDispatcher(ProtoDispatcher):
         return super().dispatch(stream, *args, **kwargs)
 
 
-class ShardingReceiver(Receiver):
-    def __init__(self, redis: Union[Redis, RedisCluster], group: str, consumer: str, *, workers=32):
-        super().__init__(redis, group, consumer, workers, dispatcher_cls=NormalizedDispatcher)
+class ShardingConsumer(Consumer):
+    def __init__(self, redis: Union[Redis, RedisCluster], group: str, name: str, *, workers=32):
+        super().__init__(redis, group, name, workers, dispatcher_cls=NormalizedDispatcher)
         self._sharding = Sharding(shards=len(redis.get_primaries()))
 
     def start(self):
-        logging.info(f'start {self._group} {self._consumer}')
+        logging.info(f'start {self._group} {self._name}')
         self._stopped = False
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
@@ -96,7 +96,7 @@ class ShardingReceiver(Receiver):
     def stop(self):
         if self._stopped:
             return
-        logging.info(f'stop {self._group} {self._consumer}')
+        logging.info(f'stop {self._group} {self._name}')
         self._stopped = True
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
@@ -107,7 +107,7 @@ class ShardingReceiver(Receiver):
                 if stream == self._waker:  # already deleted
                     continue
                 for sharded_stream in self._sharding.all_sharded_keys(stream):
-                    pipe.xgroup_delconsumer(sharded_stream, self._group, self._consumer)
+                    pipe.xgroup_delconsumer(sharded_stream, self._group, self._name)
             pipe.execute()
 
 
@@ -199,22 +199,22 @@ class MigratingTimer(ShardingTimer):
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
 
-class MigratingReceiver(ShardingReceiver):
-    def __init__(self, redis, group: str, consumer: str, *, workers=32, old_receiver: Receiver):
-        assert old_receiver.redis is not redis, 'same redis, use ShardingReceiver instead'
-        super().__init__(redis, group, consumer, workers=workers)
-        self.old_receiver = old_receiver
+class MigratingProducer(ShardingConsumer):
+    def __init__(self, redis, group: str, name: str, *, workers=32, old_consumer: Consumer):
+        assert old_consumer.redis is not redis, 'same redis, use ShardingProducer instead'
+        super().__init__(redis, group, name, workers=workers)
+        self.old_consumer = old_consumer
 
     def start(self):
-        return self.old_receiver.start() + super().start()
+        return self.old_consumer.start() + super().start()
 
     def stop(self):
-        self.old_receiver.stop()
+        self.old_consumer.stop()
         super().stop()
 
     def __call__(self, key_or_cls, *, stream=None):
         def decorator(f):
-            self.old_receiver(key_or_cls, stream=stream)(f)
+            self.old_consumer(key_or_cls, stream=stream)(f)
             self._dispatcher(key_or_cls, stream=stream)(f)
             return f
 

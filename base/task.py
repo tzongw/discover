@@ -12,7 +12,7 @@ from redis import Redis, RedisCluster
 from pydantic import BaseModel
 from yaml import safe_dump as dumps
 from yaml import safe_load as loads
-from .mq import Receiver, Publisher
+from .mq import Consumer, Producer
 from .timer import Timer
 from .utils import variadic_args, func_desc, stream_name
 
@@ -52,12 +52,12 @@ class AsyncTask(_BaseTask):
     2. add new argument at the end and set a default value
     """
 
-    def __init__(self, timer: Timer, publisher: Publisher, receiver: Receiver):
-        assert timer.redis is publisher.redis is receiver.redis
+    def __init__(self, timer: Timer, producer: Producer, consumer: Consumer):
+        assert timer.redis is producer.redis is consumer.redis
         super().__init__()
         self.timer = timer
-        self.receiver = receiver
-        self.publisher = publisher
+        self.producer = producer
+        self.consumer = consumer
 
     @staticmethod
     def stream_name(task: Task):
@@ -68,7 +68,7 @@ class AsyncTask(_BaseTask):
         vf = self.paths[path]
         stream = self.stream_name(Task(path=path))
 
-        @self.receiver(Task, stream=stream)
+        @self.consumer(Task, stream=stream)
         def handler(task: Task):
             args = loads(task.args)
             kwargs = loads(task.kwargs)
@@ -84,7 +84,7 @@ class AsyncTask(_BaseTask):
         wrapper.__task_wrapped__ = f
         return wrapper
 
-    def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
+    def create(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
         stream = self.stream_name(task)
         return self.timer.create(task_id, task, interval, loop=loop, stream=stream)
 
@@ -102,9 +102,9 @@ class AsyncTask(_BaseTask):
                     interval=timedelta(milliseconds=res['interval']),
                     loop=res['loop'])
 
-    def publish(self, task):
+    def post(self, task):
         stream = self.stream_name(task)
-        self.publisher.publish(task, stream=stream)
+        self.producer.post(task, stream=stream)
 
 
 class Priority(StrEnum):

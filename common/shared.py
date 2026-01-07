@@ -12,11 +12,11 @@ from redis import RedisCluster
 from base import Registry, LogSuppress, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
-from base import Publisher, Receiver, Timer
+from base import Producer, Consumer, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.utils import create_redis
-from base.sharding import Sharding, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
+from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
     ShardingZTimer
 from base import func_desc, Base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
@@ -45,17 +45,17 @@ invalidator = create_invalidator(redis)
 if isinstance(redis, RedisCluster):
     ztimer = ShardingZTimer(redis, app_name, sharding=Sharding(shards=3))
     timer = ShardingTimer(redis, hint=hint, sharding=Sharding(shards=3, fixed_keys=[const.TICK_TIMER]))
-    publisher = ShardingPublisher(redis, hint=hint)
-    receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
+    producer = ShardingProducer(redis, hint=hint)
+    consumer = ShardingConsumer(redis, group=app_name, name=hint)
     heavy_task = ShardingHeavyTask(redis, app_name)
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
-    publisher = Publisher(redis, hint=hint)
-    receiver = Receiver(redis, group=app_name, consumer=hint)
+    producer = Producer(redis, hint=hint)
+    consumer = Consumer(redis, group=app_name, name=hint)
     heavy_task = HeavyTask(redis, app_name)
 
-async_task = AsyncTask(timer, publisher, receiver)
+async_task = AsyncTask(timer, producer, consumer)
 poller = Poller(redis, async_task)
 
 user_service = UserService(registry, const.RPC_USER, options.host)  # type: Union[UserService, service.user.Iface]
@@ -77,7 +77,7 @@ class Status:
 status = Status()
 _workers = set()  # thread workers
 _mains = []
-_exits = [registry.stop, receiver.stop, heavy_task.stop]
+_exits = [registry.stop, consumer.stop, heavy_task.stop]
 mercy = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)  # wait time for graceful exit
 
 
@@ -107,7 +107,7 @@ def init_main():
 @atexit.register
 def gracefully_exit():
     gevent.joinall(list(_workers))
-    receiver.join()
+    consumer.join()
     scheduler.join()
     executor.join()
     unique_id.stop()  # at last

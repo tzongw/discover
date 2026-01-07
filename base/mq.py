@@ -9,13 +9,13 @@ from .dispatcher import Dispatcher
 from .executor import Executor
 
 
-class Publisher:
+class Producer:
     def __init__(self, redis: Redis, *, maxlen=4096, hint=None):
         self.redis = redis
         self.hint = hint
         self.maxlen = maxlen
 
-    def publish(self, message: BaseModel, stream=None):
+    def post(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
         params = [stream, 'MAXLEN', '~', self.maxlen]
         if self.hint:
@@ -51,15 +51,15 @@ class ProtoDispatcher(Dispatcher):
         return decorator
 
 
-class Receiver:
-    def __init__(self, redis: Redis, group: str, consumer: str, workers=32, dispatcher_cls=ProtoDispatcher):
+class Consumer:
+    def __init__(self, redis: Redis, group: str, name: str, workers=32, dispatcher_cls=ProtoDispatcher):
         self.redis = redis
         self._group = group
-        self._consumer = consumer
-        self._waker = f'waker:{self._group}:{self._consumer}'
+        self._name = name
+        self._waker = f'waker:{self._group}:{self._name}'
         self._stopped = True
         self._workers = workers
-        self._executor = Executor(max_workers=workers, queue_size=1, name='receiver')
+        self._executor = Executor(max_workers=workers, queue_size=1, name=f'consumer:{name}')
         self._dispatcher = dispatcher_cls(self._executor)
 
         @self._dispatcher(self._waker)
@@ -73,7 +73,7 @@ class Receiver:
         return self._executor.join(timeout)
 
     def start(self):
-        logging.info(f'start {self._group} {self._consumer}')
+        logging.info(f'start {self._group} {self._name}')
         self._stopped = False
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
@@ -86,13 +86,13 @@ class Receiver:
     def stop(self):
         if self._stopped:
             return
-        logging.info(f'stop {self._group} {self._consumer}')
+        logging.info(f'stop {self._group} {self._name}')
         self._stopped = True
         streams = self._dispatcher.keys()
         with self.redis.pipeline(transaction=False) as pipe:
             pipe.xadd(self._waker, {'wake': 'up'})
             for stream in streams:
-                pipe.xgroup_delconsumer(stream, self._group, self._consumer)
+                pipe.xgroup_delconsumer(stream, self._group, self._name)
             pipe.delete(self._waker)
             pipe.execute()
 
@@ -101,11 +101,11 @@ class Receiver:
         count = self._workers * 2
         while not self._stopped:
             try:
-                result = self.redis.xreadgroup(self._group, self._consumer, streams, count=count, block=0, noack=True)
+                result = self.redis.xreadgroup(self._group, self._name, streams, count=count, block=0, noack=True)
                 for stream, messages in result:
                     for message in messages:
                         self._dispatcher.dispatch(stream, *message[::-1])
             except Exception:
                 logging.exception(f'')
                 gevent.sleep(1)
-        logging.info(f'receiver exit {streams.keys()}')
+        logging.info(f'consumer {self._name} exit {streams.keys()}')

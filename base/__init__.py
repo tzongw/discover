@@ -18,7 +18,7 @@ from .executor import Executor, WaitGroup
 from .dispatcher import Dispatcher, TimeDispatcher
 from .scheduler import Scheduler
 from .invalidator import create_invalidator, Invalidator
-from .mq import Receiver, Publisher
+from .mq import Consumer, Producer
 from .registry import Registry
 from .service import Service
 from .timer import Timer

@@ -97,7 +97,7 @@ def dispatch_timeout(full_key, data):
 
 
 if options.tick_timer:
-    @receiver(const.TICK_STREAM)
+    @consumer(const.TICK_STREAM)
     def on_tick(_, sid):
         ts = int(sid[:-2])
         time_dispatcher.dispatch_tick(ts)

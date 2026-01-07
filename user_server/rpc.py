@@ -60,7 +60,7 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            shared.publisher.publish(Connect(uid=uid))
+            shared.producer.post(Connect(uid=uid))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success: ping interval: {const.PING_INTERVAL}')
@@ -89,7 +89,7 @@ class Handler:
         key = online_key(uid)
         if redis.hdel(key, conn_id):
             logging.info(f'logout {uid} {conn_id}')
-            shared.publisher.publish(Disconnect(uid=uid))
+            shared.producer.post(Disconnect(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')
