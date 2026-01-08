@@ -77,7 +77,7 @@ def user_limiter(*, cooldown, threshold=1):
             try:
                 return f(*args, **kwargs)
             finally:
-                doing.discard(uid)
+                doing.remove(uid)
 
         return wrapper
 

@@ -131,7 +131,7 @@ def spawn_worker(f, *args, **kwargs):
         t = time.time() - start
         if t > 30:
             logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
-        _workers.discard(g)
+        _workers.remove(g)
 
     g = gevent.spawn(worker)
     _workers.add(g)
