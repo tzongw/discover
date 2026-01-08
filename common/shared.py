@@ -98,10 +98,10 @@ def init_main():
     status.inited = True
     executor.gather(_mains)
     # optimize gc STW
-    start = time.monotonic()
+    start = time.time()
     gc.collect()
     gc.freeze()
-    logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.monotonic() - start}')
+    logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
 atexit.register(unique_id.stop)  # at last
@@ -125,10 +125,10 @@ def _cleanup():  # call once
 def spawn_worker(f, *args, **kwargs):
     def worker():
         ctx.trace = Base62.encode(snowflake.gen())
-        start = time.monotonic()
+        start = time.time()
         with LogSuppress():
             f(*args, **kwargs)
-        t = time.monotonic() - start
+        t = time.time() - start
         if t > 30:
             logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
         _workers.discard(g)

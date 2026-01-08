@@ -46,7 +46,7 @@ class Service:
         except Exception as e:
             if not pool.biz_exception(e):
                 exists = address in self._cooldown
-                self._cooldown[address] = time.monotonic() + Registry.COOLDOWN
+                self._cooldown[address] = time.time() + Registry.COOLDOWN
                 if not exists:
                     logging.error(f'+ cool down {self._name} {address}')
                     interval = self._update_addresses()
@@ -65,7 +65,7 @@ class Service:
 
     def _update_addresses(self):
         self._clean_pools()
-        now = time.monotonic()
+        now = time.time()
         expired = [addr for addr, cd in self._cooldown.items() if cd <= now]
         if expired:
             logging.info(f'- cool down {self._name} {expired}')

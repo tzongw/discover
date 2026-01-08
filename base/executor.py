@@ -87,13 +87,13 @@ class Executor:
         try:
             while True:
                 item = self._items.get(timeout=self._idle_time)  # type: _WorkItem
-                start = time.monotonic()
+                start = time.time()
                 try:
                     item.run()
                 except Exception:
                     logging.exception(f'run error {self} {item}')
                 else:
-                    t = time.monotonic() - start
+                    t = time.time() - start
                     if t > self._slow_time:
                         logging.warning(f'+ slow task {t} {self} {item}')
                 self._unfinished -= 1
