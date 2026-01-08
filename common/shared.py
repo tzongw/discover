@@ -62,9 +62,6 @@ user_service = UserService(registry, const.RPC_USER, options.host)  # type: Unio
 gate_service = GateService(registry, const.RPC_GATE, options.host)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: Union[TimerService, service.timer.Iface]
 
-_exits = [registry.stop, receiver.stop, heavy_task.stop]
-_mains = []
-
 if options.env == const.Environment.DEV:
     # for debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
@@ -79,6 +76,9 @@ class Status:
 
 status = Status()
 _workers = set()  # thread workers
+_mains = []
+_exits = [registry.stop, receiver.stop, heavy_task.stop]
+mercy = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)  # wait time for graceful exit
 
 
 def at_main(func):
@@ -156,8 +156,7 @@ def _sig_handler(sig, frame):
             _cleanup()
             if sig == signal.SIGUSR1 or not status.sysexit:
                 return
-            seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)
-            gevent.sleep(seconds)  # wait for requests & messages
+            gevent.sleep(mercy)
             sys.exit(0)
 
         status.exiting = True
