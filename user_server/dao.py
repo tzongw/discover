@@ -35,9 +35,11 @@ class CommitSession(Session):
         self._defers.append(f)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None and self._transaction:  # not rollback
-            self.commit()
-            executor.gather(self._defers)
+        if exc_type is None:
+            if self._transaction:
+                self.commit()
+            for f in self._defers:
+                executor.submit(f)
         self._defers.clear()
         return super().__exit__(exc_type, exc_val, exc_tb)
 
