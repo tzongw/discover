@@ -129,6 +129,11 @@ class RowChange(BaseModel):
         return snapshot
 
 
+@event.listens_for(RowChange, 'after_insert')
+def after_insert(mapper, connection, target: RowChange):
+    logging.info(f'{target.table_name} {target.row_id} {target.diff}')
+
+
 @table
 class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
