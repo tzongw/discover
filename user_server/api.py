@@ -436,7 +436,8 @@ def login(username: str, password: str):
     key = session_key(account.id)
     with redis.pipeline(transaction=True) as pipe:
         create_parser(pipe).hgetall(key, models.Session)
-        pipe.hsetex(key, token, models.Session(session_id=snowflake.gen()), ex=app.permanent_session_lifetime)
+        user_session = models.Session(session_id=snowflake.gen(), create_time=datetime.now())
+        pipe.hsetex(key, token, user_session, ex=app.permanent_session_lifetime)
         user_sessions: dict[str, models.Session] = pipe.execute()[0]
     if len(user_sessions) >= MAX_SESSIONS:
         tokens = user_sessions.keys()

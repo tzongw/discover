@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class Session(BaseModel):
     session_id: int
+    create_time: datetime
 
 
 class Online(BaseModel):
