@@ -477,6 +477,12 @@ def build_condition(tb, params: dict):
             conditions.append(column.is_(None))
         elif op == 'not_null':
             conditions.append(column.is_not(None))
+        elif op == 'contains':
+            conditions.append(column.contains(value, autoescape=True))
+        elif op == 'icontains':
+            conditions.append(column.icontains(value, autoescape=True))
+        elif op == 'like':
+            conditions.append(column.like(value, escape='\\'))
         else:
             raise ValueError(f'`{op}` unrecognized operator')
     return and_(*conditions)
