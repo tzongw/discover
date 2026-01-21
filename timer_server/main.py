@@ -47,8 +47,10 @@ class Handler:
         self._timers = {}  # type: Dict[str, Timer]
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
+        self._loading = False
 
     def load_timers(self):
+        self._loading = True
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
             for info in shared.parser.mget_nonatomic(full_keys, Info):
                 if info is None or info.addr != options.rpc_address or \
@@ -60,6 +62,7 @@ class Handler:
                     self.call_repeat(info.service, info.key, info.data, info.interval)
                 else:
                     logging.error(f'invalid timer: {info}')
+        self._loading = False
 
     @classmethod
     def _full_key(cls, service, key):
@@ -79,7 +82,7 @@ class Handler:
         deadline = time.time() + delay
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
-        old_info = shared.parser.set(full_key, info, px=px, get=True)
+        old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
 
@@ -96,7 +99,7 @@ class Handler:
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
-        old_info = shared.parser.set(full_key, info, get=True)
+        old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
         self._delete_timer(service, key)
@@ -176,8 +179,8 @@ def main():
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     workers += shared.registry.start()
     shared.init_main()
-    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     handler.load_timers()
+    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     shared.to_exit(handler.retreat_timers)
     atexit.register(handler.retreat_timers)  # double check
     gevent.joinall(workers, raise_error=True)
