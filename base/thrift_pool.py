@@ -1,3 +1,4 @@
+import socket
 from thrift.Thrift import TException, TApplicationException
 from thrift.protocol import TBinaryProtocol
 from thrift.protocol.TProtocol import TProtocolException
@@ -20,6 +21,7 @@ class ThriftPool(Pool):
         transport = TTransport.TBufferedTransport(sock)
         protocol = TBinaryProtocol.TBinaryProtocol(transport)
         transport.open()
+        sock.handle.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         return protocol
 
     def close_conn(self, conn: TBinaryProtocol.TBinaryProtocol):
