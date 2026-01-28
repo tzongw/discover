@@ -436,7 +436,7 @@ def login(username: str, password: str):
     key = session_key(account.id)
     with redis.pipeline(transaction=True) as pipe:
         create_parser(pipe).hgetall(key, models.Session)
-        user_session = models.Session(session_id=snowflake.gen(), create_time=datetime.now())
+        user_session = models.Session(id=snowflake.gen(), create_time=datetime.now())
         pipe.hsetex(key, token, user_session, ex=app.permanent_session_lifetime)
         user_sessions: dict[str, models.Session] = pipe.execute()[0]
     if len(user_sessions) >= MAX_SESSIONS:
@@ -446,7 +446,7 @@ def login(username: str, password: str):
         to_delete = tokens[:len(user_sessions) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
         for token in to_delete:  # normally, len(to_delete) == 1
-            session_id = user_sessions[token].session_id
+            session_id = user_sessions[token].id
             push.kick(account.id, 'token expired', session_id=session_id)
     return account
 
@@ -473,7 +473,7 @@ def authorize():
     user_session = sessions.get(uid).get(token)
     if not user_session:
         raise Unauthorized
-    g.uid, g.session_id = uid, user_session.session_id
+    g.uid, g.session = uid, user_session
     if uid in user_actives:
         return
     # refresh last active & token ttl

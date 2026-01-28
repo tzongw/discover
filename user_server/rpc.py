@@ -33,7 +33,7 @@ class Handler:
             user_session = sessions.get(uid).get(token)
             if not user_session:
                 raise ValueError('token error')
-            session_id = user_session.session_id
+            session_id = user_session.id
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)

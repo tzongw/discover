@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class Session(BaseModel):
-    session_id: int
+    id: int
     create_time: datetime
 
 
