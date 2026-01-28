@@ -140,7 +140,7 @@ def after_insert(mapper, connection, target: RowChange):
 class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
-    __exclude__ = __readonly__ = ('hashed',)
+    __exclude__ = __protect__ = ('hashed',)
 
     id = Column(Integer, primary_key=True, default=snowflake.gen)
     username = Column(String, unique=True, nullable=False)

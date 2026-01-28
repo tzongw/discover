@@ -188,7 +188,7 @@ def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
     kwargs = build_operation(tb, kwargs)
     for key in kwargs:
-        if key == tb.id.name or key in tb.__readonly__:
+        if key == tb.id.name or key in tb.__protect__:
             raise Forbidden(key)
     convert_type(tb, kwargs)
     with Session() as session:
@@ -214,7 +214,7 @@ def delete_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
-    if column == tb.id.name or column in tb.__readonly__:
+    if column == tb.id.name or column in tb.__protect__:
         raise Forbidden(column)
     col = getattr(tb, column)  # type: Column
     row = tb.get(row_id, ensure=True)
@@ -333,7 +333,7 @@ def get_snapshot(collection: str, doc_id, change_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     for key in kwargs:
-        if key == coll.id.name or key in coll.__readonly__:
+        if key == coll.id.name or key in coll.__protect__:
             raise Forbidden(key)
     doc = coll.get(doc_id, ensure=True)
     origin = coll.from_json(doc.to_json())  # clone
@@ -361,7 +361,7 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    if field == coll.id.name or field in coll.__readonly__:
+    if field == coll.id.name or field in coll.__protect__:
         raise Forbidden(field)
     doc = coll.get(doc_id, ensure=True)
     rank = doc[field]
