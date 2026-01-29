@@ -161,15 +161,15 @@ class DocumentMixin:
 
 class CacheMixin(DocumentMixin):
     @classmethod
-    def make_key(cls, key):
-        return cls.id.to_python(key)
+    def make_key(cls, doc_id):
+        return cls.id.to_python(doc_id)
 
     def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)
 
     @classmethod
-    def bulk_invalidate(cls, invalidator: Invalidator, keys):
-        invalidator.publish(cls.__name__, *keys)
+    def bulk_invalidate(cls, invalidator: Invalidator, doc_ids):
+        invalidator.publish(cls.__name__, *doc_ids)
 
     @staticmethod
     def fields_expire(*fields):
@@ -193,19 +193,20 @@ class RedisCacheMixin(CacheMixin):
     __fields_version__: str = None
 
     @classmethod
-    def make_key(cls, key):
+    def make_key(cls, doc_id):
         v = cls.__fields_version__
         if v is None:
             v = cls.__fields_version__ = Base62.encode(crc32(' '.join(cls._fields).encode()))
-        return f'{cls.__name__}:{v}:{cls.id.to_python(key)}'
+        return f'{cls.__name__}:{v}:{cls.id.to_python(doc_id)}'
 
     def invalidate(self, invalidator: Invalidator):
         key = self.make_key(self.id)
         invalidator.redis.delete(key)
 
     @classmethod
-    def bulk_invalidate(cls, invalidator: Invalidator, keys):
-        invalidator.redis.delete(*[cls.make_key(key) for key in keys])
+    def bulk_invalidate(cls, invalidator: Invalidator, doc_ids):
+        keys = [cls.make_key(doc_id) for doc_id in doc_ids]
+        invalidator.redis.delete(*keys)
 
 
 class Semaphore:
@@ -400,15 +401,15 @@ class TableMixin:
 
 class SqlCacheMixin(TableMixin):
     @classmethod
-    def make_key(cls, key):
-        return cls.id.type.python_type(key)
+    def make_key(cls, row_id):
+        return cls.id.type.python_type(row_id)
 
     def invalidate(self, invalidator: Invalidator):
         invalidator.publish(self.__class__.__name__, self.id)
 
     @classmethod
-    def bulk_invalidate(cls, invalidator: Invalidator, keys):
-        invalidator.publish(cls.__name__, *keys)
+    def bulk_invalidate(cls, invalidator: Invalidator, row_ids):
+        invalidator.publish(cls.__name__, *row_ids)
 
     @staticmethod
     def columns_expire(*columns):
