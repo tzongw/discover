@@ -104,10 +104,13 @@ def init_main():
     logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-atexit.register(unique_id.stop)  # at last
-atexit.register(executor.join)  # wait tasks
-atexit.register(receiver.join)  # wait mq
-atexit.register(lambda: gevent.joinall(_workers))  # wait workers
+@atexit.register
+def gracefully_exit():
+    gevent.joinall(list(_workers))
+    receiver.join()
+    scheduler.join()
+    executor.join()
+    unique_id.stop()  # at last
 
 
 @atexit.register
@@ -152,7 +155,7 @@ def _sig_handler(sig, frame):
         if sig == signal.SIGINT:
             sys.exit(1)
     else:
-        def graceful_exit():
+        def sig_exit():
             _cleanup()
             if sig == signal.SIGUSR1 or not status.sysexit:
                 return
@@ -160,7 +163,7 @@ def _sig_handler(sig, frame):
             sys.exit(0)
 
         status.exiting = True
-        gevent.spawn(graceful_exit)
+        gevent.spawn(sig_exit)
 
 
 signal.signal(signal.SIGTERM, _sig_handler)

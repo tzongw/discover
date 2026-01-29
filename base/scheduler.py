@@ -59,7 +59,12 @@ class Scheduler:
         self._event = Event()
         self._executor = Executor(name='scheduler')
         self._handles = []  # type: List[Handle]
+        self._stopped = False
         gevent.spawn(self._run)
+
+    def join(self, timeout=None):
+        self._stopped = True
+        return self._executor.join(timeout)
 
     def call_later(self, callback: Callable, delay: Union[float, timedelta]) -> Handle:
         if isinstance(delay, timedelta):
@@ -88,7 +93,7 @@ class Scheduler:
         return proxy
 
     def _run(self):
-        while True:
+        while not self._stopped:
             now = time.time()
             while self._handles and self._handles[0].when <= now:
                 handle = heapq.heappop(self._handles)  # type: Handle
