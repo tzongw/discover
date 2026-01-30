@@ -26,9 +26,9 @@ class Pool(metaclass=abc.ABCMeta):
 
     def shutdown(self):
         self._maxsize = 0  # _return_conn will close using conns
-        self.reset()
+        self.reap_idle()
 
-    def reset(self):
+    def reap_idle(self):
         while self._idle.qsize():
             conn = self._idle.get_nowait()
             with LogSuppress():
