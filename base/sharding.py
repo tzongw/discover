@@ -199,7 +199,7 @@ class MigratingTimer(ShardingTimer):
         return super().tick(key, stream, interval, offset=offset, maxlen=maxlen)
 
 
-class MigratingProducer(ShardingConsumer):
+class MigratingConsumer(ShardingConsumer):
     def __init__(self, redis, group: str, name: str, *, workers=32, old_consumer: Consumer):
         assert old_consumer.redis is not redis, 'same redis, use ShardingProducer instead'
         super().__init__(redis, group, name, workers=workers)
