@@ -4,7 +4,7 @@ import uuid
 import functools
 from datetime import datetime, timedelta
 from collections import namedtuple, OrderedDict
-from typing import TypeVar, Optional, Generic, Callable, Sequence
+from typing import TypeVar, Generic, Callable, Sequence
 from redis import Redis, RedisCluster
 import gevent
 from . import utils
@@ -33,7 +33,7 @@ def expire_at(expire):
 class Cache(Singleflight[T]):
     # https://redis.io/docs/latest/develop/reference/client-side-caching/#avoiding-race-conditions
 
-    def __init__(self, *, get=None, mget=None, maxsize: Optional[int] = 4096, make_key=utils.make_key):
+    def __init__(self, *, get=None, mget=None, maxsize=4096, make_key=utils.make_key):
         super().__init__(get=get, mget=mget, make_key=make_key)
         self.lru = OrderedDict()
         self.maxsize = maxsize
@@ -82,14 +82,22 @@ class Cache(Singleflight[T]):
         made_key = self._make_key(key, *args, **kwargs)
         self.lru.pop(made_key, None)
 
-    def listen(self, invalidator: Invalidator, group: str):
-        @invalidator(group)
-        def invalidate(key: str):
-            self.invalids += 1
+    def invalidate_all(self):
+        self.invalids += 1
+        self.lru.clear()
+
+    def listen(self, invalidator: Invalidator, group: str, delay_policy=None):
+        def do_invalidate(key: str):
             if key:
-                self.lru.pop(self._make_key(key), None)
+                self.invalidate(key)
             else:
-                self.lru.clear()
+                self.invalidate_all()
+
+        @invalidator(group)
+        def on_invalidate(key: str):
+            do_invalidate(key)
+            if delay_policy:
+                delay_policy(lambda: do_invalidate(key))
 
 
 class TtlCache(Cache[T]):
@@ -182,13 +190,13 @@ class FullMixin(Generic[T]):
 
 
 class FullCache(FullMixin[T], Cache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_values):
+    def __init__(self, *, mget, maxsize=4096, make_key=utils.make_key, get_values):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_values=get_values)
 
 
 class FullTtlCache(FullMixin[T], TtlCache[T]):
-    def __init__(self, *, mget, maxsize: Optional[int] = 4096, make_key=utils.make_key, get_values):
+    def __init__(self, *, mget, maxsize=4096, make_key=utils.make_key, get_values):
         super(FullMixin, self).__init__(mget=mget, maxsize=maxsize, make_key=make_key)
         super().__init__(get_values=get_values)
 

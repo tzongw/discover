@@ -1,3 +1,4 @@
+import gc
 import sys
 import time
 import signal
@@ -8,16 +9,16 @@ from dataclasses import dataclass
 from typing import Union
 import gevent
 from redis import RedisCluster
-from base import Registry, LogSuppress, Exclusion, ZTimer
+from base import Registry, LogSuppress, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
-from base import Publisher, Receiver, Timer
+from base import Producer, Consumer, Timer
 from base import create_invalidator, create_parser
 from base import Dispatcher, TimeDispatcher
 from base.utils import create_redis
-from base.sharding import Sharding, ShardingTimer, ShardingReceiver, ShardingPublisher, ShardingHeavyTask, \
+from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
     ShardingZTimer
-from base import func_desc, base62, once
+from base import func_desc, Base62, once
 from base import AsyncTask, HeavyTask, Poller, Script
 import service
 from . import const
@@ -35,24 +36,23 @@ redis = create_redis(options.redis)
 registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)
 unique_id = UniqueId(redis)
 app_id = unique_id.gen(app_name, range(snowflake.max_worker_id))
-id_generator = snowflake.IdGenerator(options.datacenter, app_id)
+snowflake = snowflake.Snowflake(options.datacenter, app_id)
 hint = f'{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
 invalidator = create_invalidator(redis)
-exclusion = Exclusion(redis)
 
 if isinstance(redis, RedisCluster):
     ztimer = ShardingZTimer(redis, app_name, sharding=Sharding(shards=3))
     timer = ShardingTimer(redis, hint=hint, sharding=Sharding(shards=3, fixed_keys=[const.TICK_TIMER]))
-    publisher = ShardingPublisher(redis, hint=hint)
-    receiver = ShardingReceiver(redis, group=app_name, consumer=hint)
+    producer = ShardingProducer(redis, hint=hint)
+    consumer = ShardingConsumer(redis, group=app_name, name=hint)
     heavy_task = ShardingHeavyTask(redis, app_name)
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
-    publisher = Publisher(redis, hint=hint)
-    receiver = Receiver(redis, group=app_name, consumer=hint)
+    producer = Producer(redis, hint=hint)
+    consumer = Consumer(redis, group=app_name, name=hint)
     heavy_task = HeavyTask(redis, app_name)
 
 async_task = AsyncTask(ztimer, time_dispatcher)
@@ -61,9 +61,6 @@ poller = Poller(redis, async_task)
 user_service = UserService(registry, const.RPC_USER, options.host)  # type: Union[UserService, service.user.Iface]
 gate_service = GateService(registry, const.RPC_GATE, options.host)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: Union[TimerService, service.timer.Iface]
-
-_exits = [registry.stop, receiver.stop, heavy_task.stop]
-_mains = []
 
 if options.env == const.Environment.DEV:
     # for debug
@@ -79,6 +76,9 @@ class Status:
 
 status = Status()
 _workers = set()  # thread workers
+_mains = []
+_exits = [registry.stop, consumer.stop, heavy_task.stop]
+mercy = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)  # wait time for graceful exit
 
 
 def at_main(func):
@@ -87,7 +87,7 @@ def at_main(func):
     return func
 
 
-def at_exit(func):
+def to_exit(func):
     assert callable(func) and not status.exiting
     _exits.append(func)
     return func
@@ -97,11 +97,20 @@ def init_main():
     assert not status.inited
     status.inited = True
     executor.gather(_mains)
+    # optimize gc STW
+    start = time.time()
+    gc.collect()
+    gc.freeze()
+    logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-atexit.register(unique_id.stop)  # at last
-atexit.register(executor.join)  # wait all task done
-atexit.register(lambda: gevent.joinall(_workers))  # wait all thread workers
+@atexit.register
+def gracefully_exit():
+    gevent.joinall(list(_workers))
+    consumer.join()
+    scheduler.join()
+    executor.join()
+    unique_id.stop()  # at last
 
 
 @atexit.register
@@ -118,14 +127,14 @@ def _cleanup():  # call once
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = base62.encode(id_generator.gen())
-        start = time.monotonic()
+        ctx.trace = Base62.encode(snowflake.gen())
+        start = time.time()
         with LogSuppress():
             f(*args, **kwargs)
-        t = time.monotonic() - start
+        t = time.time() - start
         if t > 30:
             logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
-        _workers.discard(g)
+        _workers.remove(g)
 
     g = gevent.spawn(worker)
     _workers.add(g)
@@ -141,18 +150,20 @@ def async_worker(f):
 
 
 def _sig_handler(sig, frame):
-    def graceful_exit():
-        logging.info(f'exit {sig}')
-        _cleanup()
-        if sig == signal.SIGUSR1 or not status.sysexit:
-            return
-        seconds = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 20)
-        gevent.sleep(seconds)  # wait for requests & messages
-        sys.exit(0)
+    logging.info(f'received signal {sig}')
+    if status.exiting:  # signal again
+        if sig == signal.SIGINT:
+            sys.exit(1)
+    else:
+        def sig_exit():
+            _cleanup()
+            if sig == signal.SIGUSR1 or not status.sysexit:
+                return
+            gevent.sleep(mercy)
+            sys.exit(0)
 
-    if not status.exiting:
         status.exiting = True
-        gevent.spawn(graceful_exit)
+        gevent.spawn(sig_exit)
 
 
 signal.signal(signal.SIGTERM, _sig_handler)

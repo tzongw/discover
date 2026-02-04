@@ -23,7 +23,7 @@ class Task(BaseModel):
     kwargs: str = dumps({})
 
 
-@dataclass
+@dataclass(frozen=True)
 class Info:
     remaining: timedelta
     interval: timedelta
@@ -81,7 +81,7 @@ class AsyncTask(_BaseTask):
         wrapper.__task_wrapped__ = f
         return wrapper
 
-    def post(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
+    def create(self, task_id: str, task: Task, interval: timedelta, *, loop=False):
         key = self.timer_key(task_id)
         data = task.json(exclude_defaults=True)
         return self.ztimer.new(key, data, interval, loop=loop)
@@ -108,12 +108,13 @@ class AsyncTask(_BaseTask):
         self.ztimer.fire(key)
 
 
-class HeavyTask(_BaseTask):
-    class Priority(StrEnum):
-        HIGH = 'high'
-        DEFAULT = 'default'
-        LOW = 'low'
+class Priority(StrEnum):
+    HIGH = 'high'
+    DEFAULT = 'default'
+    LOW = 'low'
 
+
+class HeavyTask(_BaseTask):
     def __init__(self, redis: Redis | RedisCluster, biz: str):
         super().__init__()
         self.redis = redis
@@ -166,7 +167,7 @@ class HeavyTask(_BaseTask):
             pipe.execute()
 
     def _run(self, exec_func, key, waker):
-        queues = [f'{key}:{priority}' for priority in self.Priority] + [waker]
+        queues = [f'{key}:{priority}' for priority in Priority] + [waker]
         while not self._stopped:
             try:
                 r = self.redis.blpop(queues)

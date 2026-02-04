@@ -4,11 +4,12 @@ from pydantic import BaseModel
 
 
 class Session(BaseModel):
+    id: int
     create_time: datetime
 
 
 class Online(BaseModel):
-    session_id: str
+    session_id: int
     address: str
 
 

@@ -108,7 +108,9 @@ class Invalidator:
                         self.executor.submit(self._get_result, fut, full_key, group)
             except Exception:
                 logging.exception(f'')
-                pubsub = None
+                if pubsub:
+                    pubsub.reset()
+                    pubsub = None
                 gevent.sleep(1)
 
 

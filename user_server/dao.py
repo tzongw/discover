@@ -6,7 +6,6 @@ from enum import StrEnum, IntEnum
 from datetime import datetime, timedelta
 from typing import Type, Self, ContextManager
 from contextlib import contextmanager
-from gevent.lock import RLock
 from mongoengine import Document, IntField, StringField, connect, DateTimeField, EnumField, \
     EmbeddedDocument, ListField, EmbeddedDocumentListField, BooleanField, DictField, DynamicField
 from pymongo import monitoring
@@ -23,7 +22,7 @@ from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
 from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
 from config import options
-from shared import invalidator, id_generator, switch_tracer, executor
+from shared import invalidator, snowflake, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
 
 
@@ -37,19 +36,18 @@ class CommitSession(Session):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            self.commit()
-            executor.gather(self._defers)
+            if self._transaction:
+                self.commit()
+            for f in self._defers:
+                executor.submit(f)
+        self._defers.clear()
         return super().__exit__(exc_type, exc_val, exc_tb)
 
 
 class SessionMaker(sessionmaker):
-    def __init__(self, bind, **kwargs):
-        super().__init__(bind, **kwargs)
-        self.tx_lock = RLock()
-
     @contextmanager
     def transaction(self, readonly=False) -> ContextManager[CommitSession]:
-        with self.tx_lock, self() as session, session.begin(), switch_tracer:
+        with self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN' if readonly else 'BEGIN IMMEDIATE')
             yield session
             assert readonly or not switch_tracer.is_switched(), 'transaction switched'
@@ -69,18 +67,19 @@ def sqlite_connect(conn, rec):
     cur.execute('PRAGMA journal_mode = WAL')
     cur.execute('PRAGMA synchronous = NORMAL')
     cur.execute('PRAGMA temp_store = MEMORY')
+    # cur.execute('PRAGMA query_only = ON')
     cur.close()
 
 
 if slow_log := options.slow_log:
     @event.listens_for(engine, 'before_cursor_execute')
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        context.query_start_time = time.monotonic()
+        context.query_begin_time = time.time()
 
 
     @event.listens_for(engine, 'after_cursor_execute')
     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-        elapsed = time.monotonic() - context.query_start_time
+        elapsed = time.time() - context.query_begin_time
         if elapsed > slow_log:
             logging.warning(f'elapsed: {elapsed:.2f}s slow query: {statement} parameters: {parameters}\n' +
                             ''.join(traceback.format_stack()))
@@ -113,7 +112,7 @@ def table(tb):
 class RowChange(BaseModel):
     __tablename__ = 'row_changes'
 
-    id = Column(Integer, primary_key=True, default=id_generator.gen)
+    id = Column(Integer, primary_key=True, default=snowflake.gen)
     table_name = Column(String, nullable=False)
     row_id = Column(Integer, nullable=False)
     diff = Column(JSON, nullable=False)
@@ -132,15 +131,20 @@ class RowChange(BaseModel):
         return snapshot
 
 
+@event.listens_for(RowChange, 'after_insert')
+def after_insert(mapper, connection, target: RowChange):
+    logging.info(f'{target.table_name} {target.row_id} {target.diff}')
+
+
 @table
 class Account(TableMixin, BaseModel):
     __tablename__ = 'accounts'
     __include__ = ('id', 'create_time', 'age', 'last_active')
-    __exclude__ = __readonly__ = ('hashed',)
+    __exclude__ = __protect__ = ('hashed',)
 
-    id = Column(Integer, primary_key=True, default=id_generator.gen)
-    username = Column(String(40), unique=True, nullable=False)
-    hashed = Column(String(40), nullable=False)
+    id = Column(Integer, primary_key=True, default=snowflake.gen)
+    username = Column(String, unique=True, nullable=False)
+    hashed = Column(String, nullable=False)
     age = Column(Integer, nullable=False, default=20, server_default='20')
     last_active = Column(DateTime, nullable=False, default=datetime.now)
 
@@ -208,7 +212,7 @@ class Change(Document):
         ]
     }
 
-    id = IntField(primary_key=True, default=id_generator.gen)
+    id = IntField(primary_key=True, default=snowflake.gen)
     coll_name = StringField(required=True)
     doc_id = DynamicField(required=True)
     diff = DictField(required=True)
@@ -261,7 +265,7 @@ class Profile(CacheMixin, Document):
     __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
-    id = IntField(primary_key=True, default=id_generator.gen)
+    id = IntField(primary_key=True, default=snowflake.gen)
     name = StringField(default='')
     addr = StringField(default='')
     rank = IntField()

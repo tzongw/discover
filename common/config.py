@@ -17,7 +17,7 @@ class CtxLogFormatter(LogFormatter):
         return super().format(record)
 
 
-LOG_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(funcName)s:%(lineno)d %(process)d]%(end_color)s ' \
+LOG_FORMAT = '%(color)s[%(levelname)4.4s %(asctime)s %(module)s:%(funcName)s:%(lineno)d %(process)d]%(end_color)s ' \
              '%(context)s %(message)s'
 
 

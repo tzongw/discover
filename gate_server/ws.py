@@ -7,9 +7,10 @@ from urllib import parse
 from collections import defaultdict
 import gevent
 from gevent import pywsgi
+from gevent.queue import Queue
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.websocket import WebSocket
-from base.utils import base62
+from base.utils import Base62
 from base.sharding import ShardingDict, ShardingSet
 import shared
 import const
@@ -61,30 +62,27 @@ WebSocket.handle_ping = handle_ping
 
 
 class Client:
-    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'writing', 'step']
+    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'step']
     PONG_MESSAGE = object()
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
         self.context = {}
         self.ws = ws
-        self.messages = []
+        self.messages = Queue()
         self.groups = set()
-        self.writing = False
         self.step = 0
 
     def __str__(self):
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
-        self.messages.append(message)
-        if self.writing:
-            return
-        self.writing = True
-        gevent.spawn(self._writer)
+        self.messages.put_nowait(message)
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
+        self.ws.handler.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        gevent.spawn(self._writer)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
             with shared.user_service.client(addr) as client:
@@ -105,22 +103,17 @@ class Client:
             client.ping(options.rpc_address, self.conn_id, self.context)
 
     def _writer(self):
-        assert self.writing
         try:
-            while self.messages:
-                messages = self.messages
-                self.messages = []
-                for message in messages:
-                    if message is None:
-                        raise StopIteration
-                    elif message is self.PONG_MESSAGE:
-                        self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
-                    else:
-                        self.ws.send(message)
-            else:
-                self.writing = False
+            while True:
+                message = self.messages.get()
+                if message is None:
+                    raise StopIteration
+                elif message is self.PONG_MESSAGE:
+                    self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
+                else:
+                    self.ws.send(message)
         except Exception:
-            self.ws.close()  # keep writing status true
+            self.ws.close()
 
     def stop(self):
         self.send(None)
@@ -133,8 +126,8 @@ class Client:
             self.context.pop(key, None)
 
 
-clients = ShardingDict[str, Client](shards=64)
-groups = defaultdict(lambda: ShardingSet(shards=8))  # type: dict[str, ShardingSet[Client]]
+clients = ShardingDict[str, Client](shards=128)
+groups = defaultdict(lambda: ShardingSet(shards=32))  # type: dict[str, ShardingSet[Client]]
 
 
 def remove_from_group(client: Client, group):
@@ -145,7 +138,7 @@ def remove_from_group(client: Client, group):
 
 
 def client_serve(ws: WebSocket):
-    conn_id = base62.encode(shared.id_generator.gen())
+    conn_id = Base62.encode(shared.snowflake.gen())
     client = Client(ws, conn_id)
     clients[conn_id] = client
     environ = ws.environ

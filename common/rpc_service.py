@@ -11,20 +11,20 @@ import logging
 
 class Selector:
     @staticmethod
-    def _one_shot(client_factory, name, *args, **kwargs):
+    def _oneshot(client_factory, name, *args, **kwargs):
         with client_factory() as client:
             return getattr(client, name)(*args, **kwargs)
 
     @staticmethod
     def _retry(client_factory, name, *args, **kwargs):
         try:
-            return Selector._one_shot(client_factory, name, *args, **kwargs)
+            return Selector._oneshot(client_factory, name, *args, **kwargs)
         except Exception as e:
             if ThriftPool.biz_exception(e):
                 raise
         # will retry another node
         logging.warning(f'retry {name} {args} {kwargs}')
-        return Selector._one_shot(client_factory, name, *args, **kwargs)
+        return Selector._oneshot(client_factory, name, *args, **kwargs)
 
     @staticmethod
     def _traverse(client_factory, addresses, name, *args, **kwargs):
@@ -41,7 +41,7 @@ class UserService(Service, Selector):
 
     def __getattr__(self, name):
         if hasattr(user.Iface, name):
-            return partial(self._one_shot, self.client, name)
+            return partial(self._oneshot, self.client, name)
         return super().__getattr__(name)
 
 
@@ -66,5 +66,5 @@ class TimerService(Service, Selector):
 
     def __getattr__(self, name):
         if hasattr(timer.Iface, name):
-            return partial(self._one_shot, self.client, name)
+            return partial(self._oneshot, self.client, name)
         return super().__getattr__(name)

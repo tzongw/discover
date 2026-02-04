@@ -9,14 +9,13 @@ from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
 from base import create_parser
 from base import LogSuppress
-from base.utils import salt_hash
 import const
 from config import options
 from models import Online
 from service import user
 from common.messages import Connect, Disconnect
 import shared
-from shared import app, online_key, redis, dispatch_timeout
+from shared import app, online_key, redis, dispatch_timeout, sessions
 import push
 
 
@@ -31,8 +30,12 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            session_id = salt_hash(token, salt=uid)
-            if session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
+            user_session = sessions.get(uid).get(token)
+            if user_session:
+                session_id = user_session.id
+            elif options.env == const.Environment.DEV:
+                session_id = uid
+            else:
                 raise ValueError('token error')
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
@@ -50,14 +53,14 @@ class Handler:
                     client.remove_conn(_conn_id)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
-                logging.info(f'login fail {address} {conn_id} {params}')
+                logging.info(f'login fail {address} {conn_id} {params} {e}')
             else:
                 logging.exception(f'login error {address} {conn_id} {params}')
             with shared.gate_service.client(address) as client:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            shared.publisher.publish(Connect(uid=uid))
+            shared.producer.post(Connect(uid=uid))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success: ping interval: {const.PING_INTERVAL}')
@@ -86,7 +89,7 @@ class Handler:
         key = online_key(uid)
         if redis.hdel(key, conn_id):
             logging.info(f'logout {uid} {conn_id}')
-            shared.publisher.publish(Disconnect(uid=uid))
+            shared.producer.post(Disconnect(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

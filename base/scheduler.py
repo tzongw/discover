@@ -37,12 +37,34 @@ class Handle:
         return f'handle: {func_desc(self.callback)} at: {datetime.fromtimestamp(self.when)}'
 
 
+class Proxy:
+    __slots__ = ['_handle']
+
+    def __init__(self, handle: Handle):
+        self._handle = handle
+
+    def reset(self, handle: Handle):
+        self._handle = handle
+
+    def cancel(self):
+        self._handle.cancel()
+
+    @property
+    def cancelled(self):
+        return self._handle.cancelled
+
+
 class Scheduler:
     def __init__(self):
         self._event = Event()
         self._executor = Executor(name='scheduler')
         self._handles = []  # type: List[Handle]
+        self._stopped = False
         gevent.spawn(self._run)
+
+    def join(self, timeout=None):
+        self._stopped = True
+        return self._executor.join(timeout)
 
     def call_later(self, callback: Callable, delay: Union[float, timedelta]) -> Handle:
         if isinstance(delay, timedelta):
@@ -59,8 +81,19 @@ class Scheduler:
             self._event.set()
         return handle
 
+    def call_repeat(self, callback: Callable, interval: Union[float, timedelta]) -> Handle | Proxy:
+        @functools.wraps(callback)
+        def run():
+            with LogSuppress():
+                callback()
+            if not proxy.cancelled:
+                proxy.reset(self.call_later(run, interval))
+
+        proxy = Proxy(self.call_later(run, interval))
+        return proxy
+
     def _run(self):
-        while True:
+        while not self._stopped:
             now = time.time()
             while self._handles and self._handles[0].when <= now:
                 handle = heapq.heappop(self._handles)  # type: Handle
@@ -70,34 +103,9 @@ class Scheduler:
             self._event.clear()
             self._event.wait(timeout)
 
-    def __call__(self, period: Union[float, timedelta]):
+    def __call__(self, interval: Union[float, timedelta]):
         def decorator(f):
-            pc = PeriodicCallback(self, f, period)
-            f.stop = pc.stop
+            self.call_repeat(f, interval)
             return f
 
         return decorator
-
-
-class PeriodicCallback:
-    __slots__ = ['_handle']
-
-    def __init__(self, scheduler: Scheduler, callback: Callable, period: Union[float, timedelta]):
-        @functools.wraps(callback)
-        def run():
-            if not self.stopped:
-                with LogSuppress():
-                    callback()
-            if not self.stopped:
-                self._handle = scheduler.call_later(run, period)
-
-        self._handle = scheduler.call_later(run, period)
-
-    @property
-    def stopped(self):
-        return self._handle is None
-
-    def stop(self):
-        if self._handle:
-            self._handle.cancel()
-            self._handle = None

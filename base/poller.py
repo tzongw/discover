@@ -12,7 +12,7 @@ from .task import AsyncTask, Task
 from .utils import variadic_args
 
 
-@dataclass
+@dataclass(frozen=True)
 class Config:
     poll: Callable
     interval: timedelta
@@ -61,7 +61,7 @@ class Poller:
                 status = PollStatus(config.poll(queue))  # double check
                 if status != PollStatus.DONE:  # race
                     logging.info(f'new jobs, restart {group} {queue}')
-                    async_task.post(task_id, task, config.interval, loop=True)
+                    async_task.create(task_id, task, config.interval, loop=True)
 
         self.poll_task = poll_task
 
@@ -75,7 +75,7 @@ class Poller:
             return
         config = self.configs[group]
         task = self.poll_task(group, queue)
-        if self.async_task.post(task_id, task, config.interval, loop=True):
+        if self.async_task.create(task_id, task, config.interval, loop=True):
             self.async_task.fire(task_id)
 
     def __call__(self, group: str, *, interval=timedelta(seconds=5), spawn=None):

@@ -60,7 +60,7 @@ def user_limiter(*, cooldown, threshold=1):
             uid = g.uid
             if uid in doing:  # not reentrant
                 raise TooManyRequests
-            now = time.monotonic()
+            now = time.time()
             while limiters:  # expire sorted
                 uid, limiter = next(iter(limiters.items()))
                 if limiter.expire > now:
@@ -77,7 +77,7 @@ def user_limiter(*, cooldown, threshold=1):
             try:
                 return f(*args, **kwargs)
             finally:
-                doing.discard(uid)
+                doing.remove(uid)
 
         return wrapper
 
@@ -97,7 +97,12 @@ def dispatch_timeout(full_key, data):
 
 
 if options.tick_timer:
-    @receiver(const.TICK_STREAM)
+    @consumer(const.TICK_STREAM)
     def on_tick(_, sid):
         ts = int(sid[:-2])
         time_dispatcher.dispatch_tick(ts)
+
+
+def delay_delete(op):
+    for delay in [1, 3, 10]:
+        scheduler.call_later(op, delay)

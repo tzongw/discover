@@ -4,9 +4,8 @@ import logging
 import const
 from datetime import timedelta, datetime
 from base import LogSuppress
-from base.scheduler import PeriodicCallback
 from common.messages import Connect, Disconnect, Alarm
-from shared import dispatcher, receiver, timer_service, at_exit, timer, invalidator, async_task, at_main, \
+from shared import dispatcher, consumer, timer_service, to_exit, timer, invalidator, async_task, at_main, \
     time_dispatcher, async_worker, app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
@@ -34,17 +33,17 @@ def on_register(account: Account):
     logging.info(f'{account}')
 
 
-@receiver(Connect)
+@consumer(Connect)
 def on_connect(data: Connect):
     logging.info(f'{data}')
 
 
-@receiver(Disconnect)
+@consumer(Disconnect)
 def on_disconnect(data: Disconnect):
     logging.info(f'{data}')
 
 
-@receiver(Alarm)
+@consumer(Alarm)
 def on_alarm(data: Alarm):
     logging.info(f'{data}')
 
@@ -86,26 +85,26 @@ def init():
     if options.init_timer == 'rpc':
         timer_service.call_later(rpc_service, 'notice:1', 'one shot', delay=3)
         timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
-        at_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
+        to_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
         if options.tick_timer:
             timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
-            at_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
+            to_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
-        at_exit(lambda: ztimer.kill('welcome:2'))
+        to_exit(lambda: ztimer.kill('welcome:2'))
         if options.tick_timer:
             ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
-            at_exit(lambda: ztimer.kill(const.TICK_TIMER))
-        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
-        at_exit(pc.stop)
+            to_exit(lambda: ztimer.kill(const.TICK_TIMER))
+        handle = scheduler.call_repeat(poll_timeouts, timedelta(seconds=1))
+        to_exit(handle.cancel)
     elif options.init_timer == 'task':
         task_id = 'task:hello'
-        async_task.post(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=5), loop=True)
-        at_exit(lambda: async_task.cancel(task_id))
+        async_task.create(task_id, task('hello', 3, timedelta(seconds=1)), timedelta(seconds=5), loop=True)
+        to_exit(lambda: async_task.cancel(task_id))
         logging.info(async_task.info(task_id))
         if options.tick_timer:
             ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
-            at_exit(lambda: ztimer.kill(const.TICK_TIMER))
-        pc = PeriodicCallback(scheduler, poll_timeouts, timedelta(seconds=1))
-        at_exit(pc.stop)
+            to_exit(lambda: ztimer.kill(const.TICK_TIMER))
+        handle = scheduler.call_repeat(poll_timeouts, timedelta(seconds=1))
+        to_exit(handle.cancel)

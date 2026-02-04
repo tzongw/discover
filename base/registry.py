@@ -103,5 +103,7 @@ class Registry:
                         timeout = 0.0
             except Exception:
                 logging.exception(f'')
-                pubsub = None
+                if pubsub:
+                    pubsub.reset()
+                    pubsub = None
                 gevent.sleep(self._INTERVAL)

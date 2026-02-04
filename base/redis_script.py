@@ -116,7 +116,7 @@ class Script:
             self.loaded.add(name)
         self.redis = redis
 
-    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None) -> list[int]:
+    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None) -> tuple[int, int]:
         """return [increment, value]"""
         keys_and_args = [key, increment, limit]
         if expire:

@@ -11,7 +11,6 @@ import gevent
 from flask import Blueprint, g, request, stream_with_context, current_app
 from gevent import pywsgi
 from marshmallow.validate import Range
-from redis.commands.core import HashDataPersistOptions
 from sqlalchemy import Column
 from sqlalchemy.exc import OperationalError
 from webargs import fields
@@ -19,16 +18,16 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
-from base import singleflight
+from base import singleflight, create_parser, CriticalSection, Priority
 from base.poller import PollStatus
-from base.utils import base62, salt_hash, LogSuppress
+from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
 from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
-from shared import app, dispatcher, id_generator, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, script, scheduler, exclusion
+from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
+from shared import session_key, async_task, heavy_task, script, scheduler
 import push
 
 cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
@@ -49,12 +48,12 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = base62.encode(id_generator.gen())
+    ctx.trace = Base62.encode(snowflake.gen())
 
 
 @async_task
-@heavy_task(priority=heavy_task.Priority.HIGH)
-@exclusion('lock:{message}', timedelta(seconds=30))
+@heavy_task(priority=Priority.HIGH)
+@CriticalSection(redis, 'lock:{message}', timedelta(seconds=30))
 def log(message):
     for i in range(10):
         logging.info(f'{message} {i}')
@@ -90,7 +89,7 @@ def hello(names):
         if redis.rpush('queue', *names) == len(names):  # head of the queue
             poller.notify('hello', 'queue')
     else:
-        async_task.post(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=3))
+        async_task.create(f'task:{uuid.uuid4()}', log(names[0]), timedelta(seconds=3))
     return f'say hello {names}'
 
 
@@ -149,8 +148,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
     with Session() as session:
         order_by = build_order_by(tb, order_by)
         cond = build_condition(tb, kwargs)
-        query = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count)
-        rows = [row.to_dict(exclude=[]) for row in query]
+        rows = session.query(tb).filter(cond).order_by(*order_by).offset(cursor).limit(count).all()
         if cursor:
             total = -1
         elif len(rows) < count:
@@ -159,7 +157,7 @@ def get_rows(table: str, cursor=0, count=20, order_by=None, **kwargs):
             total = len(session.query(tb.id).filter(cond).limit(1000).all())
     return {
         'total': total,
-        'rows': rows,
+        'rows': [row.to_dict(exclude=[]) for row in rows],
         'cursor': '' if len(rows) < count or total == count else str(cursor + count),
     }
 
@@ -190,7 +188,7 @@ def update_row(table: str, row_id, **kwargs):
     tb = tables[table]
     kwargs = build_operation(tb, kwargs)
     for key in kwargs:
-        if key == tb.id.name or key in tb.__readonly__:
+        if key == tb.id.name or key in tb.__protect__:
             raise Forbidden(key)
     convert_type(tb, kwargs)
     with Session() as session:
@@ -216,7 +214,7 @@ def delete_row(table: str, row_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_rows(table: str, row_id, column, **kwargs):
     tb = tables[table]
-    if column == tb.id.name or column in tb.__readonly__:
+    if column == tb.id.name or column in tb.__protect__:
         raise Forbidden(column)
     col = getattr(tb, column)  # type: Column
     row = tb.get(row_id, ensure=True)
@@ -335,7 +333,7 @@ def get_snapshot(collection: str, doc_id, change_id):
 def update_document(collection: str, doc_id, **kwargs):
     coll = collections[collection]
     for key in kwargs:
-        if key == coll.id.name or key in coll.__readonly__:
+        if key == coll.id.name or key in coll.__protect__:
             raise Forbidden(key)
     doc = coll.get(doc_id, ensure=True)
     origin = coll.from_json(doc.to_json())  # clone
@@ -363,7 +361,7 @@ def delete_document(collection: str, doc_id):
 @use_kwargs({}, location='json_or_form', unknown='include')
 def move_documents(collection: str, doc_id, field: str, **kwargs):
     coll = collections[collection]
-    if field == coll.id.name or field in coll.__readonly__:
+    if field == coll.id.name or field in coll.__protect__:
         raise Forbidden(field)
     doc = coll.get(doc_id, ensure=True)
     rank = doc[field]
@@ -423,14 +421,13 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    with Session.transaction() as session:
+    with Session() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
-            account = Account(username=username)
-            account.hashed = salt_hash(password, salt=account.id)
-            session.add(account)
-            dispatcher.signal(account)
-        elif account.hashed != salt_hash(password, salt=account.id):
+            account = Account(username=username, hashed=hash_password(password))
+            session.add(account)  # username unique index
+            session.defer(lambda: dispatcher.signal(account))
+        elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
@@ -438,19 +435,19 @@ def login(username: str, password: str):
     flask.session.permanent = True
     key = session_key(account.id)
     with redis.pipeline(transaction=True) as pipe:
-        pipe.hkeys(key)
-        session_id = salt_hash(token, salt=account.id)
-        pipe.hsetex(key, session_id, models.Session(create_time=datetime.now()), ex=app.permanent_session_lifetime,
-                    data_persist_option=HashDataPersistOptions.FNX)
-        session_ids, added = pipe.execute()
-        assert added, 'session id conflicts'
-    if len(session_ids) >= MAX_SESSIONS:
-        ttls = {sid: ttl for sid, ttl in zip(session_ids, redis.httl(key, *session_ids))}
-        session_ids.sort(key=lambda x: ttls[x])
-        to_delete = session_ids[:len(session_ids) - MAX_SESSIONS + 1]
+        create_parser(pipe).hgetall(key, models.Session)
+        user_session = models.Session(id=snowflake.gen(), create_time=datetime.now())
+        pipe.hsetex(key, token, user_session, ex=app.permanent_session_lifetime)
+        user_sessions: dict[str, models.Session] = pipe.execute()[0]
+    if len(user_sessions) >= MAX_SESSIONS:
+        tokens = user_sessions.keys()
+        ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
+        tokens = sorted(tokens, key=lambda x: ttls[x])
+        to_delete = tokens[:len(user_sessions) - MAX_SESSIONS + 1]
         redis.hdel(key, *to_delete)
-        for sid in to_delete:  # normally, len(to_delete) == 1
-            push.kick(account.id, 'token expired', session_id=sid)
+        for token in to_delete:  # normally, len(to_delete) == 1
+            session_id = user_sessions[token].id
+            push.kick(account.id, 'token expired', session_id=session_id)
     return account
 
 
@@ -473,22 +470,21 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
         raise Unauthorized
-    session_id = salt_hash(token, salt=uid)
-    if session_id not in sessions.get(uid):
+    user_session = sessions.get(uid).get(token)
+    if not user_session:
         raise Unauthorized
-    g.uid, g.session_id = uid, session_id
+    g.uid, g.session = uid, user_session
     if uid in user_actives:
         return
     # refresh last active & token ttl
     logging.info(f'user active: {uid}')
     now = datetime.now()
     user_actives[uid] = now.timestamp()
-    with LogSuppress(OperationalError), Session() as session:  # ignore db locked error, like creating indexes
+    with LogSuppress(OperationalError), Session() as session:  # ignore db locked error
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    if redis.httl(key, session_id)[0] < 0.9 * ttl:
-        redis.hexpire(key, int(ttl), session_id)  # will invalidate local cache
+    redis.hexpire(key, int(ttl), token)
 
 
 @bp.route('/whoami')

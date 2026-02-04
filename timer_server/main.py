@@ -6,7 +6,7 @@ from config import options
 import time
 import atexit
 import logging
-from typing import Dict, Callable
+from typing import Dict
 from dataclasses import dataclass
 import gevent
 from thrift.transport import TSocket
@@ -17,7 +17,7 @@ from setproctitle import setproctitle
 from pydantic import BaseModel
 from service.timer import Processor
 from service.timeout import Client
-from base.scheduler import PeriodicCallback
+from base.scheduler import Handle
 from base.service import Service
 from base import LogSuppress, batched
 from base.utils import DefaultDict
@@ -34,10 +34,10 @@ class Info(BaseModel):
     interval: float = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Timer:
     info: Info
-    cancel: Callable
+    handle: Handle
 
 
 class Handler:
@@ -47,8 +47,10 @@ class Handler:
         self._timers = {}  # type: Dict[str, Timer]
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
+        self._loading = False
 
     def load_timers(self):
+        self._loading = True
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
             for info in shared.parser.mget_nonatomic(full_keys, Info):
                 if info is None or info.addr != options.rpc_address or \
@@ -60,6 +62,7 @@ class Handler:
                     self.call_repeat(info.service, info.key, info.data, info.interval)
                 else:
                     logging.error(f'invalid timer: {info}')
+        self._loading = False
 
     @classmethod
     def _full_key(cls, service, key):
@@ -79,7 +82,7 @@ class Handler:
         deadline = time.time() + delay
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
-        old_info = shared.parser.set(full_key, info, px=px, get=True)
+        old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
 
@@ -87,21 +90,21 @@ class Handler:
             self._delete_timer(service, key)
             self._fire_timer(service, key, data)
 
-        handle = shared.scheduler.call_at(callback, deadline)
         self._delete_timer(service, key)
-        self._timers[full_key] = Timer(info=info, cancel=handle.cancel)
+        handle = shared.scheduler.call_at(callback, deadline)
+        self._timers[full_key] = Timer(info=info, handle=handle)
 
     def call_repeat(self, service, key, data, interval):
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
-        old_info = shared.parser.set(full_key, info, get=True)
+        old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
-        pc = PeriodicCallback(shared.scheduler, lambda: self._fire_timer(service, key, data), interval)
         self._delete_timer(service, key)
-        self._timers[full_key] = Timer(info=info, cancel=pc.stop)
+        handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
+        self._timers[full_key] = Timer(info=info, handle=handle)
 
     def remove_timer(self, service, key):
         logging.debug(f'{service} {key}')
@@ -115,7 +118,7 @@ class Handler:
         full_key = self._full_key(service, key)
         if timer := self._timers.pop(full_key, None):
             logging.debug(f'delete {full_key}')
-            timer.cancel()
+            timer.handle.cancel()
 
     @staticmethod
     def _rpc_delete(info: Info):
@@ -129,7 +132,7 @@ class Handler:
         while self._timers and addr in shared.timer_service.addresses():
             full_key, timer = self._timers.popitem()
             logging.debug(f'retreating timer: {full_key}')
-            timer.cancel()
+            timer.handle.cancel()
             info = timer.info
             with LogSuppress():
                 shared.redis.delete(full_key)
@@ -176,9 +179,9 @@ def main():
     setproctitle(f'{shared.app_name}-{shared.app_id}-{options.rpc_port}')
     workers += shared.registry.start()
     shared.init_main()
-    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     handler.load_timers()
-    shared.at_exit(handler.retreat_timers)
+    shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
+    shared.to_exit(handler.retreat_timers)
     atexit.register(handler.retreat_timers)  # double check
     gevent.joinall(workers, raise_error=True)
 

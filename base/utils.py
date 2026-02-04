@@ -7,11 +7,13 @@ import bisect
 import hashlib
 import contextlib
 from binascii import crc32
+from datetime import timedelta
 from random import choice
 from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
 from inspect import signature, Parameter
-from typing import Callable, Type, Union
+from typing import Callable, Type, Union, Iterable, Any
+import bcrypt
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
 import gevent
@@ -53,10 +55,10 @@ class Addr:
 class Version:
     def __init__(self, value='0.0.0'):
         version = [int(s) for s in value.split('.')]
-        if len(version) != 3 or not all(0 <= v <= 65535 for v in version):
+        if len(version) != 3 or not all(0 <= v < 1000 for v in version):
             raise ValueError(value)
         self.value = value
-        self.int = sum(v << 16 * i for i, v in enumerate(reversed(version)))
+        self.int = version[0] * 1000 * 1000 + version[1] * 1000 + version[2]
 
     def __str__(self):
         return self.value
@@ -114,6 +116,22 @@ class SlidingWindow:
         self._counters[cur_tick % self._windows] += count
         self._last_tick = cur_tick
         return count
+
+
+class Limiter:
+    def __init__(self, redis: Redis | RedisCluster, limit: int, expire: timedelta):
+        self._redis = redis
+        self._limit = limit
+        self._expire = expire
+
+    def can_pass(self, key):
+        with self._redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, self._expire, nx=True)
+            count = pipe.execute()[0]
+        if count == self._limit:
+            logging.warning(f'{key} reach limit {self._limit}')
+        return count <= self._limit
 
 
 @lru_cache(maxsize=None)
@@ -178,6 +196,18 @@ def native_worker(f):
     return wrapper
 
 
+@native_worker
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode(), salt)
+    return hashed.decode()
+
+
+@native_worker
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+
 class DefaultDict(defaultdict):
     def __missing__(self, key):
         if not self.default_factory:
@@ -195,7 +225,7 @@ class PascalCaseDict(dict):
         return super().__getitem__(item)
 
 
-class base62:
+class Base62:
     charset = string.digits + string.ascii_uppercase + string.ascii_lowercase
     base = 62
     mapping = {c: index for index, c in enumerate(charset)}
@@ -223,7 +253,7 @@ class base62:
         return ''.join(choice(cls.charset) for _ in range(n))
 
 
-class base36(base62):
+class Base36(Base62):
     charset = string.digits + string.ascii_uppercase
     base = 36
     mapping = {c: index for index, c in enumerate(charset)}
@@ -250,18 +280,27 @@ def create_redis(addr: str):
 
 
 def string_hash(s: str):
-    digest = hashlib.md5(s.encode()).digest()
-    return int.from_bytes(digest[:8], signed=True)
+    h = hashlib.blake2b(s.encode(), digest_size=8)
+    return int.from_bytes(h.digest(), signed=True)
 
 
-def salt_hash(value, *, salt):
-    return hashlib.sha1(f'{salt}{value}'.encode()).hexdigest()
+def try_flock(path):
+    return _flock(path, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
+@native_worker
 def flock(path):
+    return _flock(path, fcntl.LOCK_EX)
+
+
+def _flock(path, mode):
     f = open(path, 'a+')
     try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(f, mode)
+        f.truncate(0)
+        f.write(str(os.getpid()))
+        f.flush()
+        return f
     except BlockingIOError:
         f.seek(0)
         pid = f.readline()
@@ -270,11 +309,6 @@ def flock(path):
     except Exception:
         f.close()
         raise
-    f.seek(0)
-    f.truncate(0)
-    f.write(str(os.getpid()))
-    f.flush()
-    return f
 
 
 def diff_dict(after: dict, before: dict):
@@ -303,3 +337,81 @@ def apply_diff(origin: dict, diff: dict):
             apply_diff(vo, value)
         else:
             origin[key] = value
+
+
+class UvCache:
+    def __init__(self):
+        self._cache = defaultdict(set)
+
+    def add(self, uid, views: Iterable) -> int:
+        for view in views:
+            self._cache[view].add(uid)
+        return len(self._cache)
+
+    def pick(self) -> dict[Any, set]:
+        cache = self._cache
+        self._cache = defaultdict(set)
+        return cache
+
+
+class PvCache:
+    def __init__(self):
+        self._cache = defaultdict(int)
+
+    def add(self, views: Iterable) -> int:
+        for view in views:
+            self._cache[view] += 1
+        return len(self._cache)
+
+    def pick(self) -> dict[Any, int]:
+        cache = self._cache
+        self._cache = defaultdict(int)
+        return cache
+
+    def get(self, view) -> int:
+        return self._cache.get(view, 0)
+
+
+class ListCache:
+    def __init__(self):
+        self._cache = []
+
+    def add(self, item) -> int:
+        self._cache.append(item)
+        return len(self._cache)
+
+    def pick(self) -> list:
+        cache = self._cache
+        self._cache = []
+        return cache
+
+
+class SetCache:
+    def __init__(self):
+        self._cache = set()
+
+    def add(self, item) -> int:
+        self._cache.add(item)
+        return len(self._cache)
+
+    def pick(self) -> set:
+        cache = self._cache
+        self._cache = set()
+        return cache
+
+
+class DictCache:
+    def __init__(self):
+        self._cache = {}
+
+    def add(self, key, value) -> int:
+        self._cache[key] = value
+        return len(self._cache)
+
+    def pop(self, key):
+        return self._cache.pop(key, None)
+
+    def pick(self) -> dict:
+        cache = self._cache
+        self._cache = {}
+        return cache
