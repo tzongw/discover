@@ -283,6 +283,10 @@ class ShardingZTimer(ZTimer):
         self._update_sharded(key)
         return super().new(key, data, interval, loop=loop)
 
+    def fire(self, key: str):
+        self._update_sharded(key)
+        return super().fire(key)
+
     def kill(self, key: str):
         self._update_sharded(key)
         return super().kill(key)
@@ -328,6 +332,14 @@ class MigratingZTimer(ShardingZTimer):
         if added and self.is_moved(key) and self.old_timer.kill(key):
             added = 0
         return added
+
+    def fire(self, key: str):
+        if not self.is_migrating:
+            return self.old_timer.fire(key)
+        updated = super().fire(key)
+        if not updated and self.is_moved(key):
+            updated = self.old_timer.fire(key)
+        return updated
 
     def kill(self, key):
         if not self.is_migrating:
