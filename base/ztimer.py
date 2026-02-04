@@ -82,7 +82,7 @@ class ZTimer:
             return
         loop, interval, data = meta.split('|', maxsplit=2)
         return {
-            'remaining': max(timeout - time.time(), 0),
+            'remaining': max(float(timeout) - time.time(), 0),
             'data': data,
             'interval': float(interval),
             'loop': loop == '1',
