@@ -79,6 +79,6 @@ class Timer:
             keys_and_args.append(self.hint)
         return self.new(key, 'timer_xadd', interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
+    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=60):
         keys_and_args = [stream, offset, self.maxlen]
         return self.new(key, 'timer_tick', interval, loop=True, num_keys=1, keys_and_args=keys_and_args)
