@@ -18,12 +18,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import const
 from base import FullCache, Cache
+from base.cache import RedisCache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
-from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
+from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin, RedisCacheMixin
 from config import options
 from shared import invalidator, snowflake, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
+from shared import redis
 
 
 class CommitSession(Session):
@@ -203,7 +205,7 @@ def collection(coll):
     return coll
 
 
-class Change(Document):
+class Change(RedisCacheMixin, Document):
     meta = {
         'strict': False,
         'indexes': [
@@ -225,6 +227,11 @@ class Change(Document):
         for change in changes:
             apply_diff(snapshot, change.diff)
         return snapshot
+
+
+change_cache = RedisCache[Change](redis, mget=Change.mget, make_key=Change.make_key, expire=timedelta(seconds=30),
+                                  serialize=Change.to_json, deserialize=Change.from_json)
+Change.mget = change_cache.mget
 
 
 class CRUD(StrEnum):
