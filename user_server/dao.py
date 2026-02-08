@@ -18,12 +18,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import const
 from base import FullCache, Cache
+from base.cache import RedisCache
 from base.chunk import LazySequence
 from base.utils import PascalCaseDict, apply_diff
-from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin
+from base.misc import DocumentMixin, CacheMixin, TimeDeltaField, TableMixin, SqlCacheMixin, RedisCacheMixin
 from config import options
 from shared import invalidator, snowflake, switch_tracer, executor
 from models import QueueConfig, SmsConfig, ConfigModels
+from shared import redis
 
 
 class CommitSession(Session):
@@ -261,7 +263,7 @@ Role.mget = role_cache.mget
 
 
 @collection
-class Profile(CacheMixin, Document):
+class Profile(RedisCacheMixin, Document):
     __include__ = ('name', 'addr', 'create_time')
     meta = {'strict': False}
 
@@ -292,15 +294,9 @@ def get_all_profiles():
     return lazy, None
 
 
-profile_cache = FullCache[Profile](mget=Profile.mget, make_key=Profile.make_key, get_values=get_all_profiles)
-profile_cache.listen(invalidator, Profile.__name__)
+profile_cache = RedisCache[Profile](redis, mget=Profile.mget, make_key=Profile.make_key, expire=timedelta(seconds=30),
+                                    serialize=Profile.to_json, deserialize=Profile.from_json)
 Profile.mget = profile_cache.mget
-
-
-@profile_cache.cached
-def valid_profiles():
-    now = datetime.now()
-    return [profile for profile in profile_cache.values if profile.expire > now]
 
 
 @collection
