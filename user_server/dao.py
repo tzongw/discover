@@ -229,6 +229,7 @@ class Change(RedisCacheMixin, Document):
         return snapshot
 
 
+assert Change.validate_version(redis)
 change_cache = RedisCache[Change](redis, mget=Change.mget, make_key=Change.make_key, expire=timedelta(seconds=30),
                                   serialize=Change.to_json, deserialize=Change.from_json)
 Change.mget = change_cache.mget

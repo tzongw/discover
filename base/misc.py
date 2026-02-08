@@ -201,6 +201,14 @@ class RedisCacheMixin(CacheMixin):
     def _compatible_versions(cls):
         return range(cls.__cache_version__ - cls.__compatibility__, cls.__cache_version__ + cls.__compatibility__ + 1)
 
+    @classmethod
+    def validate_version(cls, redis: Redis | RedisCluster):
+        with redis.pipeline(transaction=True) as pipe:
+            key = f'{cls.__name__}:versions'
+            pipe.zadd(key, {' '.join(cls._fields): cls.__cache_version__})
+            pipe.zrange(key, cls.__cache_version__, cls.__cache_version__, byscore=True)
+            return len(pipe.execute()[1]) == 1
+
     def invalidate(self, invalidator: Invalidator):
         keys = [f'{self.__class__.__name__}:{v}:{self.id}' for v in self._compatible_versions()]
         invalidator.redis.delete(*keys)
