@@ -315,9 +315,9 @@ class Setting(CacheMixin, Document):
         return super().get(cls.__name__, ensure=ensure, default=default)
 
 
-cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
-cache.listen(invalidator, Setting.__name__)
-Setting.mget = cache.mget
+setting_cache: Cache[Setting] = Cache(mget=Setting.mget, make_key=Setting.make_key, maxsize=None)
+setting_cache.listen(invalidator, Setting.__name__)
+Setting.mget = setting_cache.mget
 
 
 class Status(StrEnum):
@@ -332,7 +332,7 @@ class TokenSetting(Setting):
     status = EnumField(Status, default=Status.OK)
 
 
-cache.listen(invalidator, TokenSetting.__name__)
+setting_cache.listen(invalidator, TokenSetting.__name__)
 
 
 class CommandLogger(monitoring.CommandListener):
