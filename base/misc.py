@@ -134,7 +134,7 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=100, query=None, only_id=False):
+    def batch_range(cls, field, *, start, stop, batch=1000, query=None, only_id=False):
         if not isinstance(field, str):
             field = field.name
         asc = start < stop
@@ -390,7 +390,7 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=100, query=(), only_id=False):
+    def batch_range(cls, column, *, start, stop, batch=1000, query=(), only_id=False):
         if isinstance(column, str):
             col = getattr(cls, column)
         else:
