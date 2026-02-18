@@ -62,6 +62,31 @@ user_service = UserService(registry, const.RPC_USER, options.host)  # type: Unio
 gate_service = GateService(registry, const.RPC_GATE, options.host)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: Union[TimerService, service.timer.Iface]
 
+
+def spawn_worker(f, *args, **kwargs):
+    def worker():
+        ctx.trace = Base62.encode(snowflake.gen())
+        start = time.time()
+        with LogSuppress():
+            f(*args, **kwargs)
+        t = time.time() - start
+        if t > 30:
+            logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
+        _workers.remove(g)
+
+    g = gevent.spawn(worker)
+    _workers.add(g)
+    return g
+
+
+def async_worker(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        spawn_worker(f, *args, **kwargs)
+
+    return wrapper
+
+
 if options.env == const.Environment.DEV:
     # for debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
@@ -104,16 +129,6 @@ def init_main():
     logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-@atexit.register
-def gracefully_exit():
-    gevent.joinall(list(_workers))
-    consumer.join()
-    scheduler.join()
-    executor.join()
-    unique_id.stop()  # at last
-
-
-@atexit.register
 @once
 def _cleanup():  # call once
     logging.info(f'cleanup')
@@ -125,28 +140,14 @@ def _cleanup():  # call once
             executor.gather(_exits)
 
 
-def spawn_worker(f, *args, **kwargs):
-    def worker():
-        ctx.trace = Base62.encode(snowflake.gen())
-        start = time.time()
-        with LogSuppress():
-            f(*args, **kwargs)
-        t = time.time() - start
-        if t > 30:
-            logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
-        _workers.remove(g)
-
-    g = gevent.spawn(worker)
-    _workers.add(g)
-    return g
-
-
-def async_worker(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        spawn_worker(f, *args, **kwargs)
-
-    return wrapper
+@atexit.register
+def _gracefully_exit():
+    _cleanup()
+    gevent.joinall(list(_workers))
+    consumer.join()
+    scheduler.join()
+    executor.join()
+    unique_id.stop()  # at last
 
 
 def _sig_handler(sig, frame):
