@@ -96,7 +96,7 @@ if options.env == const.Environment.DEV:
 class Status:
     inited = False
     exiting = False
-    sysexit = True
+    script = False
 
 
 status = Status()
@@ -150,15 +150,15 @@ def _gracefully_exit():
     unique_id.stop()  # at last
 
 
-def _sig_handler(sig, frame):
+def _sig_handler(sig, _):
     logging.info(f'received signal {sig}')
-    if status.exiting:  # signal again
+    if status.exiting:  # signal again, no mercy
         if sig == signal.SIGINT:
-            sys.exit(1)
+            gevent.spawn(lambda: sys.exit(1))
     else:
         def sig_exit():
             _cleanup()
-            if sig == signal.SIGUSR1 or not status.sysexit:
+            if sig == signal.SIGUSR1 or status.script:
                 return
             gevent.sleep(mercy)
             sys.exit(0)

@@ -12,7 +12,7 @@ from shared import app_name, app_id, init_main
 
 
 def main():
-    shared.status.sysexit = False
+    shared.status.script = True
     logging.info(f'{app_name} app id: {app_id}')
     shared.registry.start()
     shared.invalidator.start()
