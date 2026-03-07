@@ -52,7 +52,10 @@ class SessionMaker(sessionmaker):
         with self() as session, session.begin(), switch_tracer:
             session.connection().exec_driver_sql('BEGIN' if readonly else 'BEGIN IMMEDIATE')
             yield session
-            assert readonly or not switch_tracer.is_switched(), 'transaction switched'
+            if readonly:
+                assert not session.new and not session.dirty and not session.deleted, 'transaction modified'
+            else:
+                assert not switch_tracer.is_switched(), 'transaction switched'
 
 
 if options.env in [const.Environment.DEV, const.Environment.TEST]:
