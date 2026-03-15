@@ -30,7 +30,7 @@ from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_wo
 from shared import session_key, async_task, heavy_task, script, scheduler
 import push
 
-cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
+cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
 
 
