@@ -29,8 +29,7 @@ app_name = options.app_name
 rpc_service = options.rpc_service
 http_service = options.http_service
 executor = Executor(name='shared')
-dispatcher = Dispatcher(executor)
-time_dispatcher = TimeDispatcher(executor)
+dispatcher = TimeDispatcher(executor)
 scheduler = Scheduler()
 redis = create_redis(options.redis)
 registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)

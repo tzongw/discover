@@ -87,20 +87,20 @@ def user_limiter(*, cooldown, threshold=1):
 def dispatch_timeout(full_key, data):
     if full_key != const.TICK_TIMER:
         group, key = full_key.split(':', maxsplit=1)
-        time_dispatcher.dispatch(group, key, data)
+        dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
         ts = int(time.time())
         increment, _ = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
         offset = min(increment, 60)
         for ts in range(ts - offset + 1, ts + 1):
-            time_dispatcher.dispatch_tick(ts)
+            dispatcher.dispatch_tick(ts)
 
 
 if options.tick_timer:
     @consumer(const.TICK_STREAM)
     def on_tick(_, sid):
         ts = int(sid[:-2])
-        time_dispatcher.dispatch_tick(ts)
+        dispatcher.dispatch_tick(ts)
 
 
 def delay_delete(op):
