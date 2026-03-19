@@ -103,6 +103,6 @@ if options.tick_timer:
         dispatcher.dispatch_tick(ts)
 
 
-def delay_delete(op):
+def delay_policy(op):
     for delay in [1, 3, 10]:
         scheduler.call_later(op, delay)
