@@ -11,7 +11,6 @@ from . import utils
 from .singleflight import Singleflight, singleflight
 from .invalidator import Invalidator
 from .chunk import LazySequence
-from .redis_script import Script
 
 T = TypeVar('T')
 _NONE = object()
@@ -254,11 +253,10 @@ class RedisCache(Singleflight[T]):
         if todo_indexes:
             new_values = self.raw_mget([keys[index] for index in todo_indexes], *args, **kwargs)
             with self.redis.pipeline(transaction=False) as pipe:
-                script = Script(pipe)
                 for index, value in zip(todo_indexes, new_values):
                     values[index] = value
                     data = self.serialize(value) if self.serialize else value
-                    script.compare_set(made_keys[index], placeholder, data, self.expire)
+                    pipe.set(made_keys[index], data, ifeq=placeholder, ex=self.expire)
                 pipe.execute()
         try_times = 0
         while wait_indexes:

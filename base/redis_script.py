@@ -32,24 +32,6 @@ local function limited_incrby(keys, args)
     return {increment, cur}
 end
 
-local function compare_set(keys, args)
-    if redis.call('GET', keys[1]) == args[1] then
-        redis.call('SET', keys[1], unpack(args, 2))
-        return 1
-    else
-        return 0
-    end
-end
-
-local function compare_del(keys, args)
-    if redis.call('GET', keys[1]) == args[1] then
-        redis.call('DEL', keys[1])
-        return 1
-    else
-        return 0
-    end
-end
-
 local function compare_expire(keys, args)
     if redis.call('GET', keys[1]) == args[1] then
         redis.call('PEXPIRE', keys[1], unpack(args, 2))
@@ -122,17 +104,6 @@ class Script:
         if expire:
             keys_and_args.append(int(expire.total_seconds() * 1000))
         return self.redis.fcall('limited_incrby', 1, *keys_and_args)
-
-    def compare_set(self, key, expected, value, expire: timedelta = None, keepttl=False):
-        keys_and_args = [key, expected, value]
-        if expire:
-            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
-        if keepttl:
-            keys_and_args.append('KEEPTTL')
-        return self.redis.fcall('compare_set', 1, *keys_and_args)
-
-    def compare_del(self, key, expected):
-        return self.redis.fcall('compare_del', 1, key, expected)
 
     def compare_expire(self, key, expected, expire: timedelta, *, nx=False, xx=False, gt=False, lt=False):
         keys_and_args = [key, expected, int(expire.total_seconds() * 1000)]
