@@ -78,8 +78,6 @@ local function hsetx(keys, args)
 end
 
 redis.register_function('limited_incrby', limited_incrby)
-redis.register_function('compare_set', compare_set)
-redis.register_function('compare_del', compare_del)
 redis.register_function('compare_expire', compare_expire)
 redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
