@@ -14,7 +14,7 @@ from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Producer, Consumer, Timer
 from base import create_invalidator, create_parser
-from base import Dispatcher, TimeDispatcher
+from base import TimeDispatcher
 from base.utils import create_redis
 from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
     ShardingZTimer
