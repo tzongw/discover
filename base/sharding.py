@@ -59,9 +59,9 @@ class Sharding:
 
 
 class ShardingProducer(Producer):
-    def __init__(self, redis: Union[Redis, RedisCluster], *, maxlen=4096, hint=None):
+    def __init__(self, redis: Union[Redis, RedisCluster], *, sharding: Sharding, maxlen=4096, hint=None):
         super().__init__(redis, maxlen=maxlen, hint=hint)
-        self._sharding = Sharding(shards=len(redis.get_primaries()))
+        self._sharding = sharding
 
     def post(self, message: BaseModel, stream=None):
         stream = stream or stream_name(message)
@@ -76,9 +76,9 @@ class NormalizedDispatcher(ProtoDispatcher):
 
 
 class ShardingConsumer(Consumer):
-    def __init__(self, redis: Union[Redis, RedisCluster], group: str, name: str, *, workers=32):
+    def __init__(self, redis: Union[Redis, RedisCluster], group: str, name: str, *, sharding: Sharding, workers=32):
         super().__init__(redis, group, name, workers, dispatcher_cls=NormalizedDispatcher)
-        self._sharding = Sharding(shards=len(redis.get_primaries()))
+        self._sharding = sharding
 
     def start(self):
         logging.info(f'start {self._group} {self._name}')
@@ -200,9 +200,9 @@ class MigratingTimer(ShardingTimer):
 
 
 class MigratingConsumer(ShardingConsumer):
-    def __init__(self, redis, group: str, name: str, *, workers=32, old_consumer: Consumer):
-        assert old_consumer.redis is not redis, 'same redis, use ShardingProducer instead'
-        super().__init__(redis, group, name, workers=workers)
+    def __init__(self, redis, group: str, name: str, *, sharding: Sharding, workers=32, old_consumer: Consumer):
+        assert old_consumer.redis is not redis, 'same redis, use ShardingConsumer instead'
+        super().__init__(redis, group, name, workers=workers, sharding=sharding)
         self.old_consumer = old_consumer
 
     def start(self):
@@ -222,9 +222,9 @@ class MigratingConsumer(ShardingConsumer):
 
 
 class ShardingStock(Stock):
-    def __init__(self, redis: RedisCluster):
+    def __init__(self, redis: RedisCluster, *, sharding: Sharding):
         super().__init__(redis)
-        self.sharding = Sharding(shards=len(redis.get_primaries()))
+        self.sharding = sharding
 
     def mget(self, keys, hint=None):
         with self.redis.pipeline(transaction=False) as pipe:
@@ -375,9 +375,9 @@ class MigratingZTimer(ShardingZTimer):
 
 
 class ShardingHeavyTask(HeavyTask):
-    def __init__(self, redis: RedisCluster, biz: str):
+    def __init__(self, redis: RedisCluster, biz: str, *, sharding: Sharding):
         super().__init__(redis, biz)
-        self._sharding = Sharding(shards=len(redis.get_primaries()))
+        self._sharding = sharding
 
     def _get_queue(self, task):
         key = self._sharding.random_sharded_key(self._key)
@@ -405,10 +405,10 @@ class ShardingHeavyTask(HeavyTask):
 
 
 class MigratingHeavyTask(ShardingHeavyTask):
-    def __init__(self, redis: RedisCluster, biz: str, *, old_heavy_task: HeavyTask):
+    def __init__(self, redis: RedisCluster, biz: str, *, sharding: Sharding, old_heavy_task: HeavyTask):
         assert old_heavy_task.redis is not redis or not isinstance(old_heavy_task, ShardingHeavyTask), \
             'same redis, use ShardingHeavyTask instead'
-        super().__init__(redis, biz)
+        super().__init__(redis, biz, sharding=sharding)
         self.old_heavy_task = old_heavy_task
 
     def start(self, exec_func=None):
