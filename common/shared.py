@@ -54,7 +54,7 @@ else:
     consumer = Consumer(redis, group=app_name, name=hint)
     heavy_task = HeavyTask(redis, app_name)
 
-async_task = AsyncTask(ztimer, time_dispatcher)
+async_task = AsyncTask(ztimer, dispatcher)
 poller = Poller(redis, async_task)
 
 user_service = UserService(registry, const.RPC_USER, options.host)  # type: Union[UserService, service.user.Iface]
