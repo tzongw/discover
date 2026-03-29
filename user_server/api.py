@@ -97,12 +97,13 @@ def hello(names):
 def echo(message):
     gevent.sleep(0.1)
     tick = redis.get('tick')
-    if request.headers.get('If-None-Match') == f'W/"{tick}"':
+    match = request.headers.get('If-None-Match')
+    logging.info(f'match {match} tick {tick}')
+    if match == f'W/"{tick}"':
         return '', 304
     tick = redis.incr('tick')
-    logging.info(f'tick {tick}')
-    response = current_app.make_response(f'say hello {message} {tick}')
-    response.headers['ETag'] = tick
+    response = current_app.make_response(f'say hello {message * 1024} {tick}')
+    response.headers['ETag'] = f'W/"{tick}"'
     return response
 
 
