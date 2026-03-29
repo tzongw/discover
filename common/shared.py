@@ -14,7 +14,7 @@ from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Producer, Consumer, Timer
 from base import create_invalidator, create_parser
-from base import Dispatcher, TimeDispatcher
+from base import TimeDispatcher
 from base.utils import create_redis
 from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
     ShardingZTimer
@@ -29,8 +29,7 @@ app_name = options.app_name
 rpc_service = options.rpc_service
 http_service = options.http_service
 executor = Executor(name='shared')
-dispatcher = Dispatcher(executor)
-time_dispatcher = TimeDispatcher(executor)
+dispatcher = TimeDispatcher(executor)
 scheduler = Scheduler()
 redis = create_redis(options.redis)
 registry = Registry(redis if options.registry is None else create_redis(options.registry), const.SERVICES)
@@ -62,6 +61,31 @@ user_service = UserService(registry, const.RPC_USER, options.host)  # type: Unio
 gate_service = GateService(registry, const.RPC_GATE, options.host)  # type: Union[GateService, service.gate.Iface]
 timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: Union[TimerService, service.timer.Iface]
 
+
+def spawn_worker(f, *args, **kwargs):
+    def worker():
+        ctx.trace = Base62.encode(snowflake.gen())
+        start = time.time()
+        with LogSuppress():
+            f(*args, **kwargs)
+        t = time.time() - start
+        if t > 30:
+            logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
+        _workers.remove(g)
+
+    g = gevent.spawn(worker)
+    _workers.add(g)
+    return g
+
+
+def async_worker(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        spawn_worker(f, *args, **kwargs)
+
+    return wrapper
+
+
 if options.env == const.Environment.DEV:
     # for debug
     HeavyTask.push = lambda self, task: spawn_worker(self.exec, task)
@@ -71,7 +95,7 @@ if options.env == const.Environment.DEV:
 class Status:
     inited = False
     exiting = False
-    sysexit = True
+    script = False
 
 
 status = Status()
@@ -104,16 +128,6 @@ def init_main():
     logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-@atexit.register
-def gracefully_exit():
-    gevent.joinall(list(_workers))
-    consumer.join()
-    scheduler.join()
-    executor.join()
-    unique_id.stop()  # at last
-
-
-@atexit.register
 @once
 def _cleanup():  # call once
     logging.info(f'cleanup')
@@ -125,39 +139,25 @@ def _cleanup():  # call once
             executor.gather(_exits)
 
 
-def spawn_worker(f, *args, **kwargs):
-    def worker():
-        ctx.trace = Base62.encode(snowflake.gen())
-        start = time.time()
-        with LogSuppress():
-            f(*args, **kwargs)
-        t = time.time() - start
-        if t > 30:
-            logging.warning(f'slow worker {t} {func_desc(f)} {args = } {kwargs = }')
-        _workers.remove(g)
-
-    g = gevent.spawn(worker)
-    _workers.add(g)
-    return g
+@atexit.register
+def _gracefully_exit():
+    _cleanup()
+    gevent.joinall(list(_workers))
+    consumer.join()
+    scheduler.join()
+    executor.join()
+    unique_id.stop()  # at last
 
 
-def async_worker(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        spawn_worker(f, *args, **kwargs)
-
-    return wrapper
-
-
-def _sig_handler(sig, frame):
+def _sig_handler(sig, _):
     logging.info(f'received signal {sig}')
-    if status.exiting:  # signal again
+    if status.exiting:  # signal again, no mercy
         if sig == signal.SIGINT:
-            sys.exit(1)
+            gevent.spawn(lambda: sys.exit(1))
     else:
         def sig_exit():
             _cleanup()
-            if sig == signal.SIGUSR1 or not status.sysexit:
+            if sig == signal.SIGUSR1 or status.script:
                 return
             gevent.sleep(mercy)
             sys.exit(0)

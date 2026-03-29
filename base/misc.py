@@ -134,7 +134,7 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=100, query=None, only_id=False):
+    def batch_range(cls, field, *, start, stop, batch=1000, query=None, only_id=False):
         if not isinstance(field, str):
             field = field.name
         asc = start < stop
@@ -190,22 +190,32 @@ class TtlCacheMixin(CacheMixin):
 
 
 class RedisCacheMixin(CacheMixin):
-    __fields_version__: str = None
+    __cache_version__ = 0
+    __compatibility__ = 2
 
     @classmethod
     def make_key(cls, doc_id):
-        v = cls.__fields_version__
-        if v is None:
-            v = cls.__fields_version__ = Base62.encode(crc32(' '.join(cls._fields).encode()))
-        return f'{cls.__name__}:{v}:{cls.id.to_python(doc_id)}'
+        return f'{cls.__name__}:{cls.__cache_version__}:{doc_id}'
+
+    @classmethod
+    def _compatible_versions(cls):
+        return range(cls.__cache_version__ - cls.__compatibility__, cls.__cache_version__ + cls.__compatibility__ + 1)
+
+    @classmethod
+    def validate_version(cls, redis: Redis | RedisCluster):
+        with redis.pipeline(transaction=True) as pipe:
+            key = f'{cls.__name__}:versions'
+            pipe.zadd(key, {' '.join(cls._fields): cls.__cache_version__})
+            pipe.zrange(key, cls.__cache_version__, cls.__cache_version__, byscore=True)
+            return len(pipe.execute()[1]) == 1
 
     def invalidate(self, invalidator: Invalidator):
-        key = self.make_key(self.id)
-        invalidator.redis.delete(key)
+        keys = [f'{self.__class__.__name__}:{v}:{self.id}' for v in self._compatible_versions()]
+        invalidator.redis.delete(*keys)
 
     @classmethod
     def bulk_invalidate(cls, invalidator: Invalidator, doc_ids):
-        keys = [cls.make_key(doc_id) for doc_id in doc_ids]
+        keys = [f'{cls.__name__}:{v}:{doc_id}' for doc_id in doc_ids for v in cls._compatible_versions()]
         invalidator.redis.delete(*keys)
 
 
@@ -380,7 +390,7 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=100, query=(), only_id=False):
+    def batch_range(cls, column, *, start, stop, batch=1000, query=(), only_id=False):
         if isinstance(column, str):
             col = getattr(cls, column)
         else:

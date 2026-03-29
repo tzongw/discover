@@ -30,7 +30,7 @@ from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_wo
 from shared import session_key, async_task, heavy_task, script, scheduler
 import push
 
-cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
+cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
 
 
@@ -97,12 +97,13 @@ def hello(names):
 def echo(message):
     gevent.sleep(0.1)
     tick = redis.get('tick')
-    if request.headers.get('If-None-Match') == f'W/"{tick}"':
+    match = request.headers.get('If-None-Match')
+    logging.info(f'match {match} tick {tick}')
+    if match == f'W/"{tick}"':
         return '', 304
     tick = redis.incr('tick')
-    logging.info(f'tick {tick}')
-    response = current_app.make_response(f'say hello {message} {tick}')
-    response.headers['ETag'] = tick
+    response = current_app.make_response(f'say hello {message * 1024} {tick}')
+    response.headers['ETag'] = f'W/"{tick}"'
     return response
 
 
@@ -484,7 +485,8 @@ def authorize():
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    redis.hexpire(key, int(ttl), token)
+    if redis.httl(key, token)[0] < 0.9 * ttl:
+        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
 
 
 @bp.route('/whoami')
