@@ -42,11 +42,12 @@ script = Script(redis)
 invalidator = create_invalidator(redis)
 
 if isinstance(redis, RedisCluster):
-    ztimer = ShardingZTimer(redis, app_name, sharding=Sharding(shards=3))
-    timer = ShardingTimer(redis, hint=hint, sharding=Sharding(shards=3, fixed_keys=[const.TICK_TIMER]))
-    producer = ShardingProducer(redis, hint=hint)
-    consumer = ShardingConsumer(redis, group=app_name, name=hint)
-    heavy_task = ShardingHeavyTask(redis, app_name)
+    sharding = Sharding(shards=3, fixed_keys=[const.TICK_TIMER])
+    ztimer = ShardingZTimer(redis, app_name, sharding=sharding)
+    timer = ShardingTimer(redis, hint=hint, sharding=sharding)
+    producer = ShardingProducer(redis, hint=hint, sharding=sharding)
+    consumer = ShardingConsumer(redis, group=app_name, name=hint, sharding=sharding)
+    heavy_task = ShardingHeavyTask(redis, app_name, sharding=sharding)
 else:
     ztimer = ZTimer(redis, app_name)
     timer = Timer(redis, hint=hint)
