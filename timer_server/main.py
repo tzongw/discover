@@ -108,11 +108,11 @@ class Handler:
 
     def remove_timer(self, service, key):
         logging.debug(f'{service} {key}')
+        self._delete_timer(service, key)
         full_key = self._full_key(service, key)
         info = shared.parser.getdel(full_key, Info)
         if info and info.addr != options.rpc_address:
             self._rpc_delete(info)
-        self._delete_timer(service, key)
 
     def _delete_timer(self, service, key):
         full_key = self._full_key(service, key)

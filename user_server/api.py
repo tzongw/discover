@@ -456,7 +456,7 @@ bp = Blueprint('/', __name__)
 user_actives = {}
 
 
-@scheduler(timedelta(seconds=1))
+@scheduler(timedelta(seconds=5))
 def reap_user_active():
     past = time.time() - timedelta(minutes=10).total_seconds()
     while user_actives:
