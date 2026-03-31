@@ -97,9 +97,9 @@ def hello(names):
 def echo(message):
     gevent.sleep(0.1)
     tick = redis.get('tick')
-    match = request.headers.get('If-None-Match')
-    logging.info(f'match {match} tick {tick}')
-    if match == f'W/"{tick}"':
+    if_none_match = request.headers.get('If-None-Match')
+    logging.info(f'match {if_none_match} tick {tick}')
+    if if_none_match == f'W/"{tick}"':
         return '', 304
     tick = redis.incr('tick')
     response = current_app.make_response(f'say hello {message * 1024} {tick}')
