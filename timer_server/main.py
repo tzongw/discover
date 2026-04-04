@@ -51,7 +51,7 @@ class Handler:
 
     def load_timers(self):
         self._loading = True
-        for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=1000), 1000):
+        for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100), 100):
             for info in shared.parser.mget_nonatomic(full_keys, Info):
                 if info is None or info.addr != options.rpc_address or \
                         self._full_key(info.service, info.key) in self._timers:
