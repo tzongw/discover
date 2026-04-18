@@ -17,7 +17,7 @@ _NONE = object()
 _Pair = namedtuple('_Pair', ['value', 'expire_at'])
 
 
-def expire_at(expire):
+def expire_at(expire) -> float:
     if expire is None:
         return float('inf')
     if isinstance(expire, datetime):
@@ -145,9 +145,9 @@ class FullMixin(Generic[T]):
 
     @property
     def values(self) -> Sequence[T] | LazySequence[T]:
-        if self._version == self.invalids and self._expire_at > time.time():
-            return self._values
-        return self._update_values()
+        if self._version != self.invalids or self._expire_at < time.time():
+            self._update_values()
+        return self._values
 
     @singleflight
     def _update_values(self):
@@ -157,7 +157,6 @@ class FullMixin(Generic[T]):
         self._values = values
         self._expire_at = expire_at(expire)
         self._version = version
-        return values
 
     def cached(self, func=None, *, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
