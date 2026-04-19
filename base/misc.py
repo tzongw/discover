@@ -2,7 +2,6 @@ import contextlib
 import dataclasses
 import json
 import uuid
-from binascii import crc32
 from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
@@ -21,7 +20,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import Base62, diff_dict
+from .utils import diff_dict
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -225,7 +224,6 @@ class Semaphore:
         self.keys = [f'semaphore:{name}:{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
-        self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
         self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
 
     def __enter__(self):
@@ -243,16 +241,14 @@ class Semaphore:
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        keys, args = [self.local.key], [self.local.token]
+        key, token = self.local.key, self.local.token
         del self.local.key, self.local.token
-        self.lua_release(keys=keys, args=args)
+        self.redis.delex(key, ifeq=token)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
         key, token = self.local.key, self.local.token
-        if self.lua_reacquire(keys=[key], args=[token, timeout]):
-            return
-        raise LockError('Lock not owned')
+        return self.lua_reacquire(keys=[key], args=[token, timeout])
 
 
 class Stock:
