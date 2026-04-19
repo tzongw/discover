@@ -341,16 +341,19 @@ class TableMixin:
     id = PrimaryKey()  # type: PrimaryKey | Column | int
 
     @classmethod
-    def session_mget(cls, session, keys) -> list[Optional[Self]]:
+    def session_mget(cls, session, keys, for_update=False) -> list[Optional[Self]]:
         if not keys:
             return []
-        objects = session.query(cls).filter(cls.id.in_(keys)).all()
+        if for_update:
+            objects = session.query(cls).filter(cls.id.in_(keys)).order_by(cls.id.asc()).with_for_update().all()
+        else:
+            objects = session.query(cls).filter(cls.id.in_(keys)).all()
         mapping = {o.id: o for o in objects}
         return [mapping.get(cls.id.type.python_type(k)) for k in keys]
 
     @classmethod
-    def session_get(cls, session, key) -> Optional[Self]:
-        return cls.session_mget(session, key)[0]
+    def session_get(cls, session, key, for_update=False) -> Optional[Self]:
+        return cls.session_mget(session, key, for_update)[0]
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
