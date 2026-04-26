@@ -353,7 +353,7 @@ class TableMixin:
 
     @classmethod
     def session_get(cls, session, key, for_update=False) -> Optional[Self]:
-        return cls.session_mget(session, key, for_update)[0]
+        return cls.session_mget(session, [key], for_update)[0]
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
