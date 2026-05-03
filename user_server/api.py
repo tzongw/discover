@@ -422,11 +422,11 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    with Session() as session:
+    with Session.transaction() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
             account = Account(username=username, hashed=hash_password(password))
-            session.add(account)  # username unique index
+            session.add(account)
             session.defer(lambda: dispatcher.signal(account))
         elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
