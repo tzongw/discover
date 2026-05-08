@@ -13,6 +13,7 @@ from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField, Q
+from mongoengine.fields import BaseField
 from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date, Column, Integer, TypeDecorator
 from pydantic import BaseModel
@@ -133,14 +134,16 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=100, query=None, only_id=False):
-        if not isinstance(field, str):
+    def batch_range(cls, field: BaseField | str, *, start, stop, batch=100, query=None, only: BaseField | str = None):
+        if isinstance(field, BaseField):
             field = field.name
+        if isinstance(only, BaseField):
+            only = only.name
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
         q = Q(**query) if query else Q()
-        fields = {cls.id.name, field} if only_id else []
+        fields = {cls.id.name, field, only} if only else []
         while True:
             range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
@@ -155,7 +158,7 @@ class DocumentMixin:
                 if doc[field] != last:
                     break
                 seen_ids.append(doc.id)
-            yield [doc.id for doc in docs] if only_id else docs
+            yield [doc[only] for doc in docs] if only else docs
 
 
 class CacheMixin(DocumentMixin):
@@ -389,31 +392,27 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=100, query=(), only_id=False):
-        if isinstance(column, str):
-            col = getattr(cls, column)
-        else:
-            col, column = column, column.name
+    def batch_range(cls, column: Column, *, start, stop, batch=100, query=(), only: Column = None):
         asc = start < stop
-        order_by = col.asc() if asc else col.desc()
+        order_by = column.asc() if asc else column.desc()
         seen_ids = []
-        entities = {cls.id, col} if only_id else [cls]
+        entities = {cls.id, column, only} if only else [cls]
         while True:
             with cls.Session() as session:
-                range_query = [col >= start, col < stop, cls.id.not_in(seen_ids)] if asc else \
-                    [col <= start, col > stop, cls.id.not_in(seen_ids)]
+                range_query = [column >= start, column < stop, cls.id.not_in(seen_ids)] if asc else \
+                    [column <= start, column > stop, cls.id.not_in(seen_ids)]
                 rows = session.query(*entities).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
-            last = getattr(rows[-1], column)
+            last = getattr(rows[-1], column.name)
             if last != start:
                 seen_ids = []
                 start = last
             for row in reversed(rows):
-                if getattr(row, column) != last:
+                if getattr(row, column.name) != last:
                     break
                 seen_ids.append(row.id)
-            yield [row.id for row in rows] if only_id else rows
+            yield [getattr(row, only.name) for row in rows] if only else rows
 
 
 class SqlCacheMixin(TableMixin):
