@@ -2,8 +2,7 @@ import time
 from datetime import datetime
 from random import randrange
 
-# twitter's snowflake parameters
-twepoch = 1288834974657
+epoch = 1778570683249 # 2026-05-12 15:24:43.249
 timestamp_bits = 41
 datacenter_id_bits = 5
 worker_id_bits = 10
@@ -27,7 +26,7 @@ def make(timestamp_ms: int, datacenter_id: int, worker_id: int, sequence_id: int
 
     assert 0 <= timestamp_ms < max_timestamp and 0 <= datacenter_id < max_datacenter_id and \
            0 <= worker_id < max_worker_id and 0 <= sequence_id < max_sequence_id
-    sid = timestamp_ms - twepoch
+    sid = timestamp_ms - epoch
     sid = (sid << datacenter_id_bits) | datacenter_id
     sid = (sid << worker_id_bits) | worker_id
     sid = (sid << sequence_id_bits) | sequence_id
@@ -43,7 +42,7 @@ def melt(snowflake_id):
     datacenter_id = snowflake_id & datacenter_id_mask
     snowflake_id >>= datacenter_id_bits
     timestamp_ms = snowflake_id & timestamp_mask
-    timestamp_ms += twepoch
+    timestamp_ms += epoch
 
     return timestamp_ms, datacenter_id, worker_id, sequence_id
 
@@ -85,7 +84,7 @@ class Snowflake:
 
 
 if __name__ == '__main__':
-    t0 = twepoch + 1234
+    t0 = epoch + 1234
     print(local_datetime(t0))
     args = (t0, 12, 23, 34)
     assert melt(make(*args)) == args
