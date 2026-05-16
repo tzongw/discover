@@ -48,7 +48,7 @@ class Service:
                 exists = address in self._cooldown
                 self._cooldown[address] = time.time() + Registry.COOLDOWN
                 if not exists:
-                    logging.error(f'+ cool down {self._name} {address}')
+                    logging.info(f'+ cool down {self._name} {address}')
                     interval = self._update_addresses()
                     if not self._reaping:
                         self._reaping = True
