@@ -73,8 +73,6 @@ class Handler:
             online = shared.parser.hgetex(key, [conn_id], Online, ex=const.ONLINE_TTL)[0]
             if not online:
                 raise ValueError(f'conn invalid {conn_id}')
-            if online.session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
-                raise ValueError(f'session expired {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
