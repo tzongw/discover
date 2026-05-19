@@ -21,7 +21,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import diff_dict
+from .utils import diff_dict, func_desc
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -309,7 +309,7 @@ class TimeDeltaField(FloatField):
 
 
 class CriticalSection:
-    def __init__(self, redis: Union[Redis, RedisCluster], pattern: str, timeout=timedelta(minutes=1)):
+    def __init__(self, redis: Union[Redis, RedisCluster], pattern: str = None, timeout=timedelta(minutes=1)):
         self.redis = redis
         self.pattern = pattern
         self.timeout = timeout
@@ -317,12 +317,17 @@ class CriticalSection:
     def __call__(self, f):
         params = signature(f).parameters
         names = {index: param.name for index, param in enumerate(params.values())}
+        default_key = f'critical_section:{func_desc(f)}'
+        default_lock = Lock(self.redis, default_key, self.timeout.total_seconds(), blocking=False)
 
         @wraps(f)
         def wrapper(*args, **kwargs):
-            values = {names[index]: value for index, value in enumerate(args)}
-            key = self.pattern.format(*args, **values, **kwargs)
-            lock = Lock(self.redis, key, self.timeout.total_seconds(), blocking=False)
+            if self.pattern:
+                values = {names[index]: value for index, value in enumerate(args)}
+                key = self.pattern.format(*args, **values, **kwargs)
+                lock = Lock(self.redis, key, self.timeout.total_seconds(), blocking=False)
+            else:
+                lock = default_lock
             with contextlib.suppress(LockError), lock:
                 f(*args, **kwargs)
 

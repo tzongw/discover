@@ -86,7 +86,6 @@ class Handler:
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
         if redis.hdel(key, conn_id):
-            logging.info(f'logout {uid} {conn_id}')
             shared.producer.post(Disconnect(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
