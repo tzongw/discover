@@ -35,12 +35,12 @@ def on_register(account: Account):
 
 @consumer(Connect)
 def on_connect(data: Connect):
-    logging.info(f'{data}')
+    logging.debug(f'{data}')
 
 
 @consumer(Disconnect)
 def on_disconnect(data: Disconnect):
-    logging.info(f'{data}')
+    logging.debug(f'{data}')
 
 
 @consumer(Alarm)
