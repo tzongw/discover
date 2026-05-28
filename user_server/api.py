@@ -121,7 +121,7 @@ def get_future(key):
     if value is None:  # first request
         gevent.sleep(5)
         value = options.http_address
-        script.compare_set(full_key, placeholder, value, expire=timedelta(seconds=20))
+        redis.set(full_key, value, ifeq=placeholder, ex=timedelta(seconds=20))
         return value
     if value.startswith('PLACEHOLDER-'):  # wait for others
         fut = invalidator.future('future', key)
