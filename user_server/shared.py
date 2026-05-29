@@ -90,7 +90,7 @@ def dispatch_timeout(full_key, data):
         dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
         ts = int(time.time())
-        increment, _ = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
+        _, increment = redis.increx('timestamp:tick', byint=ts, ubound=ts, saturate=True)
         offset = min(increment, 60)
         for ts in range(ts - offset + 1, ts + 1):
             dispatcher.dispatch_tick(ts)
