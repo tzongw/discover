@@ -271,10 +271,10 @@ def redis_name(redis: Union[Redis, RedisCluster]):
 def create_redis(addr: str):
     if ',' in addr:
         addr = choice(addr.split(','))
-        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
+        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True, socket_timeout=None, protocol=2)
     else:
         proto = 'unix' if os.path.exists(addr) else 'redis'
-        return Redis.from_url(f'{proto}://{addr}', decode_responses=True)
+        return Redis.from_url(f'{proto}://{addr}', decode_responses=True, socket_timeout=None, protocol=2)
 
 
 def string_hash(s: str):

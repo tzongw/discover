@@ -5,7 +5,7 @@ from redis import Redis, RedisCluster
 from redis.client import Pipeline
 from pydantic import BaseModel
 from redis.cluster import ClusterPipeline
-from redis.client import _RedisCallbacks, _RedisCallbacksRESP2
+from redis._parsers.response_callbacks import _RedisCallbacks, _RedisCallbacksRESP2
 from .misc import JSONEncoder
 
 M = TypeVar('M', bound=BaseModel)
