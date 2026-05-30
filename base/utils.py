@@ -118,22 +118,6 @@ class SlidingWindow:
         return count
 
 
-class Limiter:
-    def __init__(self, redis: Redis | RedisCluster, limit: int, expire: timedelta):
-        self._redis = redis
-        self._limit = limit
-        self._expire = expire
-
-    def can_pass(self, key):
-        with self._redis.pipeline(transaction=True) as pipe:
-            pipe.incr(key)
-            pipe.expire(key, self._expire, nx=True)
-            count = pipe.execute()[0]
-        if count == self._limit:
-            logging.warning(f'{key} reach limit {self._limit}')
-        return count <= self._limit
-
-
 @lru_cache(maxsize=None)
 def ip_address(ipv6=False):
     with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
