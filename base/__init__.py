@@ -10,7 +10,6 @@ from .misc import ListConverter, CriticalSection
 from .singleflight import Singleflight, singleflight, once
 from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, Snowflake
-from .chunk import batched
 from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool

@@ -4,9 +4,9 @@ import random
 import time
 from datetime import timedelta, datetime
 from functools import lru_cache
-from typing import TypeVar, Generic, Generator
+from itertools import batched
+from typing import TypeVar, Generic, Generator, Union
 from random import shuffle
-from typing import Union
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
@@ -15,7 +15,6 @@ from .utils import stream_name, CHash
 from .misc import Stock
 from .timer import Timer
 from .ztimer import ZTimer
-from .chunk import batched
 from .task import HeavyTask
 
 

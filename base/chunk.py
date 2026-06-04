@@ -1,16 +1,9 @@
 # -*- coding: utf-8 -*-
 import bisect
-from itertools import islice
 from typing import TypeVar, Generic, Iterator
 from .singleflight import singleflight
 
 T = TypeVar('T')
-
-
-def batched(iterable, n):
-    iterator = iter(iterable)
-    while batch := tuple(islice(iterator, n)):
-        yield batch
 
 
 class LoadTimesError(Exception):
