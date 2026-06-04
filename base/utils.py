@@ -7,7 +7,6 @@ import bisect
 import hashlib
 import contextlib
 from binascii import crc32
-from datetime import timedelta
 from random import choice
 from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
