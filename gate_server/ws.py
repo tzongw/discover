@@ -81,7 +81,8 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
-        self.ws.handler.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        if options.http_port:
+            self.ws.handler.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         gevent.spawn(self._writer)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
