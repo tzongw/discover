@@ -58,7 +58,7 @@ class Parser:
 
     @staticmethod
     def _parser(cls: M):
-        return lambda value: cls.parse_raw(value) if value is not None else None
+        return lambda value: cls.model_validate_json(value) if value is not None else None
 
     def set(self, name: str, model: M, **kwargs) -> Union[M, bool]:
         response = self._redis.set(name, model, **kwargs)
@@ -96,15 +96,15 @@ class Parser:
         def convert(values):
             json_fields = getattr(cls, '__json_fields__', [])
             mapping = {k: json.loads(v) if k in json_fields else v for k, v in zip(fields, values) if v is not None}
-            return cls.parse_obj(mapping) if mapping or default else None
+            return cls.model_validate(mapping) if mapping or default else None
 
-        fields = cls.__fields__
+        fields = cls.model_fields
         return self._redis.execute_command('HMGET', name, *fields, convert=convert)
 
     def hset(self, name: str, model: M, **kwargs) -> int:
         """hash as model"""
         json_fields = getattr(model, '__json_fields__', [])
-        mapping = model.dict(exclude_unset=True)
+        mapping = model.model_dump(exclude_unset=True)
         for k, v in mapping.items():
             if k in json_fields:
                 mapping[k] = json.dumps(v, cls=JSONEncoder)
@@ -112,7 +112,7 @@ class Parser:
 
     def hgetall(self, name, cls: Type[M]) -> dict[str, M]:
         """field as model"""
-        return self._redis.execute_command('HGETALL', name, convert=cls.parse_raw)
+        return self._redis.execute_command('HGETALL', name, convert=cls.model_validate_json)
 
     def hgetex(self, name, keys, cls: Type[M], **kwargs) -> List[M]:
         """field as model"""
