@@ -5,6 +5,17 @@ from .singleflight import singleflight
 
 T = TypeVar('T')
 
+try:
+    from itertools import batched
+except ImportError:
+    from itertools import islice
+
+
+    def batched(iterable, n):
+        iterator = iter(iterable)
+        while batch := tuple(islice(iterator, n)):
+            yield batch
+
 
 class LoadTimesError(Exception):
     pass

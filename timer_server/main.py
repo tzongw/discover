@@ -8,7 +8,6 @@ import atexit
 import logging
 from typing import Dict
 from dataclasses import dataclass
-from itertools import batched
 import gevent
 from thrift.transport import TSocket
 from thrift.transport import TTransport
@@ -22,6 +21,7 @@ from base.scheduler import Handle
 from base.service import Service
 from base import LogSuppress
 from base.utils import DefaultDict
+from base.chunk import batched
 import const
 import shared
 

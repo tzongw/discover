@@ -4,7 +4,6 @@ import random
 import time
 from datetime import timedelta, datetime
 from functools import lru_cache
-from itertools import batched
 from typing import TypeVar, Generic, Generator, Union
 from random import shuffle
 import gevent
@@ -16,6 +15,7 @@ from .misc import Stock
 from .timer import Timer
 from .ztimer import ZTimer
 from .task import HeavyTask
+from .chunk import batched
 
 
 class Sharding:
