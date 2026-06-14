@@ -229,6 +229,7 @@ class RedisCache(SingleFlight[T]):
         self.prefix = prefix
         self.try_interval = try_interval
         self.try_times = try_times
+        self.lock_time = 2 * self.try_times * self.try_interval
 
     def _cached_mget(self, keys, *args, **kwargs):
         placeholder = self.prefix + str(uuid.uuid4())
@@ -236,11 +237,10 @@ class RedisCache(SingleFlight[T]):
         todo_indexes = []
         wait_indexes = []
         with self.redis.pipeline(transaction=False) as pipe:
-            lock_time = max(self.try_interval * self.try_times, timedelta(seconds=5))
             for key in keys:
                 made_key = self._make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
-                pipe.set(made_key, placeholder, nx=True, px=lock_time, get=True)
+                pipe.set(made_key, placeholder, nx=True, px=self.lock_time, get=True)
             values = pipe.execute()
         for index, value in enumerate(values):
             if value is None:
@@ -274,6 +274,6 @@ class RedisCache(SingleFlight[T]):
                 break
             if try_times >= self.try_times:
                 fail_keys = ', '.join(f'`{keys[index]}`' for index in fail_indexes)
-                raise ValueError(f'{fail_keys} not resolve')
+                raise ValueError(f'{fail_keys} not resolved')
             wait_indexes = fail_indexes
         return values
