@@ -8,7 +8,7 @@ from typing import TypeVar, Generic, Callable, Sequence
 from redis import Redis, RedisCluster
 import gevent
 from . import utils
-from .singleflight import Singleflight, singleflight
+from .singleflight import SingleFlight, singleflight
 from .invalidator import Invalidator
 from .chunk import LazySequence
 
@@ -29,7 +29,7 @@ def expire_at(expire) -> float:
     raise ValueError(f'{expire} not valid')
 
 
-class Cache(Singleflight[T]):
+class Cache(SingleFlight[T]):
     # https://redis.io/docs/latest/develop/reference/client-side-caching/#avoiding-race-conditions
 
     def __init__(self, *, get=None, mget=None, maxsize=4096, make_key=utils.make_key):
@@ -217,7 +217,7 @@ def ttl_cache(expire, *, maxsize=128):
     return decorator
 
 
-class RedisCache(Singleflight[T]):
+class RedisCache(SingleFlight[T]):
     def __init__(self, redis: Redis | RedisCluster, *, get=None, mget=None, expire: timedelta, make_key, serialize=None,
                  deserialize=None, prefix='PLACEHOLDER:', try_interval=timedelta(milliseconds=50), try_times=10):
         super().__init__(mget=self._cached_mget, make_key=make_key)

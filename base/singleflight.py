@@ -7,7 +7,7 @@ from . import utils
 T = TypeVar('T')
 
 
-class Singleflight(Generic[T]):
+class SingleFlight(Generic[T]):
     def __init__(self, *, get=None, mget=None, make_key=utils.make_key):
         self._make_key = make_key
         self._mget = utils.make_mget(get, mget)
@@ -57,7 +57,7 @@ def singleflight(f):
         args, *items = key
         return f(*args, **dict(items))
 
-    sf = Singleflight(get=get)
+    sf = SingleFlight(get=get)
 
     @functools.wraps(f)
     def wrapper(*args, **kwargs):

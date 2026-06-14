@@ -7,7 +7,7 @@ from yaml.constructor import SafeConstructor
 from pydantic import BaseModel
 from .utils import LogSuppress, Addr, ip_address, stream_name, Base62, func_desc
 from .misc import ListConverter, CriticalSection
-from .singleflight import Singleflight, singleflight, once
+from .singleflight import SingleFlight, singleflight, once
 from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, Snowflake
 from .defer import deferrable, defer_if, defer
