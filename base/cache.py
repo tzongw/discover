@@ -68,7 +68,7 @@ class Cache(SingleFlight[T]):
                 indexes.append(index)
         if missing_keys:
             version = self.invalids
-            values, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            values, real_gets = self._mget_stats(missing_keys, *args, **kwargs)
             for index, made_key, value, real_get in zip(indexes, made_keys, values, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
@@ -123,7 +123,7 @@ class TtlCache(Cache[T]):
                 indexes.append(index)
         if missing_keys:
             version = self.invalids
-            tuples, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            tuples, real_gets = self._mget_stats(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire), real_get in zip(indexes, made_keys, tuples, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
