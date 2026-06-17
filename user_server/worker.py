@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import gevent
 from base import Base62
-from base import WaitGroup
+from base import JoinGroup
 from config import define, options, ctx
 import shared
 
@@ -15,7 +15,7 @@ def handle_task(task):
 
 
 def main():
-    wg = WaitGroup(max_workers=options.concurrency, slow_time=options.slow_time)
+    wg = JoinGroup(max_workers=options.concurrency, slow_time=options.slow_time)
     workers = shared.heavy_task.start(exec_func=lambda task: wg.submit(handle_task, task))
     gevent.joinall(workers, raise_error=True)
     wg.join()

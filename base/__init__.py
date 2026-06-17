@@ -13,7 +13,7 @@ from .snowflake import extract_datetime, from_datetime, Snowflake
 from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool
-from .executor import Executor, WaitGroup
+from .executor import Executor, JoinGroup
 from .dispatcher import Dispatcher, TimeDispatcher
 from .scheduler import Scheduler
 from .invalidator import create_invalidator, Invalidator

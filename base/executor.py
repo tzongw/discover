@@ -110,6 +110,6 @@ class Executor:
             self._adjust_workers()  # race
 
 
-class WaitGroup(Executor):
-    def __init__(self, max_workers=10, queue_size=1, idle_time=5, slow_time=20, name='wait_group'):
+class JoinGroup(Executor):
+    def __init__(self, max_workers=20, queue_size=1, idle_time=10, slow_time=30, name='wait_group'):
         super().__init__(max_workers, queue_size, idle_time, slow_time, name)
