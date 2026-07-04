@@ -27,7 +27,7 @@ from config import options, ctx
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, script, scheduler
+from shared import session_key, async_task, heavy_task, scheduler
 import push
 
 cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
