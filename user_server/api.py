@@ -23,7 +23,7 @@ from base.poller import PollStatus
 from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
-from config import options, ctx
+from config import options, ctx, http_listener
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
@@ -35,10 +35,11 @@ cursor_filed.num_type = lambda v: int(v or 0)
 
 
 def serve():
+    listener = http_listener()
     logger = None if options.env == Environment.PROD else logging.getLogger()
-    server = pywsgi.WSGIServer(options.http_port, app, log=logger, error_log=logging.getLogger())
+    server = pywsgi.WSGIServer(listener, app, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
-    if not options.http_port:
+    if not options.unix_sock and not options.http_port:
         while not server.address[1]:
             gevent.sleep(0.01)
         options.http_port = server.address[1]

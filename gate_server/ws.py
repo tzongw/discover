@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-import os
-import logging
 import socket
-import atexit
+import logging
 from urllib import parse
 from collections import defaultdict
 import gevent
@@ -14,7 +12,7 @@ from base.utils import Base62
 from base.sharding import ShardingDict, ShardingSet
 import shared
 import const
-from config import options
+from config import options, http_listener
 
 
 def app(environ, start_response):
@@ -29,19 +27,7 @@ def app(environ, start_response):
 
 
 def serve():
-    if sock_path := options.unix_sock:
-        try:
-            os.unlink(sock_path)
-        except FileNotFoundError:
-            pass
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(sock_path)
-        os.chmod(sock_path, 0o700)
-        sock.listen()
-        listener = sock
-        atexit.register(os.unlink, sock_path)
-    else:
-        listener = options.http_port
+    listener = http_listener()
     logger = None if options.env == const.Environment.PROD else logging.getLogger()
     server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)

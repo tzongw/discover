@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
+import socket
+import atexit
 import logging
 from tornado.log import LogFormatter
 from tornado.options import define, parse_config_file
@@ -55,6 +58,33 @@ def http_port_callback(port: int):
         options.http_address = f'{options.host}:{port}'
 
 
+def unix_sock_callback(sock_path: str):
+    if not sock_path:
+        return
+    real_path = sock_path.format(pid=os.getpid())
+    if sock_path != real_path:
+        options.unix_sock = real_path
+    else:
+        options.define('http_address')
+        options.http_address = 'unix://' + sock_path
+
+
+def http_listener():
+    sock_path = options.unix_sock
+    if not sock_path:
+        return options.http_port
+    try:
+        os.unlink(sock_path)
+    except FileNotFoundError:
+        pass
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(sock_path)
+    os.chmod(sock_path, 0o700)
+    sock.listen()
+    atexit.register(os.unlink, sock_path)
+    return sock
+
+
 options.log_to_stderr = False
 options.add_parse_callback(parse_callback)
 
@@ -68,3 +98,4 @@ define('log_file', type=str, help='log file path')
 define('host', utils.ip_address(), str, 'public host', callback=host_callback)
 define('rpc_port', 0, int, 'rpc port', callback=rpc_port_callback)
 define('http_port', 0, int, 'http port', callback=http_port_callback)
+define('unix_sock', '', str, 'http unix sock', callback=unix_sock_callback)
