@@ -40,7 +40,7 @@ class Poller:
             config = self.configs.get(group)
             if not config:
                 logging.info(f'no config, quit {queue}')  # deploying? other apps will poll again
-                return None
+                return
             if spawn := config.spawn:
                 spawn(do_poll, config, group, queue)
             else:
