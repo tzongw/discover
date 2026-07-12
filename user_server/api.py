@@ -103,7 +103,7 @@ def echo(message):
     if if_none_match == f'W/"{tick}"':
         return '', 304
     tick = redis.incr('tick')
-    response = current_app.make_response(f'say hello {message * 1024} {tick}')
+    response = current_app.make_response(f'say hello {message} {tick}')
     response.headers['ETag'] = f'W/"{tick}"'
     return response
 

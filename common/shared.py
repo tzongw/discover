@@ -143,10 +143,10 @@ def _cleanup():  # call once
 @atexit.register
 def _gracefully_exit():
     _cleanup()
-    gevent.joinall(list(_workers))
     consumer.join()
     scheduler.join()
     executor.join()
+    gevent.joinall(list(_workers))
     unique_id.stop()  # at last
 
 
