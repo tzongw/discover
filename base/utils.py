@@ -265,6 +265,13 @@ def string_hash(s: str):
     return int.from_bytes(h.digest(), signed=True)
 
 
+def safe_int(s: str, default=None):
+    try:
+        return int(s)
+    except ValueError:
+        return default
+
+
 def try_flock(path):
     return _flock(path, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
