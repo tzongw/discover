@@ -85,14 +85,14 @@ class Cache(SingleFlight[T]):
         self.invalids += 1
         self.lru.clear()
 
-    def listen(self, invalidator: Invalidator, group: str, clear=False, delay_policy=None):
+    def listen(self, invalidator: Invalidator, group: str, clear=False, delay_policy=None, bcast=True):
         def do_invalidate(key: str):
             if clear or not key:
                 self.invalidate_all()
             else:
                 self.invalidate(key)
 
-        @invalidator(group)
+        @invalidator(group, bcast)
         def on_invalidate(key: str):
             do_invalidate(key)
             if delay_policy:

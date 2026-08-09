@@ -18,7 +18,7 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
-from base import singleflight, create_parser, CriticalSection, Priority
+from base import singleflight, create_parser, CriticalSection, Priority, Cache
 from base.poller import PollStatus
 from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
@@ -94,15 +94,24 @@ def hello(names):
     return f'say hello {names}'
 
 
+def get_value(key):
+    return redis.get(f'echo:{key}')
+
+
+echo_cache = Cache(get=get_value)
+echo_cache.listen(invalidator, group='echo', bcast=False)
+
+
 @app.route('/echo/<message>')
 def echo(message):
     gevent.sleep(0.1)
-    tick = redis.get('tick')
+    tick = echo_cache.get('tick')
     if_none_match = request.headers.get('If-None-Match')
     logging.info(f'match {if_none_match} tick {tick}')
     if if_none_match == f'W/"{tick}"':
         return '', 304
-    tick = redis.incr('tick')
+    if message == 'incr':
+        tick = redis.incr('echo:tick')
     response = current_app.make_response(f'say hello {message} {tick}')
     response.headers['ETag'] = f'W/"{tick}"'
     return response
