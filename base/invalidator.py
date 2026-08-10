@@ -37,8 +37,12 @@ class Invalidator:
         return decorator
 
     @property
-    def groups(self):
+    def all_groups(self):
         return self.dispatcher.keys() | self.getters.keys()
+
+    @property
+    def tracking_groups(self):
+        return {group for group in self.all_groups if group not in self.bcast_groups}
 
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
@@ -76,26 +80,36 @@ class Invalidator:
             raise
 
     def _invalidate_all(self):
-        for group in self.groups:
+        for group in self.all_groups:
             self.dispatcher.dispatch(group, '')
 
     def _run(self, redis: Redis, subscribe=True):
         def get_connection(*args, **kwargs):
             conn = origin_get_connection(*args, **kwargs)
-            if client_id is not None and self.conns.get(conn) != client_id:
+            if conn not in self.conns:  # first time
+                def disconnect(*args, **kwargs):
+                    self.conns[conn] = None
+                    for group in self.tracking_groups:
+                        self.dispatcher.dispatch(group, '')
+                    return origin_disconnect(*args, **kwargs)
+
+                self.conns[conn] = None
+                origin_disconnect = conn.disconnect
+                conn.disconnect = disconnect
+
+            if client_id is not None and self.conns[conn] != client_id:
                 redirect_to = client_id  # may change, save snapshot
                 command = f'CLIENT TRACKING ON REDIRECT {redirect_to}'
                 conn.send_command(command)
                 res = conn.read_response()
-                prefixes = ' '.join(f'PREFIX {group}{self.sep}' for group in tracking_groups)
+                prefixes = ' '.join(f'PREFIX {group}{self.sep}' for group in self.tracking_groups)
                 logging.info(f'{command} {prefixes} {res}')
                 self.conns[conn] = redirect_to
             return conn
 
         pubsub = None
         client_id = None
-        tracking_groups = [group for group in self.groups if group not in self.bcast_groups]
-        if tracking_groups:
+        if self.tracking_groups:
             pool = redis.connection_pool
             origin_get_connection = pool.get_connection
             pool.get_connection = get_connection
