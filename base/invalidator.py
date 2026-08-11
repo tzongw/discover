@@ -18,7 +18,6 @@ class Invalidator:
         self.dispatcher = Dispatcher(self.executor)
         self.futures = WeakValueDictionary()
         self.getters = {}
-        self.conns = WeakKeyDictionary()
         self.bcast_groups = set()
 
     def __call__(self, group, bcast=True):
@@ -86,18 +85,19 @@ class Invalidator:
     def _run(self, redis: Redis, subscribe=True):
         def get_connection(*args, **kwargs):
             conn = origin_get_connection(*args, **kwargs)
-            if client_id is not None and self.conns.get(conn) != client_id:
+            if client_id is not None and redirections.get(conn) != client_id:
                 redirect_to = client_id  # may change, save snapshot
                 command = f'CLIENT TRACKING ON REDIRECT {redirect_to}'
                 conn.send_command(command)
                 res = conn.read_response()
                 prefixes = ' '.join(f'PREFIX {group}{self.sep}' for group in self.tracking_groups)
                 logging.info(f'{command} {prefixes} {res}')
-                self.conns[conn] = redirect_to
+                redirections[conn] = redirect_to
             return conn
 
         pubsub = None
         client_id = None
+        redirections = WeakKeyDictionary()
         if self.tracking_groups:
             pool = redis.connection_pool
             origin_get_connection = pool.get_connection
@@ -125,7 +125,8 @@ class Invalidator:
                 logging.debug(f'got {msg}')
                 data = msg['data']
                 if data is None:
-                    logging.warning(f'db flush all')
+                    logging.info(f'flush all')
+                    redirections.clear()
                     self._invalidate_all()
                     continue
                 if isinstance(data, (bytes, str)):
