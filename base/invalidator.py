@@ -86,18 +86,7 @@ class Invalidator:
     def _run(self, redis: Redis, subscribe=True):
         def get_connection(*args, **kwargs):
             conn = origin_get_connection(*args, **kwargs)
-            if conn not in self.conns:  # first time
-                def disconnect(*args, **kwargs):
-                    self.conns[conn] = None
-                    for group in self.tracking_groups:
-                        self.dispatcher.dispatch(group, '')
-                    return origin_disconnect(*args, **kwargs)
-
-                self.conns[conn] = None
-                origin_disconnect = conn.disconnect
-                conn.disconnect = disconnect
-
-            if client_id is not None and self.conns[conn] != client_id:
+            if client_id is not None and self.conns.get(conn) != client_id:
                 redirect_to = client_id  # may change, save snapshot
                 command = f'CLIENT TRACKING ON REDIRECT {redirect_to}'
                 conn.send_command(command)
