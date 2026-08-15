@@ -7,7 +7,7 @@ from werkzeug.exceptions import TooManyRequests
 from werkzeug.debug import DebuggedApplication
 from flasgger import Swagger
 from flask import Flask, g
-from base import Cache
+from base import Cache, create_invalidator
 from base import ListConverter
 from base.misc import JSONProvider, make_response, SwitchTracer
 import const
@@ -36,12 +36,15 @@ def session_key(uid: int):
 
 def _get_user_sessions(uid: int):
     key = session_key(uid)
-    user_sessions = parser.hgetall(key, Session)
+    user_sessions = caching_parser.hgetall(key, Session)
     return MappingProxyType(user_sessions)
 
 
+caching_redis = create_redis(options.redis)
+caching_parser = create_parser(caching_redis)
+invalidator = create_invalidator(caching_redis)
 sessions: Cache[dict[str, Session]] = Cache(get=_get_user_sessions, make_key=int)
-sessions.listen(invalidator, 'session')
+sessions.listen(invalidator, 'session', bcast=False)
 
 
 @dataclass

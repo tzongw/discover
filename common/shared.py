@@ -13,7 +13,7 @@ from base import Registry, LogSuppress, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Producer, Consumer, Timer
-from base import create_invalidator, create_parser
+from base import create_parser
 from base import TimeDispatcher
 from base.utils import create_redis
 from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
@@ -39,7 +39,6 @@ snowflake = snowflake.Snowflake(options.datacenter, app_id)
 hint = f'{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
-invalidator = create_invalidator(redis)
 
 if isinstance(redis, RedisCluster):
     sharding = Sharding(shards=3, fixed_keys=[const.TICK_TIMER])

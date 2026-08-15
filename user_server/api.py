@@ -27,7 +27,7 @@ from config import options, ctx, http_listener
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, scheduler
+from shared import session_key, async_task, heavy_task, scheduler, caching_redis
 import push
 
 cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
@@ -95,7 +95,7 @@ def hello(names):
 
 
 def get_value(key):
-    return redis.get(f'echo:{key}')
+    return caching_redis.get(f'echo:{key}')
 
 
 echo_cache = Cache(get=get_value)
@@ -105,13 +105,11 @@ echo_cache.listen(invalidator, group='echo', bcast=False)
 @app.route('/echo/<message>')
 def echo(message):
     gevent.sleep(0.1)
-    tick = echo_cache.get('tick')
+    tick = echo_cache.get(message)
     if_none_match = request.headers.get('If-None-Match')
     logging.info(f'match {if_none_match} tick {tick}')
     if if_none_match == f'W/"{tick}"':
         return '', 304
-    if message == 'incr':
-        tick = redis.incr('echo:tick')
     response = current_app.make_response(f'say hello {message} {tick}')
     response.headers['ETag'] = f'W/"{tick}"'
     return response
