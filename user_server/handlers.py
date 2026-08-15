@@ -48,11 +48,6 @@ def on_alarm(data: Alarm):
     logging.info(f'{data}')
 
 
-@invalidator('session')
-def session_invalidate(key):
-    logging.info(key)
-
-
 @invalidator('runtime')
 def runtime_invalidate(key):
     if key != f'{app_name}:{app_id}':

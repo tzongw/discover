@@ -19,10 +19,18 @@ class Invalidator:
         self.futures = WeakValueDictionary()
         self.getters = {}
         self.bcast_groups = set()
+        self.tracking_groups = set()
+
+    def add_group(self, group, bcast):
+        if bcast:
+            assert group not in self.tracking_groups, f'{group} already in tracking groups'
+            self.bcast_groups.add(group)
+        else:
+            assert group not in self.bcast_groups, f'{group} already in bcast groups'
+            self.tracking_groups.add(group)
 
     def __call__(self, group, bcast=True):
-        if bcast:
-            self.bcast_groups.add(group)
+        self.add_group(group, bcast)
         return self.dispatcher(group)
 
     def getter(self, group, bcast=True):
@@ -31,17 +39,8 @@ class Invalidator:
             self.getters[group] = f
             return f
 
-        if bcast:
-            self.bcast_groups.add(group)
+        self.add_group(group, bcast)
         return decorator
-
-    @property
-    def all_groups(self):
-        return self.dispatcher.keys() | self.getters.keys()
-
-    @property
-    def tracking_groups(self):
-        return {group for group in self.all_groups if group not in self.bcast_groups}
 
     def start(self):
         return [gevent.spawn(self._run, self.redis)]
@@ -79,7 +78,7 @@ class Invalidator:
             raise
 
     def _invalidate_all(self):
-        for group in self.all_groups:
+        for group in self.bcast_groups | self.tracking_groups:
             self.dispatcher.dispatch(group, '')
 
     def _run(self, redis: Redis, subscribe=True):
