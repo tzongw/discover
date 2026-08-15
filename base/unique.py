@@ -25,8 +25,7 @@ class UniqueId:
         partition = randrange(r.start, r.stop)
         range_chain = chain(range(partition, r.stop), range(r.start, partition))
         for unique_id in range_chain:
-            if self._redis.hsetex(key, str(unique_id), '', ex=self._TTL,
-                                  data_persist_option=HashDataPersistOptions.FNX):
+            if self._redis.hsetex(key, unique_id, '', ex=self._TTL, data_persist_option=HashDataPersistOptions.FNX):
                 logging.info(f'{key} got unique id {unique_id}')
                 self._keys[key] = unique_id
                 return unique_id
