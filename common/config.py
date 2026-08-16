@@ -7,7 +7,7 @@ from tornado.log import LogFormatter
 from tornado.options import define, parse_config_file
 from tornado.options import options
 from concurrent_log_handler import ConcurrentRotatingFileHandler
-from base import utils
+from base import utils, once
 from .const import Environment
 from gevent.local import local
 
@@ -69,6 +69,7 @@ def unix_sock_callback(sock_path: str):
         options.http_address = 'unix://' + sock_path
 
 
+@once
 def http_listener():
     sock_path = options.unix_sock
     if not sock_path:
