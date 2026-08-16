@@ -95,7 +95,8 @@ def hello(names):
 
 
 def get_value(key):
-    return caching_redis.get(f'echo:{key}')
+    full_key = invalidator.full_key('echo', key)
+    return caching_redis.get(full_key)
 
 
 echo_cache = Cache(get=get_value)
@@ -116,7 +117,8 @@ def echo(message):
 
 
 @invalidator.getter('future')
-def getter(full_key):
+def getter(key):
+    full_key = invalidator.full_key('future', key)
     return redis.get(full_key)
 
 
@@ -124,14 +126,14 @@ def getter(full_key):
 @singleflight
 def get_future(key):
     full_key = invalidator.full_key('future', key)
-    placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
+    placeholder = f'PLACEHOLDER:{uuid.uuid4()}'
     value = redis.set(full_key, placeholder, nx=True, ex=10, get=True)
     if value is None:  # first request
         gevent.sleep(5)
         value = options.http_address
         redis.set(full_key, value, ifeq=placeholder, ex=timedelta(seconds=20))
         return value
-    if value.startswith('PLACEHOLDER-'):  # wait for others
+    if value.startswith('PLACEHOLDER:'):  # wait for others
         fut = invalidator.future('future', key)
         return fut.result(10)
     return value  # cached
