@@ -30,6 +30,7 @@ class Invalidator:
             self.tracking_groups.add(group)
 
     def __call__(self, group, bcast=True):
+        assert self.sep not in group
         self.add_group(group, bcast)
         return self.dispatcher(group)
 
