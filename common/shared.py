@@ -64,7 +64,7 @@ timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: U
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = Base62.encode(snowflake.gen())
+        ctx.trace_id = Base62.encode(snowflake.gen())
         start = time.time()
         with LogSuppress():
             f(*args, **kwargs)

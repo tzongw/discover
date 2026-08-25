@@ -49,7 +49,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = Base62.encode(snowflake.gen())
+    ctx.trace_id = Base62.encode(snowflake.gen())
 
 
 @async_task
