@@ -54,6 +54,7 @@ class Limiter:
 
 
 def user_limiter(*, cooldown, threshold=1):
+    assert threshold > 0
     doing = set()
     limiters = {}  # type: dict[int, Limiter]
 
