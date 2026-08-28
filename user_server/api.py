@@ -440,6 +440,7 @@ def login(username: str, password: str):
             session.defer(lambda: dispatcher.signal(account))
         elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
+    ctx.uid = account.id
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
     flask.session[CTX_TOKEN] = token
@@ -485,6 +486,7 @@ def authorize():
     if not user_session:
         raise Unauthorized
     g.uid, g.session = uid, user_session
+    ctx.uid = uid
     if uid in user_actives:
         return
     # refresh last active & token ttl
