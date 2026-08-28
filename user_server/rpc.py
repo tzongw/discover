@@ -15,7 +15,7 @@ from models import Online
 from service import user
 from common.messages import Connect, Disconnect
 import shared
-from shared import app, online_key, redis, dispatch_timeout, sessions
+from shared import app, online_key, redis, dispatch_timeout, sessions, online_users_key
 import push
 
 
@@ -42,7 +42,8 @@ class Handler:
                 create_parser(pipe).hgetall(key, Online)
                 online = Online(session_id=session_id, address=address)
                 pipe.hsetex(key, conn_id, online, ex=const.ONLINE_TTL, data_persist_option=HashDataPersistOptions.FNX)
-                conns, added = pipe.execute()
+                pipe.zincrby(online_users_key, 1, uid)
+                conns, added, _ = pipe.execute()
                 assert added, 'conn id conflicts or login twice'
             for cid, online in conns.items():
                 if online.session_id != session_id:
@@ -85,8 +86,12 @@ class Handler:
             return
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
-        if redis.hdel(key, conn_id):
-            shared.producer.post(Disconnect(uid=uid))
+        with redis.pipeline(transaction=False) as pipe:
+            pipe.hdel(key, conn_id)
+            pipe.zincrby(online_users_key, -1, uid)
+            pipe.zremrangebyscore(online_users_key, '-inf', 0)
+            pipe.execute()
+        shared.producer.post(Disconnect(uid=uid))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

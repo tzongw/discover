@@ -25,6 +25,8 @@ if options.env == const.Environment.DEV:
 swagger = Swagger(app)
 switch_tracer = SwitchTracer()
 
+online_users_key = 'users:online'
+
 
 def online_key(uid: int):
     return f'online:{uid}'
