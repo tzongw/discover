@@ -127,11 +127,11 @@ class Handler:
             # noinspection PyProtectedMember
             client._delete_timer(info.service, info.key)
 
-    def _do_retreat(self, addr):
-        logging.info(f'retreat worker {addr} start')
+    def _do_migrate(self, addr):
+        logging.info(f'migrate worker {addr} start')
         while self._timers and addr in shared.timer_service.addresses():
             full_key, timer = self._timers.popitem()
-            logging.debug(f'retreating timer: {full_key}')
+            logging.debug(f'migrating timer: {full_key}')
             timer.handle.cancel()
             info = timer.info
             with LogSuppress():
@@ -143,17 +143,17 @@ class Handler:
                         client.call_repeat(info.service, info.key, info.data, info.interval)
                     else:
                         logging.error(f'invalid timer: {info}')
-        logging.info(f'retreat worker {addr} done')
+        logging.info(f'migrate worker {addr} done')
 
-    def retreat_timers(self):
+    def migrate_timers(self):
         if not self._timers:
             return
         addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
         if not addresses:
-            logging.error(f'CAN NOT retreat timers: {len(self._timers)}')
+            logging.error(f'CAN NOT migrate timers: {len(self._timers)}')
             return
-        logging.info(f'retreat timers: {len(self._timers)}')
-        workers = [gevent.spawn(self._do_retreat, addr) for addr in addresses]
+        logging.info(f'migrate timers: {len(self._timers)}')
+        workers = [gevent.spawn(self._do_migrate, addr) for addr in addresses]
         gevent.joinall(workers)
 
 
@@ -181,8 +181,8 @@ def main():
     shared.init_main()
     handler.load_timers()
     shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
-    shared.to_exit(handler.retreat_timers)
-    shared.at_exit(handler.retreat_timers)  # double check
+    shared.to_exit(handler.migrate_timers)
+    shared.at_exit(handler.migrate_timers)  # double check
     gevent.joinall(workers, raise_error=True)
 
 
