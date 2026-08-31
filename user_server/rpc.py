@@ -61,7 +61,7 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            shared.producer.post(Connect(uid=uid))
+            shared.producer.post(Connect(uid=uid, session_id=session_id, count=len(conns) + 1))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success: ping interval: {const.PING_INTERVAL}')
@@ -87,11 +87,13 @@ class Handler:
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
         with redis.pipeline(transaction=False) as pipe:
+            create_parser(pipe).hgetex(key, [conn_id], Online)
             pipe.hdel(key, conn_id)
+            pipe.hlen(key)
             pipe.zincrby(online_users_key, -1, uid)
             pipe.zremrangebyscore(online_users_key, '-inf', 0)
-            pipe.execute()
-        shared.producer.post(Disconnect(uid=uid))
+            (online,), _, count, *_ = pipe.execute()
+        shared.producer.post(Disconnect(uid=uid, session_id=online.session_id, count=count))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

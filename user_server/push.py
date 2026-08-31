@@ -5,7 +5,7 @@ from models import Online
 from base import LogSuppress
 
 
-def send(uid=None, message=None, mapping: dict = None):
+def send(uid=None, message=None, mapping=None):
     assert uid is not None or mapping
     if mapping is None:
         mapping = {}
@@ -15,13 +15,14 @@ def send(uid=None, message=None, mapping: dict = None):
         parser = create_parser(pipe)
         for uid in mapping.keys():
             parser.hgetall(online_key(uid), Online)
-        for user_conns, message in zip(pipe.execute(), mapping.values()):
-            for conn_id, online in user_conns.items():
-                with LogSuppress(), gate_service.client(online.address) as client:
-                    if isinstance(message, str):
-                        client.send_text(conn_id, message)
-                    else:
-                        client.send_binary(conn_id, message)
+        user_conns = pipe.execute()
+    for conns, message in zip(user_conns, mapping.values()):
+        for conn_id, online in conns.items():
+            with LogSuppress(), gate_service.client(online.address) as client:
+                if isinstance(message, str):
+                    client.send_text(conn_id, message)
+                else:
+                    client.send_binary(conn_id, message)
 
 
 def kick(uid, message=None, *, session_id=None):
