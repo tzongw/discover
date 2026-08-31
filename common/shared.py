@@ -135,23 +135,26 @@ def init_main():
     logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-@once
-def _prepare_to_exit():  # call once
-    logging.info(f'prepare to exit')
+def _safe_execute(fns):
     with LogSuppress():
         if sys.argv[0].endswith('ptpython'):  # ptpython compatible
-            for fn in _to_exits:
+            for fn in fns:
                 fn()
         else:
-            executor.gather(_to_exits)
+            executor.gather(fns)
+
+
+@once
+def _prepare_to_exit():
+    logging.info(f'prepare to exit')
+    _safe_execute(_to_exits)
 
 
 @atexit.register
 def _finally_exit():
-    logging.info(f'finally exit')
     _prepare_to_exit()
-    with LogSuppress():
-        executor.gather(_at_exits)
+    logging.info(f'finally exit')
+    _safe_execute(_at_exits)
     consumer.join()
     scheduler.join()
     executor.join()
