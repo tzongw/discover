@@ -4,7 +4,6 @@ from gevent import monkey
 monkey.patch_all()
 from config import options
 import time
-import atexit
 import logging
 from typing import Dict
 from dataclasses import dataclass
@@ -183,7 +182,7 @@ def main():
     handler.load_timers()
     shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     shared.to_exit(handler.retreat_timers)
-    atexit.register(handler.retreat_timers)  # double check
+    shared.at_exit(handler.retreat_timers)  # double check
     gevent.joinall(workers, raise_error=True)
 
 

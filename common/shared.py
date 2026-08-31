@@ -100,27 +100,34 @@ class Status:
 
 status = Status()
 _workers = set()  # thread workers
-_mains = []
-_exits = [registry.stop, consumer.stop, heavy_task.stop]
+_at_mains = []  # init at main
+_to_exits = [registry.stop, consumer.stop, heavy_task.stop]  # stop receiving requests, prepare to exit
+_at_exits = []  # cleanup at exit
 mercy = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)  # wait time for graceful exit
 
 
 def at_main(func):
     assert callable(func) and not status.inited
-    _mains.append(func)
+    _at_mains.append(func)
     return func
 
 
 def to_exit(func):
     assert callable(func) and not status.exiting
-    _exits.append(func)
+    _to_exits.append(func)
+    return func
+
+
+def at_exit(func):
+    assert callable(func) and not status.exiting
+    _at_exits.append(func)
     return func
 
 
 def init_main():
     assert not status.inited
     status.inited = True
-    executor.gather(_mains)
+    executor.gather(_at_mains)
     # optimize gc STW
     start = time.time()
     gc.collect()
@@ -129,19 +136,22 @@ def init_main():
 
 
 @once
-def _cleanup():  # call once
-    logging.info(f'cleanup')
+def _prepare_to_exit():  # call once
+    logging.info(f'prepare to exit')
     with LogSuppress():
         if sys.argv[0].endswith('ptpython'):  # ptpython compatible
-            for fn in _exits:
+            for fn in _to_exits:
                 fn()
         else:
-            executor.gather(_exits)
+            executor.gather(_to_exits)
 
 
 @atexit.register
-def _gracefully_exit():
-    _cleanup()
+def _finally_exit():
+    logging.info(f'finally exit')
+    _prepare_to_exit()
+    with LogSuppress():
+        executor.gather(_at_exits)
     consumer.join()
     scheduler.join()
     executor.join()
@@ -156,7 +166,7 @@ def _sig_handler(sig, _):
             gevent.spawn(lambda: sys.exit(1))
     else:
         def sig_exit():
-            _cleanup()
+            _prepare_to_exit()
             if sig == signal.SIGUSR1 or status.script:
                 return
             gevent.sleep(mercy)
