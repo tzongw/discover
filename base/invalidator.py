@@ -22,6 +22,7 @@ class Invalidator:
         self.tracking_groups = set()
 
     def add_group(self, group, bcast):
+        assert self.sep not in group
         if bcast:
             assert group not in self.tracking_groups, f'{group} already in tracking groups'
             self.bcast_groups.add(group)
@@ -30,13 +31,12 @@ class Invalidator:
             self.tracking_groups.add(group)
 
     def __call__(self, group, bcast=True):
-        assert self.sep not in group
         self.add_group(group, bcast)
         return self.dispatcher(group)
 
     def getter(self, group, bcast=True):
         def decorator(f):
-            assert self.sep not in group and group not in self.getters
+            assert group not in self.getters
             self.getters[group] = f
             return f
 
