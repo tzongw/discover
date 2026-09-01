@@ -19,12 +19,11 @@ app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
 app.json.ensure_ascii = False
 app.make_response = partial(make_response, app)
-if options.env == const.Environment.DEV:
+if options.env in [const.Environment.DEV, const.Environment.TEST]:
+    swagger = Swagger(app)
     app.debug = True
-    app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
-swagger = Swagger(app)
+    app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=options.env == const.Environment.TEST)
 switch_tracer = SwitchTracer()
-
 online_users_key = 'users:online'
 
 
