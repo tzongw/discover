@@ -86,7 +86,7 @@ class Handler:
             return
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
-        with redis.pipeline(transaction=False) as pipe:
+        with redis.pipeline(transaction=True) as pipe:
             create_parser(pipe).hgetex(key, [conn_id], Online)
             pipe.hdel(key, conn_id)
             pipe.hlen(key)
