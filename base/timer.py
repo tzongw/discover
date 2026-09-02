@@ -23,14 +23,15 @@ local function array_to_table(array)
 end
 
 local function timer_tick(keys, args)
-    local cur_ts = redis.call('TIME')[1]
     local info = array_to_table(redis.call('XINFO', 'STREAM', keys[1]))
-    local tick_ts = string.sub(info['last-generated-id'], 1, -3)
-    local init_ts = math.max(tick_ts + 1, cur_ts - args[1])
-    for ts = init_ts, cur_ts do
-        redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], ts, '', '')
+    local last_ts = tonumber(string.sub(info['last-generated-id'], 1, -3))
+    local cur_ts = tonumber(redis.call('TIME')[1])
+    if last_ts >= cur_ts then
+        return false
     end
-    return math.max(cur_ts - init_ts + 1, 0)
+    local tick_ts = math.max(last_ts + 1, cur_ts - args[1])
+    redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], tick_ts, '', '')
+    return true
 end
 
 redis.register_function('timer_xadd', timer_xadd)
@@ -79,6 +80,6 @@ class Timer:
             keys_and_args.append(self.hint)
         return self.new(key, 'timer_xadd', interval, loop=loop, num_keys=1, keys_and_args=keys_and_args)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=60):
+    def tick(self, key: str, stream: str, offset: int, interval=timedelta(milliseconds=100)):
         keys_and_args = [stream, offset, self.maxlen]
         return self.new(key, 'timer_tick', interval, loop=True, num_keys=1, keys_and_args=keys_and_args)

@@ -82,14 +82,14 @@ def init():
         timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
         to_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
         if options.tick_timer:
-            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
+            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=0.1)
             to_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
         to_exit(lambda: ztimer.kill('welcome:2'))
         if options.tick_timer:
-            ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+            ztimer.new(const.TICK_TIMER, '', timedelta(milliseconds=500), loop=True)
             to_exit(lambda: ztimer.kill(const.TICK_TIMER))
         handle = scheduler.call_repeat(poll_timeouts, timedelta(seconds=1))
         to_exit(handle.cancel)
@@ -107,7 +107,7 @@ def init():
         logging.info(timer.info(loop_id))
         logging.info(timer.info(task_id))
         if options.tick_timer:
-            timer.tick(const.TICK_TIMER, const.TICK_STREAM)
+            timer.tick(const.TICK_TIMER, const.TICK_STREAM, const.TICK_OFFSET)
             to_exit(lambda: timer.kill(const.TICK_TIMER))
         log_level = logging.getLevelName(logging.getLogger().getEffectiveLevel())
         runtime = Runtime(address=options.host, pid=os.getpid(), log_level=log_level)

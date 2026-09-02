@@ -12,6 +12,7 @@ APP_RELOAD = 'reload'
 
 TICK_STREAM = 'stream:tick'
 TICK_TIMER = 'timer:tick'
+TICK_OFFSET = 8 * 3600
 
 RPC_USER = f'rpc_{APP_USER}'
 HTTP_USER = f'http_{APP_USER}'
