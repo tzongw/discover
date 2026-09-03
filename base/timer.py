@@ -27,11 +27,10 @@ local function timer_tick(keys, args)
     local last_ts = tonumber(string.sub(info['last-generated-id'], 1, -3))
     local cur_ts = tonumber(redis.call('TIME')[1])
     if last_ts >= cur_ts then
-        return false
+        return nil
     end
     local tick_ts = math.max(last_ts + 1, cur_ts - args[1])
-    redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], tick_ts, '', '')
-    return true
+    return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], tick_ts, '', '')
 end
 
 redis.register_function('timer_xadd', timer_xadd)
