@@ -102,9 +102,9 @@ def dispatch_timeout(full_key, data):
         if value >= sync_ts:
             dispatcher.dispatch_tick(value)
             return
-        if redis.set('timestamp:tick', sync_ts, ifeq=value):
-            logging.info(f'tick: {value} -> {sync_ts}')
-            dispatcher.dispatch_tick(sync_ts)
+        if redis.set('timestamp:tick', cur_ts, ifeq=value):
+            logging.info(f'tick: {value} -> {cur_ts}')
+            dispatcher.dispatch_tick(cur_ts)
 
 
 if options.tick_timer:
