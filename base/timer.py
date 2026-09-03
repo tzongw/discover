@@ -31,6 +31,7 @@ local function timer_tick(keys, args)
     end
     local tick_ts = last_ts + 1
     if tick_ts < cur_ts - args[1] then
+        redis.log(redis.LOG_WARNING, 'tick: ' .. tick_ts .. ' -> ' .. cur_ts)
         tick_ts = cur_ts
     end
     return redis.call('XADD', keys[1], 'MAXLEN', '~', args[2], tick_ts, '', '')
