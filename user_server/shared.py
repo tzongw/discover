@@ -95,15 +95,16 @@ def dispatch_timeout(full_key, data):
         dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
         cur_ts = int(time.time())
-        value, incr = redis.increx('timestamp:tick', ubound=cur_ts)
-        if not incr:
-            return
         sync_ts = cur_ts - const.TICK_OFFSET
-        if value >= sync_ts:
+        value, incr = redis.increx('timestamp:tick', lbound=sync_ts, ubound=cur_ts)
+        if incr:
             dispatcher.dispatch_tick(value)
             return
+        if value >= cur_ts:  # upper bound
+            return
+        # lower bound
         if redis.set('timestamp:tick', cur_ts, ifeq=value):
-            logging.info(f'tick: {value} -> {cur_ts}')
+            logging.info(f'tick: {value + 1} -> {cur_ts}')
             dispatcher.dispatch_tick(cur_ts)
 
 
