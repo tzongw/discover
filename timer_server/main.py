@@ -5,9 +5,12 @@ monkey.patch_all()
 from config import options
 import time
 import logging
+import contextlib
 from typing import Dict
 from dataclasses import dataclass
+from collections import defaultdict
 import gevent
+from gevent.lock import RLock
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -40,6 +43,12 @@ class Timer:
     handle: Handle
 
 
+class LockCounter:
+    def __init__(self):
+        self.lock = RLock()
+        self.count = 0
+
+
 class Handler:
     _PREFIX = 'TIMER'
 
@@ -48,6 +57,20 @@ class Handler:
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
         self._loading = False
+        self._lock_counters = defaultdict(LockCounter)
+
+    @contextlib.contextmanager
+    def lock(self, full_key):
+        lock_counter = self._lock_counters[full_key]
+        try:
+            lock_counter.count += 1
+            lock_counter.lock.acquire()
+            yield
+        finally:
+            lock_counter.lock.release()
+            lock_counter.count -= 1
+            if lock_counter.count == 0:
+                self._lock_counters.pop(full_key)
 
     def load_timers(self):
         self._loading = True
@@ -77,48 +100,52 @@ class Handler:
             client.timeout(key, data)
 
     def call_later(self, service, key, data, delay):
-        logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
-        deadline = time.time() + delay
-        info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
-        px = max(int(delay * 1000), 1)
-        old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
-        if old_info and old_info.addr != options.rpc_address:
-            self._rpc_delete(old_info)
+        with self.lock(full_key):
+            logging.debug(f'{service} {key} {delay}')
+            deadline = time.time() + delay
+            info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
+            px = max(int(delay * 1000), 1)
+            old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
+            if old_info and old_info.addr != options.rpc_address:
+                self._rpc_delete(old_info)
 
-        def callback():
+            def callback():
+                self._delete_timer(service, key)
+                self._fire_timer(service, key, data)
+
             self._delete_timer(service, key)
-            self._fire_timer(service, key, data)
-
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_at(callback, deadline)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+            handle = shared.scheduler.call_at(callback, deadline)
+            self._timers[full_key] = Timer(info=info, handle=handle)
 
     def call_repeat(self, service, key, data, interval):
         assert interval > 0
-        logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
-        info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
-        old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
-        if old_info and old_info.addr != options.rpc_address:
-            self._rpc_delete(old_info)
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+        with self.lock(full_key):
+            logging.debug(f'{service} {key} {interval}')
+            info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
+            old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
+            if old_info and old_info.addr != options.rpc_address:
+                self._rpc_delete(old_info)
+            self._delete_timer(service, key)
+            handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
+            self._timers[full_key] = Timer(info=info, handle=handle)
 
     def remove_timer(self, service, key):
-        logging.debug(f'{service} {key}')
-        self._delete_timer(service, key)
         full_key = self._full_key(service, key)
-        info = shared.parser.getdel(full_key, Info)
-        if info and info.addr != options.rpc_address:
-            self._rpc_delete(info)
+        with self.lock(full_key):
+            logging.debug(f'{service} {key}')
+            self._delete_timer(service, key)
+            info = shared.parser.getdel(full_key, Info)
+            if info and info.addr != options.rpc_address:
+                self._rpc_delete(info)
 
     def _delete_timer(self, service, key):
         full_key = self._full_key(service, key)
-        if timer := self._timers.pop(full_key, None):
-            logging.debug(f'delete {full_key}')
-            timer.handle.cancel()
+        with self.lock(full_key):
+            if timer := self._timers.pop(full_key, None):
+                logging.debug(f'delete {full_key}')
+                timer.handle.cancel()
 
     @staticmethod
     def _rpc_delete(info: Info):
