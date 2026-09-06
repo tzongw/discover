@@ -68,3 +68,18 @@ class TimerService(Service, Selector):
         if hasattr(timer.Iface, name):
             return partial(self._oneshot, self.client, name)
         return super().__getattr__(name)
+
+    def call_later(self, service, key, data, delay):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.call_later(service, key, data, delay)
+
+    def call_repeat(self, service, key, data, interval):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.call_repeat(service, key, data, interval)
+
+    def remove_timer(self, service, key):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.remove_timer(service, key)
