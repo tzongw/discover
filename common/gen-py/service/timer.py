@@ -179,29 +179,15 @@ class Client(Iface):
 
         """
         self.send__delete_timer(service, key)
-        self.recv__delete_timer()
 
     def send__delete_timer(self, service, key):
-        self._oprot.writeMessageBegin('_delete_timer', TMessageType.CALL, self._seqid)
+        self._oprot.writeMessageBegin('_delete_timer', TMessageType.ONEWAY, self._seqid)
         args = _delete_timer_args()
         args.service = service
         args.key = key
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
-
-    def recv__delete_timer(self):
-        iprot = self._iprot
-        (fname, mtype, rseqid) = iprot.readMessageBegin()
-        if mtype == TMessageType.EXCEPTION:
-            x = TApplicationException()
-            x.read(iprot)
-            iprot.readMessageEnd()
-            raise x
-        result = _delete_timer_result()
-        result.read(iprot)
-        iprot.readMessageEnd()
-        return
 
 
 class Processor(Iface, TProcessor):
@@ -307,24 +293,12 @@ class Processor(Iface, TProcessor):
         args = _delete_timer_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = _delete_timer_result()
         try:
             self._handler._delete_timer(args.service, args.key)
-            msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
-        except TApplicationException as ex:
-            logging.exception('TApplication exception in handler')
-            msg_type = TMessageType.EXCEPTION
-            result = ex
         except Exception:
-            logging.exception('Unexpected exception in handler')
-            msg_type = TMessageType.EXCEPTION
-            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("_delete_timer", msg_type, seqid)
-        result.write(oprot)
-        oprot.writeMessageEnd()
-        oprot.trans.flush()
+            logging.exception('Exception in oneway handler')
 
 # HELPER FUNCTIONS AND STRUCTURES
 
@@ -799,49 +773,6 @@ _delete_timer_args.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'service', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'key', 'UTF8', None, ),  # 2
-)
-
-
-class _delete_timer_result(object):
-
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('_delete_timer_result')
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-all_structs.append(_delete_timer_result)
-_delete_timer_result.thrift_spec = (
 )
 fix_spec(all_structs)
 del all_structs
