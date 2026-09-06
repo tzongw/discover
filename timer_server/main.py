@@ -30,14 +30,14 @@ class Info(BaseModel):
     key: str
     data: str
     addr: str
-    deadline: float = None
-    interval: float = None
+    deadline: float | None = None
+    interval: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class Timer:
     info: Info
-    handle: Handle
+    handle: Handle | None = None
 
 
 class Handler:
@@ -81,30 +81,36 @@ class Handler:
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
+        timer = Timer(info=info)
+        self._delete_timer(service, key)
+        self._timers[full_key] = timer
         px = max(int(delay * 1000), 1)
         old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
+        if self._timers.get(full_key) is timer:
+            def callback():
+                if self._timers.get(full_key) is timer:
+                    self._timers.pop(full_key)
+                self._fire_timer(service, key, data)
 
-        def callback():
-            self._delete_timer(service, key)
-            self._fire_timer(service, key, data)
-
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_at(callback, deadline)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+            handle = shared.scheduler.call_at(callback, deadline)
+            timer.handle = handle
 
     def call_repeat(self, service, key, data, interval):
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
         info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
+        timer = Timer(info=info)
+        self._delete_timer(service, key)
+        self._timers[full_key] = timer
         old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+        if self._timers.get(full_key) is timer:
+            handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
+            timer.handle = handle
 
     def remove_timer(self, service, key):
         logging.debug(f'{service} {key}')
@@ -117,6 +123,8 @@ class Handler:
     def _delete_timer(self, service, key):
         full_key = self._full_key(service, key)
         if timer := self._timers.pop(full_key, None):
+            if not timer.handle:
+                return
             logging.debug(f'delete {full_key}')
             timer.handle.cancel()
 
@@ -131,6 +139,8 @@ class Handler:
         logging.info(f'migrate worker {addr} start')
         while self._timers and addr in shared.timer_service.addresses():
             full_key, timer = self._timers.popitem()
+            if not timer.handle:
+                continue
             logging.debug(f'migrating timer: {full_key}')
             timer.handle.cancel()
             info = timer.info
