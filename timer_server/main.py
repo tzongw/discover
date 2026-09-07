@@ -5,9 +5,11 @@ monkey.patch_all()
 from config import options
 import time
 import logging
+import contextlib
 from typing import Dict
 from dataclasses import dataclass
 import gevent
+from gevent.lock import RLock
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -50,6 +52,7 @@ class Handler:
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
         self._loading = False
         self._uniq_id = None
+        self._locks = {}  # type: Dict[str, list]  # full_key -> [RLock, refcount]
 
     def load_timers(self):
         self._loading = True
@@ -71,6 +74,22 @@ class Handler:
     def _full_key(cls, service, key):
         return f'{cls._PREFIX}:{service}:{key}'
 
+    @contextlib.contextmanager
+    def _key_lock(self, full_key):
+        entry = self._locks.get(full_key)
+        if entry is None:
+            entry = [RLock(), 0]
+            self._locks[full_key] = entry
+        entry[1] += 1  # count holders + waiters before any yield
+        entry[0].acquire()  # reentrant per greenlet; acquire before try so release always paired
+        try:
+            yield
+        finally:
+            entry[0].release()
+            entry[1] -= 1
+            if entry[1] == 0:
+                del self._locks[full_key]
+
     def _fire_timer(self, service, key, data):
         logging.debug(f'{service} {key}')
         service = self._services[service]
@@ -86,17 +105,18 @@ class Handler:
         uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
         info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
-        old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
-        if old_info and old_info.addr != options.rpc_address:
-            self._rpc_delete(old_info)
+        with self._key_lock(full_key):
+            old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
+            if old_info and old_info.addr != options.rpc_address:
+                self._rpc_delete(old_info)
 
-        def callback():
+            def callback():
+                self._delete_timer(service, key)
+                self._fire_timer(service, key, data)
+
             self._delete_timer(service, key)
-            self._fire_timer(service, key, data)
-
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_at(callback, deadline)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+            handle = shared.scheduler.call_at(callback, deadline)
+            self._timers[full_key] = Timer(info=info, handle=handle)
 
     def call_repeat(self, service, key, data, interval):
         assert interval > 0
@@ -104,28 +124,31 @@ class Handler:
         full_key = self._full_key(service, key)
         uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
         info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
-        old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
-        if old_info and old_info.addr != options.rpc_address:
-            self._rpc_delete(old_info)
-        self._delete_timer(service, key)
-        handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
-        self._timers[full_key] = Timer(info=info, handle=handle)
+        with self._key_lock(full_key):
+            old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
+            if old_info and old_info.addr != options.rpc_address:
+                self._rpc_delete(old_info)
+            self._delete_timer(service, key)
+            handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
+            self._timers[full_key] = Timer(info=info, handle=handle)
 
     def remove_timer(self, service, key):
         logging.debug(f'{service} {key}')
-        self._delete_timer(service, key)
         full_key = self._full_key(service, key)
-        info = shared.parser.getdel(full_key, Info)
-        if info and info.addr != options.rpc_address:
-            self._rpc_delete(info)
+        with self._key_lock(full_key):
+            self._delete_timer(service, key)
+            info = shared.parser.getdel(full_key, Info)
+            if info and info.addr != options.rpc_address:
+                self._rpc_delete(info)
 
     def _delete_timer(self, service, key, uniq_id=None):
         full_key = self._full_key(service, key)
-        timer = self._timers.get(full_key)
-        if timer and (uniq_id is None or timer.info.uniq_id == uniq_id):
-            logging.debug(f'delete {full_key}')
-            self._timers.pop(full_key)
-            timer.handle.cancel()
+        with self._key_lock(full_key):
+            timer = self._timers.get(full_key)
+            if timer and (uniq_id is None or timer.info.uniq_id == uniq_id):
+                logging.debug(f'delete {full_key}')
+                self._timers.pop(full_key)
+                timer.handle.cancel()
 
     @staticmethod
     def _rpc_delete(info: Info):
