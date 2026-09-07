@@ -19,13 +19,14 @@ from service.timeout import Client
 from base.scheduler import Handle
 from base.service import Service
 from base import LogSuppress
-from base.utils import DefaultDict
+from base.utils import DefaultDict, Base62
 from base.chunk import batched
 import const
 import shared
 
 
 class Info(BaseModel):
+    uniq_id: str
     service: str
     key: str
     data: str
@@ -48,6 +49,7 @@ class Handler:
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
         self._loading = False
+        self._uniq_id = None
 
     def load_timers(self):
         self._loading = True
@@ -56,6 +58,7 @@ class Handler:
                 if info is None or info.addr != options.rpc_address or \
                         self._full_key(info.service, info.key) in self._timers:
                     continue
+                self._uniq_id = info.uniq_id
                 if info.deadline is not None:
                     self.call_later(info.service, info.key, info.data, info.deadline - time.time())
                 elif info.interval is not None:
@@ -80,7 +83,8 @@ class Handler:
         logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
-        info = Info(service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
+        uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
+        info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
         old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
         if old_info and old_info.addr != options.rpc_address:
@@ -98,7 +102,8 @@ class Handler:
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
-        info = Info(service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
+        uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
+        info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
         old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
         if old_info and old_info.addr != options.rpc_address:
             self._rpc_delete(old_info)
@@ -114,18 +119,20 @@ class Handler:
         if info and info.addr != options.rpc_address:
             self._rpc_delete(info)
 
-    def _delete_timer(self, service, key):
+    def _delete_timer(self, service, key, uniq_id=None):
         full_key = self._full_key(service, key)
-        if timer := self._timers.pop(full_key, None):
+        timer = self._timers.get(full_key)
+        if timer and (uniq_id is None or timer.info.uniq_id == uniq_id):
             logging.debug(f'delete {full_key}')
+            self._timers.pop(full_key)
             timer.handle.cancel()
 
     @staticmethod
     def _rpc_delete(info: Info):
-        logging.debug(f'{info.service} {info.key} {info.addr}')
+        logging.debug(f'{info.uniq_id} {info.service} {info.key} {info.addr}')
         with shared.timer_service.client(info.addr) as client:
             # noinspection PyProtectedMember
-            client._delete_timer(info.service, info.key)
+            client._delete_timer(info.service, info.key, info.uniq_id)
 
     def _do_migrate(self, addr):
         logging.info(f'migrate worker {addr} start')
