@@ -54,6 +54,8 @@ class Handler:
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
         self._locks = {}  # type: Dict[str, list]  # full_key -> [RLock, refcount]
+        self._migrating = False
+        self._no_peer_logged = False
 
     def load_timers(self):
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100), 100):
@@ -214,15 +216,19 @@ class Handler:
         logging.info(f'migrate worker {addr} done')
 
     def migrate_timers(self):
-        if not self._timers:
+        if self._migrating or not self._timers:
             return
         addresses = [addr for addr in shared.timer_service.addresses() if addr != options.rpc_address]
         if not addresses:
-            logging.error(f'CAN NOT migrate timers: {len(self._timers)}')
+            if not self._no_peer_logged:
+                self._no_peer_logged = True
+                logging.error(f'no peer found, CAN NOT migrate timers: {len(self._timers)}')
             return
         logging.info(f'migrate timers: {len(self._timers)}')
+        self._migrating = True
         workers = [gevent.spawn(self._do_migrate, addr) for addr in addresses]
         gevent.joinall(workers)
+        self._migrating = False
 
 
 def rpc_serve(handler):
@@ -250,7 +256,8 @@ def main():
     handler.load_timers()
     shared.registry.register({shared.rpc_service: f'{options.rpc_address}'})
     shared.to_exit(handler.migrate_timers)
-    shared.at_exit(handler.migrate_timers)  # double check
+    shared.to_exit(lambda: shared.scheduler.call_repeat(handler.migrate_timers, interval=0.1))
+    shared.at_exit(handler.migrate_timers)  # final check
     gevent.joinall(workers, raise_error=True)
 
 
