@@ -2,6 +2,7 @@ service timer {
     void call_later(1: string service, 2: string key, 3: string data, 4: double delay)
     void call_repeat(1: string service, 2: string key, 3: string data, 4: double interval)
     void remove_timer(1: string service, 2: string key)
+    void _migrate_timer(1: string info_data)
     oneway void _delete_timer(1: string service, 2: string key, 3: string uniq_id)
 }
 
