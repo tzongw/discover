@@ -116,19 +116,14 @@ class Handler:
         deadline = time.time() + delay
         px = max(int(delay * 1000), 1)
         with self._key_lock(full_key):
+            uniq_id = Base62.encode(shared.snowflake.gen())
             if info := doing_info:
-                if info.addr == options.rpc_address:  # loading
-                    if shared.redis.get(full_key) != info_data:
-                        logging.info(f'loading timer changed: {info}')
-                        return
-                else:  # migrating
-                    info.uniq_id = Base62.encode(shared.snowflake.gen())
-                    info.addr = options.rpc_address
-                    if not shared.redis.set(full_key, info, ifeq=info_data, px=px):
-                        logging.info(f'migrating timer changed: {info}')
-                        return
+                info.uniq_id = uniq_id
+                info.addr = options.rpc_address
+                if not shared.redis.set(full_key, info, ifeq=info_data, px=px):
+                    logging.info(f'timer claim failed: {info}')
+                    return
             else:
-                uniq_id = Base62.encode(shared.snowflake.gen())
                 info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address,
                             deadline=deadline)
                 old_info = shared.parser.set(full_key, info, px=px, get=True)
@@ -148,19 +143,14 @@ class Handler:
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
         with self._key_lock(full_key):
+            uniq_id = Base62.encode(shared.snowflake.gen())
             if info := doing_info:
-                if info.addr == options.rpc_address:  # loading
-                    if shared.redis.get(full_key) != info_data:
-                        logging.info(f'loading timer changed: {info}')
-                        return
-                else:  # migrating
-                    info.uniq_id = Base62.encode(shared.snowflake.gen())
-                    info.addr = options.rpc_address
-                    if not shared.redis.set(full_key, info, ifeq=info_data):
-                        logging.info(f'migrating timer changed: {info}')
-                        return
+                info.uniq_id = uniq_id
+                info.addr = options.rpc_address
+                if not shared.redis.set(full_key, info, ifeq=info_data):
+                    logging.info(f'timer claim failed: {info}')
+                    return
             else:
-                uniq_id = Base62.encode(shared.snowflake.gen())
                 info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address,
                             interval=interval)
                 old_info = shared.parser.set(full_key, info, get=True)
@@ -199,7 +189,6 @@ class Handler:
 
     def _migrate_timer(self, info_data):
         info = Info.model_validate_json(info_data)
-        assert info.addr != options.rpc_address
         self._create_timer(info, info_data)
 
     def _do_migrate(self, addr):
