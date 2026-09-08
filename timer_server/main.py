@@ -53,8 +53,6 @@ class Handler:
         self._timers = {}  # type: Dict[str, Timer]
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
-        self._info_data = None
-        self._doing_info = None
         self._locks = {}  # type: Dict[str, list]  # full_key -> [RLock, refcount]
 
     def load_timers(self):
@@ -68,14 +66,13 @@ class Handler:
                 self._create_timer(info, info_data)
 
     def _create_timer(self, info, info_data):
-        self._doing_info = info
-        self._info_data = info_data
         if info.deadline is not None:
-            self.call_later(info.service, info.key, info.data, info.deadline - time.time())
+            self.call_later(info.service, info.key, info.data, info.deadline - time.time(),
+                            doing_info=info, info_data=info_data)
         elif info.interval is not None:
-            self.call_repeat(info.service, info.key, info.data, info.interval)
+            self.call_repeat(info.service, info.key, info.data, info.interval,
+                             doing_info=info, info_data=info_data)
         else:
-            self._doing_info = self._info_data = None
             logging.error(f'invalid timer: {info}')
 
     @classmethod
@@ -106,10 +103,8 @@ class Handler:
             client = Client(conn)
             client.timeout(key, data)
 
-    def call_later(self, service, key, data, delay):
+    def call_later(self, service, key, data, delay, *, doing_info=None, info_data=None):
         logging.debug(f'{service} {key} {delay}')
-        doing_info, info_data = self._doing_info, self._info_data
-        self._doing_info = self._info_data = None
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
         px = max(int(delay * 1000), 1)
@@ -141,11 +136,9 @@ class Handler:
             handle = shared.scheduler.call_at(callback, deadline)
             self._timers[full_key] = Timer(info=info, handle=handle)
 
-    def call_repeat(self, service, key, data, interval):
+    def call_repeat(self, service, key, data, interval, *, doing_info=None, info_data=None):
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
-        doing_info, info_data = self._doing_info, self._info_data
-        self._doing_info = self._info_data = None
         full_key = self._full_key(service, key)
         with self._key_lock(full_key):
             if info := doing_info:
