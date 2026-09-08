@@ -50,25 +50,36 @@ class Handler:
         self._timers = {}  # type: Dict[str, Timer]
         self._services = DefaultDict(
             lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
-        self._loading = False
-        self._uniq_id = None
+        self._info_data = None
+        self._loading_info = None
+        self._migrating_info = None
         self._locks = {}  # type: Dict[str, list]  # full_key -> [RLock, refcount]
 
     def load_timers(self):
-        self._loading = True
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100), 100):
-            for info in shared.parser.mget_nonatomic(full_keys, Info):
-                if info is None or info.addr != options.rpc_address or \
-                        self._full_key(info.service, info.key) in self._timers:
+            for info_data in shared.redis.mget_nonatomic(full_keys):
+                if info_data is None:
                     continue
-                self._uniq_id = info.uniq_id
-                if info.deadline is not None:
-                    self.call_later(info.service, info.key, info.data, info.deadline - time.time())
-                elif info.interval is not None:
-                    self.call_repeat(info.service, info.key, info.data, info.interval)
-                else:
-                    logging.error(f'invalid timer: {info}')
-        self._loading = False
+                loading_info = Info.model_validate_json(info_data)
+                if loading_info.addr != options.rpc_address:
+                    continue
+                self._info_data = info_data
+                self._loading_info = loading_info
+                self._create_timer(loading_info)
+
+    def _create_timer(self, info):
+        assert self._info_data and (self._loading_info or self._migrating_info)
+        try:
+            if info.deadline is not None:
+                self.call_later(info.service, info.key, info.data, info.deadline - time.time())
+            elif info.interval is not None:
+                self.call_repeat(info.service, info.key, info.data, info.interval)
+            else:
+                logging.error(f'invalid timer: {info}')
+        finally:
+            self._info_data = None
+            self._loading_info = None
+            self._migrating_info = None
 
     @classmethod
     def _full_key(cls, service, key):
@@ -102,13 +113,27 @@ class Handler:
         logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
-        uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
-        info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, deadline=deadline)
         px = max(int(delay * 1000), 1)
         with self._key_lock(full_key):
-            old_info = None if self._loading else shared.parser.set(full_key, info, px=px, get=True)
-            if old_info and old_info.addr != options.rpc_address:
-                self._rpc_delete(old_info)
+            if self._loading_info:
+                if shared.redis.get(full_key) != self._info_data:
+                    logging.info(f'loading info changed: {full_key}')
+                    return
+                info = self._loading_info
+            elif self._migrating_info:
+                info = self._migrating_info
+                info.uniq_id = Base62.encode(shared.snowflake.gen())
+                info.addr = options.rpc_address
+                if not shared.parser.set(full_key, info, px=px, ifeq=self._info_data):
+                    logging.info(f'migrating info changed: {full_key}')
+                    return
+            else:
+                uniq_id = Base62.encode(shared.snowflake.gen())
+                info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address,
+                            deadline=deadline)
+                old_info = shared.parser.set(full_key, info, px=px, get=True)
+                if old_info and old_info.addr != options.rpc_address:
+                    self._rpc_delete(old_info)
 
             def callback():
                 self._delete_timer(service, key)
@@ -122,12 +147,26 @@ class Handler:
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
-        uniq_id = self._uniq_id if self._loading else Base62.encode(shared.snowflake.gen())
-        info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address, interval=interval)
         with self._key_lock(full_key):
-            old_info = None if self._loading else shared.parser.set(full_key, info, get=True)
-            if old_info and old_info.addr != options.rpc_address:
-                self._rpc_delete(old_info)
+            if self._loading_info:
+                if shared.redis.get(full_key) != self._info_data:
+                    logging.info(f'loading info changed: {full_key}')
+                    return
+                info = self._loading_info
+            elif self._migrating_info:
+                info = self._migrating_info
+                info.uniq_id = Base62.encode(shared.snowflake.gen())
+                info.addr = options.rpc_address
+                if not shared.parser.set(full_key, info, ifeq=self._info_data):
+                    logging.info(f'migrating info changed: {full_key}')
+                    return
+            else:
+                uniq_id = Base62.encode(shared.snowflake.gen())
+                info = Info(uniq_id=uniq_id, service=service, key=key, data=data, addr=options.rpc_address,
+                            interval=interval)
+                old_info = shared.parser.set(full_key, info, get=True)
+                if old_info and old_info.addr != options.rpc_address:
+                    self._rpc_delete(old_info)
             self._delete_timer(service, key)
             handle = shared.scheduler.call_repeat(lambda: self._fire_timer(service, key, data), interval)
             self._timers[full_key] = Timer(info=info, handle=handle)
@@ -149,6 +188,12 @@ class Handler:
                 logging.debug(f'delete {full_key}')
                 self._timers.pop(full_key)
                 timer.handle.cancel()
+
+    def _migrate_timer(self, info_data):
+        self._info_data = info_data
+        info = Info.model_validate_json(info_data)
+        self._migrating_info = info
+        self._create_timer(info)
 
     @staticmethod
     def _rpc_delete(info: Info):
