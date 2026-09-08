@@ -10,6 +10,7 @@ from typing import Dict
 from dataclasses import dataclass
 import gevent
 from gevent.lock import RLock
+from redis import RedisCluster
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
@@ -60,7 +61,9 @@ class Handler:
     def load_timers(self):
         group = JoinGroup(slow_time=1, name='loading_timers')
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100), 100):
-            for info_data in shared.redis.mget_nonatomic(full_keys):
+            values = shared.redis.mget_nonatomic(full_keys) if isinstance(shared.redis, RedisCluster) else \
+                shared.redis.mget(full_keys)
+            for info_data in values:
                 if info_data is None:
                     continue
                 info = Info.model_validate_json(info_data)
