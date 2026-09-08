@@ -15,7 +15,7 @@ def handle_task(task):
 
 
 def main():
-    wg = JoinGroup(max_workers=options.concurrency, slow_time=options.slow_time)
-    workers = shared.heavy_task.start(exec_func=lambda task: wg.submit(handle_task, task))
+    group = JoinGroup(max_workers=options.concurrency, slow_time=options.slow_time)
+    workers = shared.heavy_task.start(exec_func=lambda task: group.submit(handle_task, task))
     gevent.joinall(workers, raise_error=True)
-    wg.join()
+    group.join()

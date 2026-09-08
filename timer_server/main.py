@@ -20,7 +20,7 @@ from service.timer import Processor
 from service.timeout import Client
 from base.scheduler import Handle
 from base.service import Service
-from base import LogSuppress
+from base import LogSuppress, JoinGroup
 from base.utils import DefaultDict, Base62
 from base.chunk import batched
 import const
@@ -58,6 +58,7 @@ class Handler:
         self._no_peer_logged = False
 
     def load_timers(self):
+        group = JoinGroup(slow_time=1, name='loading_timers')
         for full_keys in batched(shared.redis.scan_iter(match=f'{self._PREFIX}:*', count=100), 100):
             for info_data in shared.redis.mget_nonatomic(full_keys):
                 if info_data is None:
@@ -65,7 +66,8 @@ class Handler:
                 info = Info.model_validate_json(info_data)
                 if info.addr != options.rpc_address:
                     continue
-                self._create_timer(info, info_data)
+                group.submit(self._create_timer, info, info_data)
+        group.join()
 
     def _create_timer(self, info, info_data):
         if info.deadline is not None:
