@@ -133,8 +133,8 @@ class Handler:
                     self._rpc_delete(old_info)
 
             def callback():
-                self._delete_timer(service, key)
-                self._fire_timer(service, key, data)
+                if self._delete_timer(service, key, info.uniq_id):  # fire only if still owned
+                    self._fire_timer(service, key, data)
 
             self._delete_timer(service, key)
             handle = shared.scheduler.call_at(callback, deadline)
@@ -184,6 +184,8 @@ class Handler:
                 logging.debug(f'delete {full_key}')
                 self._timers.pop(full_key)
                 timer.handle.cancel()
+                return True
+        return False
 
     @staticmethod
     def _rpc_delete(info: Info):
