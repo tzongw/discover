@@ -115,8 +115,8 @@ class Handler:
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
         px = max(int(delay * 1000), 1)
+        uniq_id = Base62.encode(shared.snowflake.gen())
         with self._key_lock(full_key):
-            uniq_id = Base62.encode(shared.snowflake.gen())
             if info := doing_info:
                 info.uniq_id = uniq_id
                 info.addr = options.rpc_address
@@ -142,8 +142,8 @@ class Handler:
         assert interval > 0
         logging.debug(f'{service} {key} {interval}')
         full_key = self._full_key(service, key)
+        uniq_id = Base62.encode(shared.snowflake.gen())
         with self._key_lock(full_key):
-            uniq_id = Base62.encode(shared.snowflake.gen())
             if info := doing_info:
                 info.uniq_id = uniq_id
                 info.addr = options.rpc_address
