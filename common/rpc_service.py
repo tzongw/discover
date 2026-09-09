@@ -64,11 +64,6 @@ class TimerService(Service, Selector):
         with self.connection(address) as conn:
             yield timer.Client(conn)
 
-    def __getattr__(self, name):
-        if hasattr(timer.Iface, name):
-            return partial(self._oneshot, self.client, name)
-        return super().__getattr__(name)
-
     def call_later(self, service, key, data, delay):
         addr = self.address(hint=key)
         with self.client(addr) as client:
