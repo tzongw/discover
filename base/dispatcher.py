@@ -41,9 +41,9 @@ class Dispatcher:
         for handle in handlers:
             self._executor.submit(handle, *args, **kwargs)
 
-    def signal(self, event):
-        cls = event.__class__
-        self.dispatch(cls, event)
+    def signal(self, obj, *, before: dict = None):
+        cls = obj.__class__
+        self.dispatch(cls, obj, before or {})
 
     def __call__(self, key):
         def decorator(f):
