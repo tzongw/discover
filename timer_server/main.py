@@ -80,7 +80,7 @@ class Handler:
             self.call_repeat(info.service, info.key, info.data, info.interval,
                              doing_info=info, info_data=info_data)
         else:
-            logging.error(f'invalid timer: {info}')
+            raise ValueError(f'invalid timer: {info}')
 
     @classmethod
     def _full_key(cls, service, key):
