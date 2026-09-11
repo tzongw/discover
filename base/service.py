@@ -63,7 +63,11 @@ class Service:
         addresses = sorted(self.addresses())
         self._healthy_addresses = [addr for addr in addresses if addr not in self._cooldown]
         self._local_addresses = [addr for addr in self._healthy_addresses if Addr(addr).host == self._local_host]
-        for addr in self._pools.keys() - self.addresses() - self._closing.keys():
+        available = set(addresses)
+        for addr in available & self._closing.keys():
+            self._closing.pop(addr)
+            logging.info(f'- closing {self._name} {addr}')
+        for addr in self._pools.keys() - available - self._closing.keys():
             logging.info(f'+ closing {self._name} {addr}')
             self._closing[addr] = now + Registry.COOLDOWN
         expired = [addr for addr, at in self._closing.items() if at <= now]
@@ -75,6 +79,9 @@ class Service:
 
     def _reap_expired(self):
         while True:
-            if self._cooldown or self._closing:
-                self._update_addresses()
+            try:
+                if self._cooldown or self._closing:
+                    self._update_addresses()
+            except Exception:
+                logging.exception(f'reap error {self._name}')
             gevent.sleep(1)
