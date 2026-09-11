@@ -114,7 +114,9 @@ class Handler:
         logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
-        px = max(int(delay * 1000), 1)
+        # +100ms grace: keep the key alive past deadline so it can't expire in-flight
+        # (during migration/CAS); the fired callback leaves a harmless leftover key
+        px = max(int(delay * 1000) + 100, 1)
         uniq_id = Base62.encode(shared.snowflake.gen())
         with self._key_lock(full_key):
             if info := doing_info:
