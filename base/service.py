@@ -18,11 +18,12 @@ class Service:
         self._registry = registry
         self._pools = DefaultDict(lambda address: ThriftPool(Addr(address), **settings))  # type: Dict[str, ThriftPool]
         self._cooldown = {}  # type: Dict[str, float]
+        self._closing = {}  # type: Dict[str, float]
         self._healthy_addresses = []  # addresses not in cooldown
         self._local_addresses = []  # healthy addresses with same host
         registry.add_callback(self._update_addresses)
         self._update_addresses()
-        self._reaping = False
+        gevent.spawn(self._reap_expired)
 
     def addresses(self):
         return self._registry.addresses(self._name)
@@ -49,24 +50,12 @@ class Service:
                 self._cooldown[address] = time.time() + Registry.COOLDOWN
                 if not exists:
                     logging.info(f'+ cool down {self._name} {address}')
-                    interval = self._update_addresses()
-                    if not self._reaping:
-                        self._reaping = True
-                        gevent.spawn_later(interval, self._reap_cooldown)
+                    self._update_addresses()
             raise
 
-    def _clean_pools(self):
-        available = self.addresses()
-        holding = set(self._pools.keys())
-        for removing in holding - available:
-            logging.info(f'clean {self._name} {removing}')
-            pool = self._pools.pop(removing)
-            pool.shutdown()
-
     def _update_addresses(self):
-        self._clean_pools()
         now = time.time()
-        expired = [addr for addr, cd in self._cooldown.items() if cd <= now]
+        expired = [addr for addr, at in self._cooldown.items() if at <= now]
         if expired:
             logging.info(f'- cool down {self._name} {expired}')
         for addr in expired:
@@ -74,9 +63,18 @@ class Service:
         addresses = sorted(self.addresses())
         self._healthy_addresses = [addr for addr in addresses if addr not in self._cooldown]
         self._local_addresses = [addr for addr in self._healthy_addresses if Addr(addr).host == self._local_host]
-        return min(self._cooldown.values()) - now if self._cooldown else 0  # next expire interval
+        for addr in self._pools.keys() - self.addresses() - self._closing.keys():
+            logging.info(f'+ closing {self._name} {addr}')
+            self._closing[addr] = now + Registry.COOLDOWN
+        expired = [addr for addr, at in self._closing.items() if at <= now]
+        for addr in expired:
+            self._closing.pop(addr)
+            logging.info(f'close {self._name} {addr}')
+            pool = self._pools.pop(addr)
+            pool.shutdown()
 
-    def _reap_cooldown(self):
-        while interval := self._update_addresses():
-            gevent.sleep(interval)
-        self._reaping = False
+    def _reap_expired(self):
+        while True:
+            if self._cooldown or self._closing:
+                self._update_addresses()
+            gevent.sleep(1)
