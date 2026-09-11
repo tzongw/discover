@@ -11,6 +11,7 @@ class Pool(metaclass=abc.ABCMeta):
         self._timeout = timeout
         self._idle = Queue()
         self._size = 0
+        self._closed = False
 
     @abc.abstractmethod
     def create_conn(self):
@@ -25,7 +26,7 @@ class Pool(metaclass=abc.ABCMeta):
         return False
 
     def shutdown(self):
-        self._maxsize = 0  # _return_conn will close using conns
+        self._closed = True
         self.reap_idle()
 
     def reap_idle(self):
@@ -50,10 +51,10 @@ class Pool(metaclass=abc.ABCMeta):
         self.close_conn(conn)
 
     def _return_conn(self, conn):
-        if self._idle.qsize() < self._maxsize:
-            self._idle.put(conn)
-        else:
+        if self._closed:
             self._close_conn(conn)
+        else:
+            self._idle.put(conn)
 
     @contextlib.contextmanager
     def connection(self):
