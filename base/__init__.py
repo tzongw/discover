@@ -58,7 +58,7 @@ def _get_moveable_keys(self, redis_conn, *args):
 
 def _encode(self: Encoder, value):
     if isinstance(value, BaseModel):
-        value = value.json(exclude_defaults=True)
+        value = value.model_dump_json(exclude_defaults=True)
     elif isinstance(value, datetime):
         value = value.strftime('%Y-%m-%d %H:%M:%S.%f')
     elif isinstance(value, date):
