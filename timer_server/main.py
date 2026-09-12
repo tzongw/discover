@@ -53,8 +53,7 @@ class Handler:
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
-        self._services = DefaultDict(
-            lambda name: Service(shared.registry, name, options.host))  # type: Dict[str, Service]
+        self._services: Dict[str, Service] = DefaultDict(lambda name: Service(shared.registry, name, options.host))
         self._locks = {}  # type: Dict[str, list]  # full_key -> [RLock, refcount]
         self._migrating = False
         self._no_peer_logged = False
