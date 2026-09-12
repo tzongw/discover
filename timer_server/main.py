@@ -49,6 +49,7 @@ class Timer:
 
 class Handler:
     _PREFIX = 'TIMER'
+    _GRACE = 60 * 1000
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
@@ -114,7 +115,7 @@ class Handler:
         logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
-        px = max(int(delay * 1000), 1)
+        px = max(int(delay * 1000), 0) + self._GRACE
         uniq_id = Base62.encode(shared.snowflake.gen())
         with self._key_lock(full_key):
             if info := doing_info:
@@ -132,6 +133,7 @@ class Handler:
 
             def callback():
                 if self._delete_timer(service, key, info.uniq_id):  # fire only if still owned
+                    shared.redis.delex(full_key, ifeq=info)
                     self._fire_timer(service, key, data)
 
             self._delete_timer(service, key)
