@@ -25,7 +25,7 @@ class Pool(metaclass=abc.ABCMeta):
     def biz_exception(e: Exception):
         return False
 
-    def shutdown(self):
+    def close(self):
         self._closed = True
         self.reap_idle()
 

@@ -75,7 +75,7 @@ class Service:
             self._closing.pop(addr)
             logging.info(f'close {self._name} {addr}')
             pool = self._pools.pop(addr)
-            pool.shutdown()
+            pool.close()
 
     def _reap_expired(self):
         while True:
