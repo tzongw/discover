@@ -38,21 +38,29 @@ def kick(uid, message=None, *, session_id=None):
             client.remove_conn(conn_id)
 
 
-def join(uid, group, *, session_id=None):
+def join(uid, group, message=None, *, session_id=None):
     conns = parser.hgetall(online_key(uid), Online)
     for conn_id, online in conns.items():
         if session_id and online.session_id != session_id:
             continue
         with LogSuppress(), gate_service.client(online.address) as client:
+            if isinstance(message, str):
+                client.send_text(conn_id, message)
+            elif isinstance(message, bytes):
+                client.send_binary(conn_id, message)
             client.join_group(conn_id, group)
 
 
-def leave(uid, group, *, session_id=None):
+def leave(uid, group, message=None, *, session_id=None):
     conns = parser.hgetall(online_key(uid), Online)
     for conn_id, online in conns.items():
         if session_id and online.session_id != session_id:
             continue
         with LogSuppress(), gate_service.client(online.address) as client:
+            if isinstance(message, str):
+                client.send_text(conn_id, message)
+            elif isinstance(message, bytes):
+                client.send_binary(conn_id, message)
             client.leave_group(conn_id, group)
 
 
