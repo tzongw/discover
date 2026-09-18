@@ -70,9 +70,9 @@ class Pool(metaclass=abc.ABCMeta):
         else:
             self._return_conn(conn)
 
-    def _invoke(self, name, *args, **kwargs):
+    def _invoke(self, func_name, *args, **kwargs):
         with self.connection() as conn:
-            return getattr(conn, name)(*args, **kwargs)
+            return getattr(conn, func_name)(*args, **kwargs)
 
     def __getattr__(self, name):
         return partial(self._invoke, name)
