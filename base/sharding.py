@@ -225,14 +225,18 @@ class ShardingStock(Stock):
         super().__init__(redis)
         self.sharding = sharding
 
+    def get(self, key, hint=None):
+        return self.mget([key], hint=hint)[0]
+
     def mget(self, keys, hint=None):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for key in keys:
-                for sharded_key in self.sharding.all_sharded_keys(key):
-                    pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            shard = None if hint is None else self.sharding.get_shard(hint)
-            return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
-                    for chunk in batched(pipe.execute(), self.sharding.shards)]
+        all_keys = sum([self.sharding.all_sharded_keys(key) for key in keys], [])
+        values = self.redis.mget_nonatomic(all_keys) if isinstance(self.redis, RedisCluster) \
+            else self.redis.mget(all_keys)
+        chunks = list(batched(values, self.sharding.shards))
+        if hint is None:
+            return [sum(int(value or 0) for value in chunk) for chunk in chunks]
+        shard = self.sharding.get_shard(hint)
+        return [0 if int(chunk[shard] or 0) == 0 else sum(int(value or 0) for value in chunk) for chunk in chunks]
 
     def _fair_amounts(self, total):
         shards = self.sharding.shards
@@ -246,25 +250,22 @@ class ShardingStock(Stock):
         assert value >= 0
         with self.redis.pipeline(transaction=False) as pipe:
             for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(value)):
-                pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
-                if expire is not None:
-                    pipe.expire(sharded_key, expire)
+                pipe.set(sharded_key, amount, ex=expire)
             pipe.execute()
 
-    def incrby(self, key, increment):
-        assert increment >= 0
+    def incrby(self, key, incr, expire=None):
+        assert incr >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(increment)):
-                pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
-            return sum(values[0] for values in pipe.execute())
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(incr)):
+                pipe.increx(sharded_key, byint=amount, ex=expire)
+            return sum(result[0] for result in pipe.execute())
 
     def try_lock(self, key, hint=None) -> bool:
         if hint is None:
             sharded_key = self.sharding.random_sharded_key(key)
         else:
             _, sharded_key = self.sharding.sharded_keys(hint, key)
-        bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
-        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+        return super().try_lock(sharded_key)
 
 
 class ShardingZTimer(ZTimer):

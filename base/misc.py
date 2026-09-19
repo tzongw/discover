@@ -258,30 +258,25 @@ class Stock:
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
 
-    def get(self, key, hint=None):
-        return self.mget([key], hint)[0]
+    def get(self, key):
+        return self.mget([key])[0]
 
-    def mget(self, keys, hint=None):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for key in keys:
-                pipe.bitfield(key).get(fmt='u32', offset=0).execute()
-            return [values[0] for values in pipe.execute()]
+    def mget(self, keys):
+        values = self.redis.mget_nonatomic(keys) if isinstance(self.redis, RedisCluster) else self.redis.mget(keys)
+        return [int(value or 0) for value in values]
 
     def reset(self, key, value=0, expire=None):
         assert value >= 0
-        with self.redis.pipeline(transaction=True) as pipe:
-            pipe.bitfield(key).set(fmt='u32', offset=0, value=value).execute()
-            if expire is not None:
-                pipe.expire(key, expire)
-            pipe.execute()
+        self.redis.set(key, value, ex=expire)
 
-    def incrby(self, key, increment):
-        assert increment >= 0
-        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=increment).execute()[0]
+    def incrby(self, key, incr, expire=None):
+        assert incr >= 0
+        value, _ = self.redis.increx(key, byint=incr, ex=expire)
+        return value
 
-    def try_lock(self, key, hint=None) -> bool:
-        bitfield = self.redis.bitfield(key, default_overflow='FAIL')
-        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+    def try_lock(self, key) -> bool:
+        _, incr = self.redis.increx(key, byint=-1, lbound=0)
+        return incr != 0
 
 
 class TimeDeltaField(FloatField):
