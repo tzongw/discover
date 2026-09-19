@@ -49,7 +49,7 @@ class Timer:
 
 class Handler:
     _PREFIX = 'TIMER'
-    _GRACE = 60 * 1000
+    _GRACE = 5  # seconds, for migrating
 
     def __init__(self):
         self._timers = {}  # type: Dict[str, Timer]
@@ -114,7 +114,7 @@ class Handler:
         logging.debug(f'{service} {key} {delay}')
         full_key = self._full_key(service, key)
         deadline = time.time() + delay
-        px = max(int(delay * 1000), 0) + self._GRACE
+        px = max(int(delay * 1000), 1)
         uniq_id = Base62.encode(shared.snowflake.gen())
         with self._key_lock(full_key):
             if info := doing_info:
@@ -132,7 +132,6 @@ class Handler:
 
             def callback():
                 if self._delete_timer(service, key, info.uniq_id):  # fire only if still owned
-                    shared.redis.delex(full_key, ifeq=info)
                     self._fire_timer(service, key, data)
 
             self._delete_timer(service, key)
@@ -194,11 +193,18 @@ class Handler:
 
     def _do_migrate(self, addr):
         logging.info(f'migrate worker {addr} start')
+        seen_uniq_ids = set()
         while self._timers and addr in shared.timer_service.addresses():
-            full_key, timer = self._timers.popitem()
-            logging.debug(f'migrating timer: {full_key}')
-            timer.handle.cancel()
+            full_key = next(iter(self._timers))  # lru first
+            timer = self._timers.pop(full_key)
             info = timer.info
+            if info.deadline is not None and info.deadline < time.time() + self._GRACE:
+                self._timers[full_key] = timer  # lru last
+                gevent.sleep(0.1 if info.uniq_id in seen_uniq_ids else 0)
+                seen_uniq_ids.add(info.uniq_id)
+                continue
+            timer.handle.cancel()
+            logging.debug(f'migrating timer: {full_key}')
             with LogSuppress():
                 info_data = shared.redis.get(full_key)
                 if info_data is None:
