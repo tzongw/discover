@@ -267,7 +267,7 @@ def string_hash(s: str):
 
 def safe_int(s: str, default=None):
     try:
-        return int(s)
+        return int(s) if s else default
     except ValueError:
         return default
 
