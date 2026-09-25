@@ -255,8 +255,11 @@ class Semaphore:
 
 
 class Stock:
+    MAX_CACHE = 1000
+
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
+        self.sold_out = {}
 
     def get(self, key):
         return self.mget([key])[0]
@@ -268,15 +271,29 @@ class Stock:
     def reset(self, key, value=0, expire=None):
         assert value >= 0
         self.redis.set(key, value, ex=expire)
+        self.clear_cache(key)
 
     def incrby(self, key, incr, expire=None):
         assert incr >= 0
         value, _ = self.redis.increx(key, byint=incr, ex=expire)
+        self.clear_cache(key)
         return value
 
-    def try_lock(self, key) -> bool:
+    def try_lock(self, key, *, precheck=False) -> bool:
+        if precheck and self.sold_out.get(key):
+            return False
         _, incr = self.redis.increx(key, byint=-1, lbound=0)
+        if incr == 0:
+            self.sold_out[key] = True
+            if len(self.sold_out) > self.MAX_CACHE:
+                self.sold_out.pop(next(iter(self.sold_out)), None)
         return incr != 0
+
+    def clear_cache(self, key=None):
+        if key is None:
+            self.sold_out.clear()
+        else:
+            self.sold_out.pop(key, None)
 
 
 class TimeDeltaField(FloatField):

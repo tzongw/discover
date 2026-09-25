@@ -252,20 +252,30 @@ class ShardingStock(Stock):
             for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(value)):
                 pipe.set(sharded_key, amount, ex=expire)
             pipe.execute()
+        self.clear_cache(key)
 
     def incrby(self, key, incr, expire=None):
         assert incr >= 0
         with self.redis.pipeline(transaction=False) as pipe:
             for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(incr)):
                 pipe.increx(sharded_key, byint=amount, ex=expire)
-            return sum(result[0] for result in pipe.execute())
+            result = sum(r[0] for r in pipe.execute())
+        self.clear_cache(key)
+        return result
 
-    def try_lock(self, key, hint=None) -> bool:
+    def try_lock(self, key, *, precheck=False, hint=None) -> bool:
         if hint is None:
             sharded_key = self.sharding.random_sharded_key(key)
         else:
             _, sharded_key = self.sharding.sharded_keys(hint, key)
-        return super().try_lock(sharded_key)
+        return super().try_lock(sharded_key, precheck=precheck)
+
+    def clear_cache(self, key=None):
+        if key is None:
+            super().clear_cache()
+        else:
+            for sharded_key in self.sharding.all_sharded_keys(key):
+                super().clear_cache(sharded_key)
 
 
 class ShardingZTimer(ZTimer):
