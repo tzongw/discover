@@ -195,11 +195,11 @@ class Handler:
         logging.info(f'migrate worker {addr} start')
         seen_uniq_ids = set()
         while self._timers and addr in shared.timer_service.addresses():
-            full_key = next(iter(self._timers))  # lru first
+            full_key = next(iter(self._timers))  # first insert
             timer = self._timers.pop(full_key)
             info = timer.info
             if info.deadline is not None and info.deadline < time.time() + self._GRACE:
-                self._timers[full_key] = timer  # lru last
+                self._timers[full_key] = timer  # last insert
                 gevent.sleep(0.1 if info.uniq_id in seen_uniq_ids else 0)
                 seen_uniq_ids.add(info.uniq_id)
                 continue
