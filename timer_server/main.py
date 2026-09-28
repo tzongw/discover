@@ -41,7 +41,7 @@ class Info(BaseModel):
         return f'{self.uniq_id = } {self.service = } {self.key = } {self.addr = }'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Timer:
     info: Info
     handle: Handle

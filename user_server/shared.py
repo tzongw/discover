@@ -48,7 +48,7 @@ sessions: Cache[dict[str, Session]] = Cache(get=_get_user_sessions, make_key=int
 sessions.listen(invalidator, 'session', bcast=False)
 
 
-@dataclass
+@dataclass(slots=True)
 class Limiter:
     expire: float
     count: int
