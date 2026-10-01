@@ -63,7 +63,7 @@ class Service:
         addresses = sorted(self.addresses())
         self._healthy_addresses = [addr for addr in addresses if addr not in self._cooldown]
         self._local_addresses = [addr for addr in self._healthy_addresses if Addr(addr).host == self._local_host]
-        available = set(addresses)
+        available = self.addresses()
         for addr in available & self._closing.keys():
             self._closing.pop(addr)
             logging.info(f'- closing {self._name} {addr}')
@@ -72,8 +72,8 @@ class Service:
             self._closing[addr] = now + Registry.COOLDOWN
         expired = [addr for addr, at in self._closing.items() if at <= now]
         for addr in expired:
-            self._closing.pop(addr)
             logging.info(f'close {self._name} {addr}')
+            self._closing.pop(addr)
             pool = self._pools.pop(addr)
             pool.close()
 

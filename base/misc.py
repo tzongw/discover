@@ -286,7 +286,7 @@ class Stock:
         if incr == 0:
             self.sold_out[key] = True
             if len(self.sold_out) > self.MAX_CACHE:
-                self.sold_out.pop(next(iter(self.sold_out)), None)
+                self.sold_out.pop(next(iter(self.sold_out)))
         return incr != 0
 
     def clear_cache(self, key=None):
