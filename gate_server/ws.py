@@ -91,15 +91,14 @@ class Client:
 
     def _writer(self):
         try:
-            while True:
-                message = self.messages.get()
-                if message is None:
-                    raise StopIteration
-                elif message is self.PONG_MESSAGE:
+            while (message := self.messages.get()) is not None:
+                if message is self.PONG_MESSAGE:
                     self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
                 else:
                     self.ws.send(message)
-        except Exception:
+        except Exception as e:
+            logging.info(f'{self} {e}')
+        finally:
             self.ws.close()
 
     def stop(self):
