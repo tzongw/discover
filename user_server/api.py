@@ -471,10 +471,10 @@ user_actives = {}
 def reap_user_active():
     past = time.time() - timedelta(minutes=10).total_seconds()
     while user_actives:
-        uid, active = next(iter(user_actives.items()))
+        key, active = next(iter(user_actives.items()))
         if active > past:
             break
-        user_actives.pop(uid)
+        user_actives.pop(key)
 
 
 @bp.before_request
@@ -487,12 +487,13 @@ def authorize():
         raise Unauthorized
     g.uid, g.session = uid, user_session
     ctx.uid = uid
-    if uid in user_actives:
+    key = (uid, token)
+    if key in user_actives:
         return
     # refresh last active & token ttl
     logging.info(f'user active: {uid}')
     now = datetime.now()
-    user_actives[uid] = now.timestamp()
+    user_actives[key] = now.timestamp()
     with LogSuppress(OperationalError), Session() as session:  # ignore db locked error
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
