@@ -259,7 +259,7 @@ class Stock:
 
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
-        self.sold_out = {}
+        self.cache = {}
 
     def get(self, key):
         return self.mget([key])[0]
@@ -280,20 +280,20 @@ class Stock:
         return value
 
     def try_lock(self, key, *, precheck=False) -> bool:
-        if precheck and self.sold_out.get(key):
+        if precheck and self.cache.get(key) == 0:
             return False
-        _, incr = self.redis.increx(key, byint=-1, lbound=0)
-        if incr == 0:
-            self.sold_out[key] = True
-            if len(self.sold_out) > self.MAX_CACHE:
-                self.sold_out.pop(next(iter(self.sold_out)))
+        value, incr = self.redis.increx(key, byint=-1, lbound=0)
+        if precheck:
+            self.cache[key] = max(value, 0)
+            if len(self.cache) > self.MAX_CACHE:
+                self.cache.pop(next(iter(self.cache)))
         return incr != 0
 
     def clear_cache(self, key=None):
         if key is None:
-            self.sold_out.clear()
+            self.cache.clear()
         else:
-            self.sold_out.pop(key, None)
+            self.cache.pop(key, None)
 
 
 class TimeDeltaField(FloatField):
