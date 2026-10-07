@@ -13,7 +13,7 @@ from base import Registry, LogSuppress, ZTimer
 from base import Executor, Scheduler
 from base import UniqueId, snowflake
 from base import Producer, Consumer, Timer
-from base import create_invalidator, create_parser
+from base import create_parser
 from base import TimeDispatcher
 from base.utils import create_redis
 from base.sharding import Sharding, ShardingTimer, ShardingConsumer, ShardingProducer, ShardingHeavyTask, \
@@ -39,7 +39,6 @@ snowflake = snowflake.Snowflake(options.datacenter, app_id)
 hint = f'{options.env}:{options.host}:{app_id}'
 parser = create_parser(redis)
 script = Script(redis)
-invalidator = create_invalidator(redis)
 
 if isinstance(redis, RedisCluster):
     sharding = Sharding(shards=3, fixed_keys=[const.TICK_TIMER])
@@ -65,7 +64,7 @@ timer_service = TimerService(registry, const.RPC_TIMER, options.host)  # type: U
 
 def spawn_worker(f, *args, **kwargs):
     def worker():
-        ctx.trace = Base62.encode(snowflake.gen())
+        ctx.trace_id = Base62.encode(snowflake.gen())
         start = time.time()
         with LogSuppress():
             f(*args, **kwargs)
@@ -101,27 +100,34 @@ class Status:
 
 status = Status()
 _workers = set()  # thread workers
-_mains = []
-_exits = [registry.stop, consumer.stop, heavy_task.stop]
+_at_mains = []  # init at main
+_to_exits = [registry.stop, consumer.stop, heavy_task.stop]  # stop receiving requests, prepare to exit
+_at_exits = []  # cleanup at exit
 mercy = {const.Environment.DEV: 1, const.Environment.TEST: 5}.get(options.env, 30)  # wait time for graceful exit
 
 
 def at_main(func):
     assert callable(func) and not status.inited
-    _mains.append(func)
+    _at_mains.append(func)
     return func
 
 
 def to_exit(func):
     assert callable(func) and not status.exiting
-    _exits.append(func)
+    _to_exits.append(func)
+    return func
+
+
+def at_exit(func):
+    assert callable(func) and not status.exiting
+    _at_exits.append(func)
     return func
 
 
 def init_main():
     assert not status.inited
     status.inited = True
-    executor.gather(_mains)
+    executor.gather(_at_mains)
     # optimize gc STW
     start = time.time()
     gc.collect()
@@ -129,24 +135,30 @@ def init_main():
     logging.info(f'gc freeze: {gc.get_freeze_count()} elapsed: {time.time() - start}')
 
 
-@once
-def _cleanup():  # call once
-    logging.info(f'cleanup')
+def _safe_execute(fns):
     with LogSuppress():
         if sys.argv[0].endswith('ptpython'):  # ptpython compatible
-            for fn in _exits:
+            for fn in fns:
                 fn()
         else:
-            executor.gather(_exits)
+            executor.gather(fns)
+
+
+@once
+def _prepare_to_exit():
+    logging.info(f'prepare to exit')
+    _safe_execute(_to_exits)
 
 
 @atexit.register
-def _gracefully_exit():
-    _cleanup()
-    gevent.joinall(list(_workers))
+def _finally_exit():
+    _prepare_to_exit()
+    logging.info(f'finally exit')
+    _safe_execute(_at_exits)
     consumer.join()
     scheduler.join()
     executor.join()
+    gevent.joinall(list(_workers))
     unique_id.stop()  # at last
 
 
@@ -157,7 +169,7 @@ def _sig_handler(sig, _):
             gevent.spawn(lambda: sys.exit(1))
     else:
         def sig_exit():
-            _cleanup()
+            _prepare_to_exit()
             if sig == signal.SIGUSR1 or status.script:
                 return
             gevent.sleep(mercy)

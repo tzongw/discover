@@ -7,7 +7,6 @@ import bisect
 import hashlib
 import contextlib
 from binascii import crc32
-from datetime import timedelta
 from random import choice
 from collections import defaultdict, namedtuple
 from functools import lru_cache, wraps, total_ordering
@@ -118,22 +117,6 @@ class SlidingWindow:
         return count
 
 
-class Limiter:
-    def __init__(self, redis: Redis | RedisCluster, limit: int, expire: timedelta):
-        self._redis = redis
-        self._limit = limit
-        self._expire = expire
-
-    def can_pass(self, key):
-        with self._redis.pipeline(transaction=True) as pipe:
-            pipe.incr(key)
-            pipe.expire(key, self._expire, nx=True)
-            count = pipe.execute()[0]
-        if count == self._limit:
-            logging.warning(f'{key} reach limit {self._limit}')
-        return count <= self._limit
-
-
 @lru_cache(maxsize=None)
 def ip_address(ipv6=False):
     with socket.socket(socket.AF_INET6 if ipv6 else socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -196,14 +179,12 @@ def native_worker(f):
     return wrapper
 
 
-@native_worker
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode(), salt)
     return hashed.decode()
 
 
-@native_worker
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
@@ -273,15 +254,22 @@ def redis_name(redis: Union[Redis, RedisCluster]):
 def create_redis(addr: str):
     if ',' in addr:
         addr = choice(addr.split(','))
-        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True)
+        return RedisCluster.from_url(f'redis://{addr}', decode_responses=True, socket_timeout=None, protocol=2)
     else:
         proto = 'unix' if os.path.exists(addr) else 'redis'
-        return Redis.from_url(f'{proto}://{addr}', decode_responses=True)
+        return Redis.from_url(f'{proto}://{addr}', decode_responses=True, socket_timeout=None, protocol=2)
 
 
 def string_hash(s: str):
     h = hashlib.blake2b(s.encode(), digest_size=8)
     return int.from_bytes(h.digest(), signed=True)
+
+
+def safe_int(s: str, default=None):
+    try:
+        return int(s) if s else default
+    except ValueError:
+        return default
 
 
 def try_flock(path):

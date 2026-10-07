@@ -55,7 +55,7 @@ class SessionMaker(sessionmaker):
             if readonly:
                 assert not session.new and not session.dirty and not session.deleted, 'transaction modified'
             else:
-                assert not switch_tracer.is_switched(), 'transaction switched'
+                assert not switch_tracer.is_switched(), 'greenlet switched in transaction'
 
 
 if options.env in [const.Environment.DEV, const.Environment.TEST]:

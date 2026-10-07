@@ -20,13 +20,13 @@ class Runtime(BaseModel):
 
 
 class QueueConfig(BaseModel):
-    limit = 1024
-    regions = 10
+    limit: int = 1024
+    regions: int = 10
 
 
 class SmsConfig(BaseModel):
-    cooldown = timedelta(minutes=1)
-    invalid_date = date(2000, 1, 1)
+    cooldown: timedelta = timedelta(minutes=1)
+    invalid_date: date = date(2000, 1, 1)
 
 
 ConfigModels = QueueConfig | SmsConfig

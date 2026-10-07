@@ -4,9 +4,8 @@ import random
 import time
 from datetime import timedelta, datetime
 from functools import lru_cache
-from typing import TypeVar, Generic, Generator
+from typing import TypeVar, Generic, Generator, Union
 from random import shuffle
-from typing import Union
 import gevent
 from pydantic import BaseModel
 from redis import Redis, RedisCluster
@@ -15,8 +14,8 @@ from .utils import stream_name, CHash
 from .misc import Stock
 from .timer import Timer
 from .ztimer import ZTimer
-from .chunk import batched
 from .task import HeavyTask
+from .chunk import batched
 
 
 class Sharding:
@@ -133,10 +132,10 @@ class ShardingTimer(Timer):
         key = self._sharding.sharded_key(key)
         return super().info(key)
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
+    def tick(self, key: str, stream: str, offset: int, interval=timedelta(milliseconds=100)):
         assert key in self._sharding.fixed_keys, 'SHOULD fixed shard to avoid duplicated timestamp'
         key, stream = self._sharding.sharded_keys(key, stream)
-        return super().tick(key, stream, interval, offset=offset)
+        return super().tick(key, stream, offset, interval)
 
 
 class MigratingTimer(ShardingTimer):
@@ -186,7 +185,7 @@ class MigratingTimer(ShardingTimer):
             info = self.old_timer.info(key)
         return info
 
-    def tick(self, key: str, stream: str, interval=timedelta(seconds=1), offset=10):
+    def tick(self, key: str, stream: str, offset: int, interval=timedelta(milliseconds=100)):
         if self.redis is not self.old_timer.redis and self.old_timer.kill(key):
             if isinstance(self.old_timer, ShardingTimer):
                 _, old_stream = self.old_timer._sharding.sharded_keys(key, stream)
@@ -196,7 +195,7 @@ class MigratingTimer(ShardingTimer):
             last_tick = int(last_id[:-2])
             _, new_stream = self._sharding.sharded_keys(key, stream)
             self.redis.xadd(new_stream, fields={'': ''}, id=str(last_tick + 1))
-        return super().tick(key, stream, interval, offset=offset)
+        return super().tick(key, stream, offset, interval)
 
 
 class MigratingConsumer(ShardingConsumer):
@@ -226,14 +225,18 @@ class ShardingStock(Stock):
         super().__init__(redis)
         self.sharding = sharding
 
+    def get(self, key, hint=None):
+        return self.mget([key], hint=hint)[0]
+
     def mget(self, keys, hint=None):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for key in keys:
-                for sharded_key in self.sharding.all_sharded_keys(key):
-                    pipe.bitfield(sharded_key).get(fmt='u32', offset=0).execute()
-            shard = None if hint is None else self.sharding.get_shard(hint)
-            return [0 if shard is not None and chunk[shard][0] == 0 else sum(values[0] for values in chunk)
-                    for chunk in batched(pipe.execute(), self.sharding.shards)]
+        all_keys = sum([self.sharding.all_sharded_keys(key) for key in keys], [])
+        values = self.redis.mget_nonatomic(all_keys) if isinstance(self.redis, RedisCluster) \
+            else self.redis.mget(all_keys)
+        chunks = list(batched(values, self.sharding.shards))
+        if hint is None:
+            return [sum(int(value or 0) for value in chunk) for chunk in chunks]
+        shard = self.sharding.get_shard(hint)
+        return [0 if int(chunk[shard] or 0) == 0 else sum(int(value or 0) for value in chunk) for chunk in chunks]
 
     def _fair_amounts(self, total):
         shards = self.sharding.shards
@@ -247,25 +250,32 @@ class ShardingStock(Stock):
         assert value >= 0
         with self.redis.pipeline(transaction=False) as pipe:
             for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(value)):
-                pipe.bitfield(sharded_key).set(fmt='u32', offset=0, value=amount).execute()
-                if expire is not None:
-                    pipe.expire(sharded_key, expire)
+                pipe.set(sharded_key, amount, ex=expire)
             pipe.execute()
+        self.clear_cache(key)
 
-    def incrby(self, key, increment):
-        assert increment >= 0
+    def incrby(self, key, incr, expire=None):
+        assert incr >= 0
         with self.redis.pipeline(transaction=False) as pipe:
-            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(increment)):
-                pipe.bitfield(sharded_key).incrby(fmt='u32', offset=0, increment=amount).execute()
-            return sum(values[0] for values in pipe.execute())
+            for sharded_key, amount in zip(self.sharding.all_sharded_keys(key), self._fair_amounts(incr)):
+                pipe.increx(sharded_key, byint=amount, ex=expire)
+            result = sum(r[0] for r in pipe.execute())
+        self.clear_cache(key)
+        return result
 
-    def try_lock(self, key, hint=None) -> bool:
+    def try_lock(self, key, *, precheck=False, hint=None) -> bool:
         if hint is None:
             sharded_key = self.sharding.random_sharded_key(key)
         else:
             _, sharded_key = self.sharding.sharded_keys(hint, key)
-        bitfield = self.redis.bitfield(sharded_key, default_overflow='FAIL')
-        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+        return super().try_lock(sharded_key, precheck=precheck)
+
+    def clear_cache(self, key=None):
+        if key is None:
+            super().clear_cache()
+        else:
+            for sharded_key in self.sharding.all_sharded_keys(key):
+                super().clear_cache(sharded_key)
 
 
 class ShardingZTimer(ZTimer):
@@ -494,7 +504,7 @@ class ShardingSet(Generic[E]):
     def __len__(self):
         return sum(len(s) for s in self._sets)
 
-    def __iter__(self) -> Generator[tuple[K, V], None, None]:
+    def __iter__(self) -> Generator[E, None, None]:
         done = 0
         for s in self._sets:
             if done >= 512:

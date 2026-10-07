@@ -2,7 +2,6 @@ import contextlib
 import dataclasses
 import json
 import uuid
-from binascii import crc32
 from datetime import datetime, date, timedelta
 from functools import wraps
 from inspect import signature
@@ -14,6 +13,7 @@ from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
 from mongoengine import EmbeddedDocument, FloatField, Q
+from mongoengine.fields import BaseField
 from pymongo.results import BulkWriteResult
 from sqlalchemy import and_, DateTime, Date, Column, Integer, TypeDecorator
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ from redis import Redis, RedisCluster
 from redis.lock import Lock
 from redis.exceptions import LockError
 from werkzeug.routing import BaseConverter
-from .utils import Base62, diff_dict
+from .utils import diff_dict, func_desc
 from .invalidator import Invalidator
 from .snowflake import extract_datetime
 
@@ -134,14 +134,16 @@ class DocumentMixin:
         return self._get_collection().bulk_write(requests, ordered, **kwargs)
 
     @classmethod
-    def batch_range(cls, field, *, start, stop, batch=1000, query=None, only_id=False):
-        if not isinstance(field, str):
+    def batch_range(cls, field: BaseField | str, *, start, stop, batch=100, query=None, only: BaseField | str = None):
+        if isinstance(field, BaseField):
             field = field.name
+        if isinstance(only, BaseField):
+            only = only.name
         asc = start < stop
         order_by = field if asc else '-' + field
         seen_ids = []
         q = Q(**query) if query else Q()
-        fields = {cls.id.name, field} if only_id else []
+        fields = {cls.id.name, field, only} if only else []
         while True:
             range_query = {f'{field}__gte': start, f'{field}__lt': stop, f'{cls.id.name}__nin': seen_ids} if asc else \
                 {f'{field}__lte': start, f'{field}__gt': stop, f'{cls.id.name}__nin': seen_ids}
@@ -156,7 +158,7 @@ class DocumentMixin:
                 if doc[field] != last:
                     break
                 seen_ids.append(doc.id)
-            yield [doc.id for doc in docs] if only_id else docs
+            yield [doc[only] for doc in docs] if only else docs
 
 
 class CacheMixin(DocumentMixin):
@@ -225,7 +227,6 @@ class Semaphore:
         self.keys = [f'semaphore:{name}:{i}' for i in range(value)]
         self.timeout = timeout
         self.local = local()
-        self.lua_release = redis.register_script(Lock.LUA_RELEASE_SCRIPT)
         self.lua_reacquire = redis.register_script(Lock.LUA_REACQUIRE_SCRIPT)
 
     def __enter__(self):
@@ -243,46 +244,56 @@ class Semaphore:
         raise LockError('Unable to acquire lock')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        keys, args = [self.local.key], [self.local.token]
+        key, token = self.local.key, self.local.token
         del self.local.key, self.local.token
-        self.lua_release(keys=keys, args=args)
+        self.redis.delex(key, ifeq=token)
 
     def reacquire(self):
         timeout = int(self.timeout.total_seconds() * 1000)
         key, token = self.local.key, self.local.token
-        if self.lua_reacquire(keys=[key], args=[token, timeout]):
-            return
-        raise LockError('Lock not owned')
+        return self.lua_reacquire(keys=[key], args=[token, timeout])
 
 
 class Stock:
+    MAX_CACHE = 1000
+
     def __init__(self, redis: Union[Redis, RedisCluster]):
         self.redis = redis
+        self.cache = {}
 
-    def get(self, key, hint=None):
-        return self.mget([key], hint)[0]
+    def get(self, key):
+        return self.mget([key])[0]
 
-    def mget(self, keys, hint=None):
-        with self.redis.pipeline(transaction=False) as pipe:
-            for key in keys:
-                pipe.bitfield(key).get(fmt='u32', offset=0).execute()
-            return [values[0] for values in pipe.execute()]
+    def mget(self, keys):
+        values = self.redis.mget_nonatomic(keys) if isinstance(self.redis, RedisCluster) else self.redis.mget(keys)
+        return [int(value or 0) for value in values]
 
     def reset(self, key, value=0, expire=None):
         assert value >= 0
-        with self.redis.pipeline(transaction=True) as pipe:
-            pipe.bitfield(key).set(fmt='u32', offset=0, value=value).execute()
-            if expire is not None:
-                pipe.expire(key, expire)
-            pipe.execute()
+        self.redis.set(key, value, ex=expire)
+        self.clear_cache(key)
 
-    def incrby(self, key, increment):
-        assert increment >= 0
-        return self.redis.bitfield(key).incrby(fmt='u32', offset=0, increment=increment).execute()[0]
+    def incrby(self, key, incr, expire=None):
+        assert incr >= 0
+        value, _ = self.redis.increx(key, byint=incr, ex=expire)
+        self.clear_cache(key)
+        return value
 
-    def try_lock(self, key, hint=None) -> bool:
-        bitfield = self.redis.bitfield(key, default_overflow='FAIL')
-        return bitfield.incrby(fmt='u32', offset=0, increment=-1).execute()[0] is not None
+    def try_lock(self, key, *, precheck=False) -> bool:
+        if precheck and self.cache.get(key) == 0:
+            return False
+        value, incr = self.redis.increx(key, byint=-1, lbound=0)
+        if precheck:
+            self.cache[key] = max(value, 0)
+            if len(self.cache) > self.MAX_CACHE:
+                self.cache.pop(next(iter(self.cache)))
+        return incr != 0
+
+    def clear_cache(self, key=None):
+        if key is None:
+            self.cache.clear()
+        else:
+            self.cache.pop(key, None)
 
 
 class TimeDeltaField(FloatField):
@@ -310,7 +321,7 @@ class TimeDeltaField(FloatField):
 
 
 class CriticalSection:
-    def __init__(self, redis: Union[Redis, RedisCluster], pattern: str, timeout=timedelta(minutes=1)):
+    def __init__(self, redis: Union[Redis, RedisCluster], pattern: str = None, timeout=timedelta(minutes=1)):
         self.redis = redis
         self.pattern = pattern
         self.timeout = timeout
@@ -318,12 +329,17 @@ class CriticalSection:
     def __call__(self, f):
         params = signature(f).parameters
         names = {index: param.name for index, param in enumerate(params.values())}
+        default_key = f'critical_section:{func_desc(f)}'
+        default_lock = Lock(self.redis, default_key, self.timeout.total_seconds(), blocking=False)
 
         @wraps(f)
         def wrapper(*args, **kwargs):
-            values = {names[index]: value for index, value in enumerate(args)}
-            key = self.pattern.format(*args, **values, **kwargs)
-            lock = Lock(self.redis, key, self.timeout.total_seconds(), blocking=False)
+            if self.pattern:
+                values = {names[index]: value for index, value in enumerate(args)}
+                key = self.pattern.format(*args, **values, **kwargs)
+                lock = Lock(self.redis, key, self.timeout.total_seconds(), blocking=False)
+            else:
+                lock = default_lock
             with contextlib.suppress(LockError), lock:
                 f(*args, **kwargs)
 
@@ -345,16 +361,19 @@ class TableMixin:
     id = PrimaryKey()  # type: PrimaryKey | Column | int
 
     @classmethod
-    def session_mget(cls, session, keys) -> list[Optional[Self]]:
+    def session_mget(cls, session, keys, for_update=False) -> list[Optional[Self]]:
         if not keys:
             return []
-        objects = session.query(cls).filter(cls.id.in_(keys)).all()
+        if for_update:
+            objects = session.query(cls).filter(cls.id.in_(keys)).order_by(cls.id.asc()).with_for_update().all()
+        else:
+            objects = session.query(cls).filter(cls.id.in_(keys)).all()
         mapping = {o.id: o for o in objects}
         return [mapping.get(cls.id.type.python_type(k)) for k in keys]
 
     @classmethod
-    def session_get(cls, session, key) -> Optional[Self]:
-        return cls.session_mget(session, key)[0]
+    def session_get(cls, session, key, for_update=False) -> Optional[Self]:
+        return cls.session_mget(session, [key], for_update)[0]
 
     @classmethod
     def mget(cls, keys) -> list[Optional[Self]]:
@@ -390,31 +409,27 @@ class TableMixin:
         return diff_dict(after, before)
 
     @classmethod
-    def batch_range(cls, column, *, start, stop, batch=1000, query=(), only_id=False):
-        if isinstance(column, str):
-            col = getattr(cls, column)
-        else:
-            col, column = column, column.name
+    def batch_range(cls, column: Column, *, start, stop, batch=100, query=(), only: Column = None):
         asc = start < stop
-        order_by = col.asc() if asc else col.desc()
+        order_by = column.asc() if asc else column.desc()
         seen_ids = []
-        entities = {cls.id, col} if only_id else [cls]
+        entities = {cls.id, column, only} if only else [cls]
         while True:
             with cls.Session() as session:
-                range_query = [col >= start, col < stop, cls.id.not_in(seen_ids)] if asc else \
-                    [col <= start, col > stop, cls.id.not_in(seen_ids)]
+                range_query = [column >= start, column < stop, cls.id.not_in(seen_ids)] if asc else \
+                    [column <= start, column > stop, cls.id.not_in(seen_ids)]
                 rows = session.query(*entities).filter(*query, *range_query).order_by(order_by).limit(batch).all()
             if not rows:
                 return
-            last = getattr(rows[-1], column)
+            last = getattr(rows[-1], column.name)
             if last != start:
                 seen_ids = []
                 start = last
             for row in reversed(rows):
-                if getattr(row, column) != last:
+                if getattr(row, column.name) != last:
                     break
                 seen_ids.append(row.id)
-            yield [row.id for row in rows] if only_id else rows
+            yield [getattr(row, only.name) for row in rows] if only else rows
 
 
 class SqlCacheMixin(TableMixin):

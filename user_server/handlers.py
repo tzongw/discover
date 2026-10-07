@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-import os
 import logging
 import const
 from datetime import timedelta, datetime
 from base import LogSuppress
 from common.messages import Connect, Disconnect, Alarm
-from shared import consumer, timer_service, to_exit, timer, invalidator, async_task, at_main, dispatcher, async_worker, \
-    app_name, app_id, parser, redis, ztimer, scheduler, dispatch_timeout, rpc_service
+from shared import consumer, timer_service, to_exit, invalidator, async_task, at_main, dispatcher, async_worker, \
+    app_name, app_id, parser, ztimer, scheduler, dispatch_timeout, rpc_service
 from models import Runtime
 from dao import Account
 from config import options
@@ -35,22 +34,17 @@ def on_register(account: Account):
 
 @consumer(Connect)
 def on_connect(data: Connect):
-    logging.info(f'{data}')
+    logging.debug(f'{data}')
 
 
 @consumer(Disconnect)
 def on_disconnect(data: Disconnect):
-    logging.info(f'{data}')
+    logging.debug(f'{data}')
 
 
 @consumer(Alarm)
 def on_alarm(data: Alarm):
     logging.info(f'{data}')
-
-
-@invalidator('session')
-def session_invalidate(key):
-    logging.info(key)
 
 
 @invalidator('runtime')
@@ -87,14 +81,14 @@ def init():
         timer_service.call_repeat(rpc_service, 'welcome:2', 'repeat', interval=5)
         to_exit(lambda: timer_service.remove_timer(rpc_service, 'welcome:2'))
         if options.tick_timer:
-            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=1)
+            timer_service.call_repeat(rpc_service, const.TICK_TIMER, '', interval=0.1)
             to_exit(lambda: timer_service.remove_timer(rpc_service, const.TICK_TIMER))
     elif options.init_timer == 'ztimer':
         ztimer.new('notice:1', 'one shot', timedelta(seconds=3))
         ztimer.new('welcome:2', 'repeat', timedelta(seconds=5), loop=True)
         to_exit(lambda: ztimer.kill('welcome:2'))
         if options.tick_timer:
-            ztimer.new(const.TICK_TIMER, '', timedelta(seconds=1), loop=True)
+            ztimer.new(const.TICK_TIMER, '', timedelta(milliseconds=500), loop=True)
             to_exit(lambda: ztimer.kill(const.TICK_TIMER))
         handle = scheduler.call_repeat(poll_timeouts, timedelta(seconds=1))
         to_exit(handle.cancel)

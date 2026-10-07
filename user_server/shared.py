@@ -7,7 +7,7 @@ from werkzeug.exceptions import TooManyRequests
 from werkzeug.debug import DebuggedApplication
 from flasgger import Swagger
 from flask import Flask, g
-from base import Cache
+from base import Cache, create_invalidator
 from base import ListConverter
 from base.misc import JSONProvider, make_response, SwitchTracer
 import const
@@ -19,11 +19,12 @@ app.url_map.converters['list'] = ListConverter
 app.json = JSONProvider(app)
 app.json.ensure_ascii = False
 app.make_response = partial(make_response, app)
-if options.env == const.Environment.DEV:
+if options.env in [const.Environment.DEV, const.Environment.TEST]:
+    swagger = Swagger(app)
     app.debug = True
-    app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=False)
-swagger = Swagger(app)
+    app.wsgi_app = DebuggedApplication(app.wsgi_app, evalex=True, pin_security=options.env == const.Environment.TEST)
 switch_tracer = SwitchTracer()
+online_users_key = 'users:online'
 
 
 def online_key(uid: int):
@@ -36,21 +37,25 @@ def session_key(uid: int):
 
 def _get_user_sessions(uid: int):
     key = session_key(uid)
-    user_sessions = parser.hgetall(key, Session)
+    user_sessions = caching_parser.hgetall(key, Session)
     return MappingProxyType(user_sessions)
 
 
+caching_redis = create_redis(options.redis)
+caching_parser = create_parser(caching_redis)
+invalidator = create_invalidator(caching_redis)
 sessions: Cache[dict[str, Session]] = Cache(get=_get_user_sessions, make_key=int)
-sessions.listen(invalidator, 'session')
+sessions.listen(invalidator, 'session', bcast=False)
 
 
-@dataclass
+@dataclass(slots=True)
 class Limiter:
     expire: float
     count: int
 
 
 def user_limiter(*, cooldown, threshold=1):
+    assert threshold > 0
     doing = set()
     limiters = {}  # type: dict[int, Limiter]
 
@@ -89,11 +94,18 @@ def dispatch_timeout(full_key, data):
         group, key = full_key.split(':', maxsplit=1)
         dispatcher.dispatch(group, key, data)
     elif options.tick_timer:
-        ts = int(time.time())
-        increment, _ = script.limited_incrby('timestamp:tick', increment=ts, limit=ts)
-        offset = min(increment, 60)
-        for ts in range(ts - offset + 1, ts + 1):
-            dispatcher.dispatch_tick(ts)
+        cur_ts = int(time.time())
+        sync_ts = cur_ts - const.TICK_OFFSET
+        value, incr = redis.increx(const.TICK_KEY, lbound=sync_ts, ubound=cur_ts)
+        if incr:
+            dispatcher.dispatch_tick(value)
+            return
+        if value >= cur_ts:  # upper bound
+            return
+        # lower bound
+        if redis.set(const.TICK_KEY, cur_ts, ifeq=value) or (value == 0 and redis.set(const.TICK_KEY, cur_ts, nx=True)):
+            logging.info(f'tick: {value + 1} -> {cur_ts}')
+            dispatcher.dispatch_tick(cur_ts)
 
 
 if options.tick_timer:

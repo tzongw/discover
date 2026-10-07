@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-import os
-import logging
 import socket
-import atexit
+import logging
 from urllib import parse
 from collections import defaultdict
 import gevent
@@ -14,7 +12,7 @@ from base.utils import Base62
 from base.sharding import ShardingDict, ShardingSet
 import shared
 import const
-from config import options
+from config import options, http_listener
 
 
 def app(environ, start_response):
@@ -29,19 +27,7 @@ def app(environ, start_response):
 
 
 def serve():
-    if sock_path := options.unix_sock:
-        try:
-            os.unlink(sock_path)
-        except FileNotFoundError:
-            pass
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(sock_path)
-        os.chmod(sock_path, 0o700)
-        sock.listen()
-        listener = sock
-        atexit.register(os.unlink, sock_path)
-    else:
-        listener = options.http_port
+    listener = http_listener()
     logger = None if options.env == const.Environment.PROD else logging.getLogger()
     server = pywsgi.WSGIServer(listener, app, handler_class=WebSocketHandler, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
@@ -81,7 +67,8 @@ class Client:
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
-        self.ws.handler.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        if options.http_port:
+            self.ws.handler.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         gevent.spawn(self._writer)
         while message := self.ws.receive():
             addr = shared.user_service.address(hint=self.conn_id)
@@ -104,15 +91,14 @@ class Client:
 
     def _writer(self):
         try:
-            while True:
-                message = self.messages.get()
-                if message is None:
-                    raise StopIteration
-                elif message is self.PONG_MESSAGE:
+            while (message := self.messages.get()) is not None:
+                if message is self.PONG_MESSAGE:
                     self.ws.send_frame(b'', WebSocket.OPCODE_PONG)
                 else:
                     self.ws.send(message)
-        except Exception:
+        except Exception as e:
+            logging.info(f'{self} {e}')
+        finally:
             self.ws.close()
 
     def stop(self):

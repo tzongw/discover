@@ -8,7 +8,7 @@ from typing import TypeVar, Generic, Callable, Sequence
 from redis import Redis, RedisCluster
 import gevent
 from . import utils
-from .singleflight import Singleflight, singleflight
+from .singleflight import SingleFlight, singleflight
 from .invalidator import Invalidator
 from .chunk import LazySequence
 
@@ -17,7 +17,7 @@ _NONE = object()
 _Pair = namedtuple('_Pair', ['value', 'expire_at'])
 
 
-def expire_at(expire):
+def expire_at(expire) -> float:
     if expire is None:
         return float('inf')
     if isinstance(expire, datetime):
@@ -29,7 +29,7 @@ def expire_at(expire):
     raise ValueError(f'{expire} not valid')
 
 
-class Cache(Singleflight[T]):
+class Cache(SingleFlight[T]):
     # https://redis.io/docs/latest/develop/reference/client-side-caching/#avoiding-race-conditions
 
     def __init__(self, *, get=None, mget=None, maxsize=4096, make_key=utils.make_key):
@@ -68,7 +68,7 @@ class Cache(Singleflight[T]):
                 indexes.append(index)
         if missing_keys:
             version = self.invalids
-            values, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            values, real_gets = self._mget_stats(missing_keys, *args, **kwargs)
             for index, made_key, value, real_get in zip(indexes, made_keys, values, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
@@ -85,14 +85,14 @@ class Cache(Singleflight[T]):
         self.invalids += 1
         self.lru.clear()
 
-    def listen(self, invalidator: Invalidator, group: str, delay_policy=None):
+    def listen(self, invalidator: Invalidator, group: str, clear=False, delay_policy=None, bcast=True):
         def do_invalidate(key: str):
-            if key:
-                self.invalidate(key)
-            else:
+            if clear or not key:
                 self.invalidate_all()
+            else:
+                self.invalidate(key)
 
-        @invalidator(group)
+        @invalidator(group, bcast)
         def on_invalidate(key: str):
             do_invalidate(key)
             if delay_policy:
@@ -123,7 +123,7 @@ class TtlCache(Cache[T]):
                 indexes.append(index)
         if missing_keys:
             version = self.invalids
-            tuples, real_gets = super()._mget_stats(missing_keys, *args, **kwargs)
+            tuples, real_gets = self._mget_stats(missing_keys, *args, **kwargs)
             for index, made_key, (value, expire), real_get in zip(indexes, made_keys, tuples, real_gets):
                 assert not isinstance(value, (list, set, dict)), 'use tuple, frozenset, MappingProxyType instead'
                 results[index] = value
@@ -145,9 +145,9 @@ class FullMixin(Generic[T]):
 
     @property
     def values(self) -> Sequence[T] | LazySequence[T]:
-        if self._version == self.invalids and self._expire_at > time.time():
-            return self._values
-        return self._update_values()
+        if self._version != self.invalids or self._expire_at < time.time():
+            self._update_values()
+        return self._values
 
     @singleflight
     def _update_values(self):
@@ -157,7 +157,6 @@ class FullMixin(Generic[T]):
         self._values = values
         self._expire_at = expire_at(expire)
         self._version = version
-        return values
 
     def cached(self, func=None, *, maxsize=128, typed=False, get_expire=None):
         def decorator(f):
@@ -218,11 +217,11 @@ def ttl_cache(expire, *, maxsize=128):
     return decorator
 
 
-class RedisCache(Singleflight[T]):
-    def __init__(self, redis, *, get=None, mget=None, expire: timedelta, make_key, serialize=None, deserialize=None,
-                 prefix='PLACEHOLDER:', try_interval=timedelta(milliseconds=50), try_times=10):
+class RedisCache(SingleFlight[T]):
+    def __init__(self, redis: Redis | RedisCluster, *, get=None, mget=None, expire: timedelta, make_key, serialize=None,
+                 deserialize=None, prefix='PLACEHOLDER:', try_interval=timedelta(milliseconds=50), try_times=10):
         super().__init__(mget=self._cached_mget, make_key=make_key)
-        self.redis = redis  # type: Redis | RedisCluster
+        self.redis = redis
         self.raw_mget = utils.make_mget(get, mget)
         self.serialize = serialize
         self.deserialize = deserialize
@@ -230,6 +229,7 @@ class RedisCache(Singleflight[T]):
         self.prefix = prefix
         self.try_interval = try_interval
         self.try_times = try_times
+        self.lock_time = 2 * self.try_times * self.try_interval
 
     def _cached_mget(self, keys, *args, **kwargs):
         placeholder = self.prefix + str(uuid.uuid4())
@@ -237,11 +237,10 @@ class RedisCache(Singleflight[T]):
         todo_indexes = []
         wait_indexes = []
         with self.redis.pipeline(transaction=False) as pipe:
-            lock_time = max(self.try_interval * self.try_times, timedelta(seconds=5))
             for key in keys:
                 made_key = self._make_key(key, *args, **kwargs)
                 made_keys.append(made_key)
-                pipe.set(made_key, placeholder, nx=True, px=lock_time, get=True)
+                pipe.set(made_key, placeholder, nx=True, px=self.lock_time, get=True)
             values = pipe.execute()
         for index, value in enumerate(values):
             if value is None:
@@ -275,6 +274,6 @@ class RedisCache(Singleflight[T]):
                 break
             if try_times >= self.try_times:
                 fail_keys = ', '.join(f'`{keys[index]}`' for index in fail_indexes)
-                raise ValueError(f'{fail_keys} not resolve')
+                raise ValueError(f'{fail_keys} not resolved')
             wait_indexes = fail_indexes
         return values
