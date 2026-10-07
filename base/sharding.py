@@ -504,7 +504,7 @@ class ShardingSet(Generic[E]):
     def __len__(self):
         return sum(len(s) for s in self._sets)
 
-    def __iter__(self) -> Generator[tuple[K, V], None, None]:
+    def __iter__(self) -> Generator[E, None, None]:
         done = 0
         for s in self._sets:
             if done >= 512:
