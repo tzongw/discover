@@ -34,13 +34,13 @@ class Invalidator:
         self.add_group(group, bcast)
         return self.dispatcher(group)
 
-    def getter(self, group, bcast=True):
+    def getter(self, group):
         def decorator(f):
             assert group not in self.getters
             self.getters[group] = f
             return f
 
-        self.add_group(group, bcast)
+        self.add_group(group, bcast=False)
         return decorator
 
     def start(self):
