@@ -7,14 +7,13 @@ from yaml.constructor import SafeConstructor
 from pydantic import BaseModel
 from .utils import LogSuppress, Addr, ip_address, stream_name, Base62, func_desc
 from .misc import ListConverter, CriticalSection
-from .singleflight import Singleflight, singleflight, once
+from .singleflight import SingleFlight, singleflight, once
 from .parser import create_parser, Parser
 from .snowflake import extract_datetime, from_datetime, Snowflake
-from .chunk import batched
 from .defer import deferrable, defer_if, defer
 from .pool import Pool
 from .thrift_pool import ThriftPool
-from .executor import Executor, WaitGroup
+from .executor import Executor, JoinGroup
 from .dispatcher import Dispatcher, TimeDispatcher
 from .scheduler import Scheduler
 from .invalidator import create_invalidator, Invalidator
@@ -59,7 +58,7 @@ def _get_moveable_keys(self, redis_conn, *args):
 
 def _encode(self: Encoder, value):
     if isinstance(value, BaseModel):
-        value = value.json(exclude_defaults=True)
+        value = value.model_dump_json(exclude_defaults=True)
     elif isinstance(value, datetime):
         value = value.strftime('%Y-%m-%d %H:%M:%S.%f')
     elif isinstance(value, date):

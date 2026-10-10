@@ -5,51 +5,6 @@ from redis import Redis, RedisCluster
 from .utils import redis_name
 
 _SCRIPT = """#!lua name=utils
-local function limited_incrby(keys, args)
-    local val = redis.call('GET', keys[1])
-    local cur = tonumber(val) or 0
-    local increment = tonumber(args[1])
-    local limit = tonumber(args[2])
-    if increment > 0 then
-        if cur >= limit then
-            return {0, cur}
-        end
-        if limit - cur < increment then
-            increment = limit - cur
-        end
-    else
-        if cur <= limit then
-            return {0, cur}
-        end
-        if limit - cur > increment then
-            increment = limit - cur
-        end
-    end 
-    cur = redis.call('INCRBY', keys[1], increment)
-    if not val and args[3] then
-        redis.call('PEXPIRE', keys[1], args[3])
-    end
-    return {increment, cur}
-end
-
-local function compare_set(keys, args)
-    if redis.call('GET', keys[1]) == args[1] then
-        redis.call('SET', keys[1], unpack(args, 2))
-        return 1
-    else
-        return 0
-    end
-end
-
-local function compare_del(keys, args)
-    if redis.call('GET', keys[1]) == args[1] then
-        redis.call('DEL', keys[1])
-        return 1
-    else
-        return 0
-    end
-end
-
 local function compare_expire(keys, args)
     if redis.call('GET', keys[1]) == args[1] then
         redis.call('PEXPIRE', keys[1], unpack(args, 2))
@@ -95,9 +50,6 @@ local function hsetx(keys, args)
     end
 end
 
-redis.register_function('limited_incrby', limited_incrby)
-redis.register_function('compare_set', compare_set)
-redis.register_function('compare_del', compare_del)
 redis.register_function('compare_expire', compare_expire)
 redis.register_function('compare_hset', compare_hset)
 redis.register_function('compare_hdel', compare_hdel)
@@ -115,24 +67,6 @@ class Script:
             redis.function_load(_SCRIPT, replace=True)
             self.loaded.add(name)
         self.redis = redis
-
-    def limited_incrby(self, key, increment: int, limit: int, expire: timedelta = None) -> tuple[int, int]:
-        """return [increment, value]"""
-        keys_and_args = [key, increment, limit]
-        if expire:
-            keys_and_args.append(int(expire.total_seconds() * 1000))
-        return self.redis.fcall('limited_incrby', 1, *keys_and_args)
-
-    def compare_set(self, key, expected, value, expire: timedelta = None, keepttl=False):
-        keys_and_args = [key, expected, value]
-        if expire:
-            keys_and_args += ['PX', int(expire.total_seconds() * 1000)]
-        if keepttl:
-            keys_and_args.append('KEEPTTL')
-        return self.redis.fcall('compare_set', 1, *keys_and_args)
-
-    def compare_del(self, key, expected):
-        return self.redis.fcall('compare_del', 1, key, expected)
 
     def compare_expire(self, key, expected, expire: timedelta, *, nx=False, xx=False, gt=False, lt=False):
         keys_and_args = [key, expected, int(expire.total_seconds() * 1000)]

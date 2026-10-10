@@ -15,7 +15,7 @@ from models import Online
 from service import user
 from common.messages import Connect, Disconnect
 import shared
-from shared import app, online_key, redis, dispatch_timeout, sessions
+from shared import app, online_key, redis, dispatch_timeout, sessions, online_users_key
 import push
 
 
@@ -40,17 +40,18 @@ class Handler:
             key = online_key(uid)
             with redis.pipeline(transaction=True) as pipe:
                 create_parser(pipe).hgetall(key, Online)
-                pipe.hsetex(key, conn_id, Online(session_id=session_id, address=address), ex=const.ONLINE_TTL,
-                            data_persist_option=HashDataPersistOptions.FNX)
-                conns, added = pipe.execute()
+                online = Online(session_id=session_id, address=address)
+                pipe.hsetex(key, conn_id, online, ex=const.ONLINE_TTL, data_persist_option=HashDataPersistOptions.FNX)
+                pipe.zincrby(online_users_key, 1, uid)
+                conns, added, _ = pipe.execute()
                 assert added, 'conn id conflicts or login twice'
-            for _conn_id, online in conns.items():
+            for cid, online in conns.items():
                 if online.session_id != session_id:
                     continue
-                logging.info(f'kick conn {uid} {_conn_id}')
+                logging.info(f'kick conn {uid} {cid}')
                 with LogSuppress(), shared.gate_service.client(online.address) as client:
-                    client.send_text(_conn_id, f'login again')
-                    client.remove_conn(_conn_id)
+                    client.send_text(cid, f'login again')
+                    client.remove_conn(cid)
         except Exception as e:
             if isinstance(e, (KeyError, ValueError)):
                 logging.info(f'login fail {address} {conn_id} {params} {e}')
@@ -60,7 +61,7 @@ class Handler:
                 client.send_text(conn_id, f'login fail {e}')
                 client.remove_conn(conn_id)
         else:
-            shared.producer.post(Connect(uid=uid))
+            shared.producer.post(Connect(uid=uid, session_id=session_id, count=len(conns) + 1))
             with shared.gate_service.client(address) as client:
                 client.set_context(conn_id, const.CTX_UID, str(uid))
                 client.send_text(conn_id, f'login success: ping interval: {const.PING_INTERVAL}')
@@ -73,8 +74,6 @@ class Handler:
             online = shared.parser.hgetex(key, [conn_id], Online, ex=const.ONLINE_TTL)[0]
             if not online:
                 raise ValueError(f'conn invalid {conn_id}')
-            if online.session_id not in shared.sessions.get(uid) and options.env != const.Environment.DEV:
-                raise ValueError(f'session expired {conn_id}')
         except (KeyError, ValueError) as e:
             logging.info(f'{address} {conn_id} {context} {e}')
             with shared.gate_service.client(address) as client:
@@ -87,9 +86,14 @@ class Handler:
             return
         uid = int(context[const.CTX_UID])
         key = online_key(uid)
-        if redis.hdel(key, conn_id):
-            logging.info(f'logout {uid} {conn_id}')
-            shared.producer.post(Disconnect(uid=uid))
+        with redis.pipeline(transaction=True) as pipe:
+            create_parser(pipe).hgetex(key, [conn_id], Online)
+            pipe.hdel(key, conn_id)
+            pipe.hlen(key)
+            pipe.zincrby(online_users_key, -1, uid)
+            pipe.zremrangebyscore(online_users_key, '-inf', 0)
+            (online,), _, count, *_ = pipe.execute()
+        shared.producer.post(Disconnect(uid=uid, session_id=online.session_id, count=count))
 
     def recv_binary(self, address: str, conn_id: str, context: Dict[str, str], message: bytes):
         logging.debug(f'{address} {conn_id} {context} {message}')

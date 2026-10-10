@@ -77,6 +77,11 @@ class Registry:
         published = False
         while True:
             try:
+                if not pubsub:
+                    pubsub = self._redis.pubsub()
+                    pubsub.subscribe(self._PREFIX)
+                    res = pubsub.parse_response()
+                    logging.info(res)
                 if self._registered and not self._stopped:
                     with self._redis.pipeline(transaction=False) as pipe:
                         for name, address in self._registered.items():
@@ -89,11 +94,6 @@ class Registry:
                         logging.info(f'publish {self._registered}')
                         self._redis.publish(self._PREFIX, 'register')
                         published = True
-                if not pubsub:
-                    pubsub = self._redis.pubsub()
-                    pubsub.subscribe(self._PREFIX)
-                    res = pubsub.parse_response()
-                    logging.info(res)
                 self._refresh()
                 timeout = self._INTERVAL
                 while msg := pubsub.get_message(timeout=timeout):

@@ -18,27 +18,28 @@ from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
 
 import models
-from base import singleflight, create_parser, CriticalSection, Priority
+from base import singleflight, create_parser, CriticalSection, Priority, Cache
 from base.poller import PollStatus
 from base.utils import Base62, LogSuppress, hash_password, verify_password
 from base.misc import DoesNotExist, CacheMixin, build_order_by, build_condition, convert_type, build_operation, \
     SqlCacheMixin, JSONEncoder
-from config import options, ctx
+from config import options, ctx, http_listener
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, script, scheduler
+from shared import session_key, async_task, heavy_task, scheduler, caching_redis
 import push
 
-cursor_filed = fields.Int(default=0, validate=Range(min=0, max=1000))
+cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
 cursor_filed.num_type = lambda v: int(v or 0)
 
 
 def serve():
+    listener = http_listener()
     logger = None if options.env == Environment.PROD else logging.getLogger()
-    server = pywsgi.WSGIServer(options.http_port, app, log=logger, error_log=logging.getLogger())
+    server = pywsgi.WSGIServer(listener, app, log=logger, error_log=logging.getLogger())
     g = gevent.spawn(server.serve_forever)
-    if not options.http_port:
+    if not options.unix_sock and not options.http_port:
         while not server.address[1]:
             gevent.sleep(0.01)
         options.http_port = server.address[1]
@@ -48,7 +49,7 @@ def serve():
 
 @app.before_request
 def init_trace():
-    ctx.trace = Base62.encode(snowflake.gen())
+    ctx.trace_id = Base62.encode(snowflake.gen())
 
 
 @async_task
@@ -93,21 +94,31 @@ def hello(names):
     return f'say hello {names}'
 
 
+def get_value(key):
+    full_key = invalidator.full_key('echo', key)
+    return caching_redis.get(full_key)
+
+
+echo_cache = Cache(get=get_value)
+echo_cache.listen(invalidator, group='echo', bcast=False)
+
+
 @app.route('/echo/<message>')
 def echo(message):
     gevent.sleep(0.1)
-    tick = redis.get('tick')
-    if request.headers.get('If-None-Match') == f'W/"{tick}"':
+    tick = echo_cache.get(message)
+    if_none_match = request.headers.get('If-None-Match')
+    logging.info(f'match {if_none_match} tick {tick}')
+    if if_none_match == f'W/"{tick}"':
         return '', 304
-    tick = redis.incr('tick')
-    logging.info(f'tick {tick}')
     response = current_app.make_response(f'say hello {message} {tick}')
-    response.headers['ETag'] = tick
+    response.headers['ETag'] = f'W/"{tick}"'
     return response
 
 
 @invalidator.getter('future')
-def getter(full_key):
+def getter(key):
+    full_key = invalidator.full_key('future', key)
     return redis.get(full_key)
 
 
@@ -115,14 +126,14 @@ def getter(full_key):
 @singleflight
 def get_future(key):
     full_key = invalidator.full_key('future', key)
-    placeholder = f'PLACEHOLDER-{uuid.uuid4()}'
+    placeholder = f'PLACEHOLDER:{uuid.uuid4()}'
     value = redis.set(full_key, placeholder, nx=True, ex=10, get=True)
     if value is None:  # first request
         gevent.sleep(5)
         value = options.http_address
-        script.compare_set(full_key, placeholder, value, expire=timedelta(seconds=20))
+        redis.set(full_key, value, ifeq=placeholder, ex=timedelta(seconds=20))
         return value
-    if value.startswith('PLACEHOLDER-'):  # wait for others
+    if value.startswith('PLACEHOLDER:'):  # wait for others
         fut = invalidator.future('future', key)
         return fut.result(10)
     return value  # cached
@@ -421,14 +432,15 @@ def login(username: str, password: str):
       200:
         description: session
     """
-    with Session() as session:
+    with Session.transaction() as session:
         account = session.query(Account).filter(Account.username == username).first()  # type: Account
         if account is None:  # register
             account = Account(username=username, hashed=hash_password(password))
-            session.add(account)  # username unique index
+            session.add(account)
             session.defer(lambda: dispatcher.signal(account))
         elif not verify_password(password, account.hashed):
             return 'account not exist or password error'
+    ctx.uid = account.id
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
     flask.session[CTX_TOKEN] = token
@@ -455,14 +467,14 @@ bp = Blueprint('/', __name__)
 user_actives = {}
 
 
-@scheduler(timedelta(seconds=1))
+@scheduler(timedelta(seconds=5))
 def reap_user_active():
     past = time.time() - timedelta(minutes=10).total_seconds()
     while user_actives:
-        uid, active = next(iter(user_actives.items()))
+        key, active = next(iter(user_actives.items()))
         if active > past:
             break
-        user_actives.pop(uid)
+        user_actives.pop(key)
 
 
 @bp.before_request
@@ -474,17 +486,20 @@ def authorize():
     if not user_session:
         raise Unauthorized
     g.uid, g.session = uid, user_session
-    if uid in user_actives:
+    ctx.uid = uid
+    key = (uid, token)
+    if key in user_actives:
         return
     # refresh last active & token ttl
     logging.info(f'user active: {uid}')
     now = datetime.now()
-    user_actives[uid] = now.timestamp()
+    user_actives[key] = now.timestamp()
     with LogSuppress(OperationalError), Session() as session:  # ignore db locked error
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
     key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    redis.hexpire(key, int(ttl), token)
+    if redis.httl(key, token)[0] < 0.9 * ttl:
+        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
 
 
 @bp.route('/whoami')

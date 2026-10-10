@@ -11,26 +11,26 @@ import logging
 
 class Selector:
     @staticmethod
-    def _oneshot(client_factory, name, *args, **kwargs):
+    def _oneshot(client_factory, func_name, *args, **kwargs):
         with client_factory() as client:
-            return getattr(client, name)(*args, **kwargs)
+            return getattr(client, func_name)(*args, **kwargs)
 
     @staticmethod
-    def _retry(client_factory, name, *args, **kwargs):
+    def _retry(client_factory, func_name, *args, **kwargs):
         try:
-            return Selector._oneshot(client_factory, name, *args, **kwargs)
+            return Selector._oneshot(client_factory, func_name, *args, **kwargs)
         except Exception as e:
             if ThriftPool.biz_exception(e):
                 raise
         # will retry another node
-        logging.warning(f'retry {name} {args} {kwargs}')
-        return Selector._oneshot(client_factory, name, *args, **kwargs)
+        logging.warning(f'retry {func_name} {args} {kwargs}')
+        return Selector._oneshot(client_factory, func_name, *args, **kwargs)
 
     @staticmethod
-    def _traverse(client_factory, addresses, name, *args, **kwargs):
+    def _traverse(client_factory, addresses, func_name, *args, **kwargs):
         for address in addresses:
             with LogSuppress(), client_factory(address) as client:
-                getattr(client, name)(*args, **kwargs)
+                getattr(client, func_name)(*args, **kwargs)
 
 
 class UserService(Service, Selector):
@@ -64,7 +64,17 @@ class TimerService(Service, Selector):
         with self.connection(address) as conn:
             yield timer.Client(conn)
 
-    def __getattr__(self, name):
-        if hasattr(timer.Iface, name):
-            return partial(self._oneshot, self.client, name)
-        return super().__getattr__(name)
+    def call_later(self, service, key, data, delay):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.call_later(service, key, data, delay)
+
+    def call_repeat(self, service, key, data, interval):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.call_repeat(service, key, data, interval)
+
+    def remove_timer(self, service, key):
+        addr = self.address(hint=key)
+        with self.client(addr) as client:
+            client.remove_timer(service, key)
