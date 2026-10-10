@@ -8,7 +8,8 @@ from inspect import signature
 from random import choice
 from typing import Any, Callable, Optional, Self, Union, Type
 from types import MappingProxyType
-from flask.app import DefaultJSONProvider, Flask
+from flask.app import Flask
+from flask.json.provider import DefaultJSONProvider
 from gevent.hub import Hub
 from gevent.local import local
 from gevent import getcurrent
