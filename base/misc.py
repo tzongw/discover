@@ -330,7 +330,9 @@ class CriticalSection:
     def __call__(self, f):
         params = signature(f).parameters
         names = {index: param.name for index, param in enumerate(params.values())}
-        default_key = f'critical_section:{func_desc(f)}'
+        path = func_desc(f)
+        assert '<' not in path, 'CAN NOT be lambda or local function'
+        default_key = f'critical_section:{path}'
         default_lock = Lock(self.redis, default_key, self.timeout.total_seconds(), blocking=False)
 
         @wraps(f)
