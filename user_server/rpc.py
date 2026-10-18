@@ -30,7 +30,8 @@ class Handler:
                 params.update(session)
             uid = int(params[const.CTX_UID])
             token = params[const.CTX_TOKEN]
-            user_session = sessions.get(uid).get(token)
+            hashed = shared.token_hash(token)
+            user_session = sessions.get(uid).get(hashed)
             if user_session:
                 session_id = user_session.id
             elif options.env == const.Environment.DEV:

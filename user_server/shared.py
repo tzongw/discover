@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import hashlib
 from common.shared import *
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -33,6 +34,10 @@ def online_key(uid: int):
 
 def session_key(uid: int):
     return f'session:{uid}'
+
+
+def token_hash(token: str):
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def _get_user_sessions(uid: int):

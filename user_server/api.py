@@ -3,8 +3,8 @@ import json
 import logging
 import time
 import uuid
-from datetime import timedelta, datetime
 from copy import copy
+from datetime import timedelta, datetime
 
 import flask
 import gevent
@@ -13,6 +13,7 @@ from gevent import pywsgi
 from marshmallow.validate import Range
 from sqlalchemy import Column
 from sqlalchemy.exc import OperationalError
+from redis.commands.core import HashDataPersistOptions
 from webargs import fields
 from webargs.flaskparser import use_kwargs
 from werkzeug.exceptions import UnprocessableEntity, Unauthorized, Forbidden, Conflict
@@ -27,7 +28,7 @@ from config import options, ctx, http_listener
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, scheduler, caching_redis
+from shared import session_key, async_task, heavy_task, scheduler, caching_redis, token_hash
 import push
 
 cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
@@ -445,20 +446,23 @@ def login(username: str, password: str):
     token = str(uuid.uuid4())
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
-    key = session_key(account.id)
+    sess_key = session_key(account.id)
+    hashed = token_hash(token)
     with redis.pipeline(transaction=True) as pipe:
-        create_parser(pipe).hgetall(key, models.Session)
+        create_parser(pipe).hgetall(sess_key, models.Session)
         user_session = models.Session(id=snowflake.gen(), create_time=datetime.now())
-        pipe.hsetex(key, token, user_session, ex=app.permanent_session_lifetime)
-        user_sessions: dict[str, models.Session] = pipe.execute()[0]
+        pipe.hsetex(sess_key, hashed, user_session, ex=app.permanent_session_lifetime,
+                    data_persist_option=HashDataPersistOptions.FNX)
+        user_sessions, added = pipe.execute()
+        assert added, 'session creation failed, token_hash conflicts'
     if len(user_sessions) >= MAX_SESSIONS:
-        tokens = user_sessions.keys()
-        ttls = {token: ttl for token, ttl in zip(tokens, redis.httl(key, *tokens))}
-        tokens = sorted(tokens, key=lambda x: ttls[x])
-        to_delete = tokens[:len(user_sessions) - MAX_SESSIONS + 1]
-        redis.hdel(key, *to_delete)
-        for token in to_delete:  # normally, len(to_delete) == 1
-            session_id = user_sessions[token].id
+        keys = user_sessions.keys()
+        ttls = {token: ttl for token, ttl in zip(keys, redis.httl(sess_key, *keys))}
+        keys = sorted(keys, key=lambda x: ttls[x])
+        to_delete = keys[:len(user_sessions) - MAX_SESSIONS + 1]
+        redis.hdel(sess_key, *to_delete)
+        for key in to_delete:  # normally, len(to_delete) == 1
+            session_id = user_sessions[key].id
             push.kick(account.id, 'token expired', session_id=session_id)
     return account
 
@@ -482,12 +486,13 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
         raise Unauthorized
-    user_session = sessions.get(uid).get(token)
+    hashed = token_hash(token)
+    user_session = sessions.get(uid).get(hashed)
     if not user_session:
         raise Unauthorized
     g.uid, g.session = uid, user_session
     ctx.uid = uid
-    key = (uid, token)
+    key = (uid, hashed)
     if key in user_actives:
         return
     # refresh last active & token ttl
@@ -496,10 +501,10 @@ def authorize():
     user_actives[key] = now.timestamp()
     with LogSuppress(OperationalError), Session() as session:  # ignore db locked error
         session.query(Account).filter(Account.id == uid).update({Account.last_active: now})
-    key = session_key(uid)
+    sess_key = session_key(uid)
     ttl = app.permanent_session_lifetime.total_seconds()
-    if redis.httl(key, token)[0] < 0.9 * ttl:
-        redis.hexpire(key, int(ttl), token)  # will invalidate local cache
+    if redis.httl(sess_key, hashed)[0] < 0.9 * ttl:
+        redis.hexpire(sess_key, int(ttl), hashed)  # will invalidate local cache
 
 
 @bp.route('/whoami')
