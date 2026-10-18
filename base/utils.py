@@ -260,7 +260,7 @@ def create_redis(addr: str):
         return Redis.from_url(f'{proto}://{addr}', decode_responses=True, socket_timeout=None, protocol=2)
 
 
-def string_hash(s: str):
+def string_hash(s: str) -> int:
     h = hashlib.blake2b(s.encode(), digest_size=8)
     return int.from_bytes(h.digest(), signed=True)
 
