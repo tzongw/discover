@@ -36,7 +36,7 @@ def session_key(uid: int):
     return f'session:{uid}'
 
 
-def token_hash(token: str):
+def hash_token(token: str):
     return hashlib.sha256(token.encode()).hexdigest()
 
 

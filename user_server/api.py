@@ -28,7 +28,7 @@ from config import options, ctx, http_listener
 from const import CTX_UID, CTX_TOKEN, MAX_SESSIONS, Environment
 from dao import Account, Session, collections, tables, Config, config_models, Change, RowChange
 from shared import app, dispatcher, snowflake, sessions, redis, poller, spawn_worker, invalidator, user_limiter
-from shared import session_key, async_task, heavy_task, scheduler, caching_redis, token_hash
+from shared import session_key, async_task, heavy_task, scheduler, caching_redis, hash_token
 import push
 
 cursor_filed = fields.Int(load_default=0, validate=Range(min=0, max=1000))
@@ -447,14 +447,14 @@ def login(username: str, password: str):
     flask.session[CTX_TOKEN] = token
     flask.session.permanent = True
     sess_key = session_key(account.id)
-    hashed = token_hash(token)
+    hashed = hash_token(token)
     with redis.pipeline(transaction=True) as pipe:
         create_parser(pipe).hgetall(sess_key, models.Session)
         user_session = models.Session(id=snowflake.gen(), create_time=datetime.now())
         pipe.hsetex(sess_key, hashed, user_session, ex=app.permanent_session_lifetime,
                     data_persist_option=HashDataPersistOptions.FNX)
         user_sessions, added = pipe.execute()
-        assert added, 'session creation failed, token_hash conflicts'
+        assert added, 'session creation failed, token hash conflicts'
     if len(user_sessions) >= MAX_SESSIONS:
         keys = user_sessions.keys()
         ttls = {token: ttl for token, ttl in zip(keys, redis.httl(sess_key, *keys))}
@@ -486,7 +486,7 @@ def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
         raise Unauthorized
-    hashed = token_hash(token)
+    hashed = hash_token(token)
     user_session = sessions.get(uid).get(hashed)
     if not user_session:
         raise Unauthorized
