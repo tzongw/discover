@@ -440,7 +440,7 @@ def login(username: str, password: str):
             session.add(account)
             session.defer(lambda: dispatcher.signal(account))
         elif not verify_password(password, account.hashed):
-            return 'account not exist or password error'
+            raise Unauthorized('account not exist or password error')
     ctx.uid = account.id
     flask.session[CTX_UID] = account.id
     token = str(uuid.uuid4())
@@ -485,11 +485,11 @@ def reap_user_active():
 def authorize():
     uid, token = flask.session.get(CTX_UID), flask.session.get(CTX_TOKEN)
     if not uid or not token:
-        raise Unauthorized
+        raise Unauthorized('uid or token not supplied')
     hashed = hash_token(token)
     user_session = sessions.get(uid).get(hashed)
     if not user_session:
-        raise Unauthorized
+        raise Unauthorized('token invalid')
     g.uid, g.session = uid, user_session
     ctx.uid = uid
     key = (uid, hashed)
