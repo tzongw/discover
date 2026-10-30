@@ -21,7 +21,7 @@ while true; do
     fi
     ts=$(stat "$stat_arg" "$wal_file")
     if [[ "$ts" == "$last_ts" ]]; then
-      sleep 0.1
+      sleep 1
       continue
     fi
     echo "ts changed: $last_ts -> $ts"
