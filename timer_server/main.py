@@ -131,7 +131,7 @@ class Handler:
                     self._rpc_delete(old_info)
 
             def callback():
-                if self._delete_timer(service, key, info.uniq_id):  # fire only if still owned
+                if self._delete_timer(service, key, uniq_id):  # fire only if still owned
                     self._fire_timer(service, key, data)
 
             self._delete_timer(service, key)
