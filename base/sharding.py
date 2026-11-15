@@ -435,11 +435,16 @@ V = TypeVar('V')
 
 class ShardingDict(Generic[K, V]):
     def __init__(self, shards):
-        self._dicts = [{} for _ in range(shards)]
+        self._shards = shards
+        self._dicts = [{}]
+        self._sharded = False
 
     def _get_shard(self, key) -> dict:
-        index = hash(key) % len(self._dicts)
-        return self._dicts[index]
+        if self._sharded:
+            index = hash(key) % len(self._dicts)
+            return self._dicts[index]
+        else:
+            return self._dicts[0]
 
     def __getitem__(self, key) -> V:
         d = self._get_shard(key)
@@ -448,6 +453,11 @@ class ShardingDict(Generic[K, V]):
     def __setitem__(self, key, value):
         d = self._get_shard(key)
         d[key] = value
+        if not self._sharded and len(d) > 128:
+            self._dicts = [{} for _ in range(self._shards)]
+            self._sharded = True
+            for k, v in d.items():
+                self[k] = v
 
     def __delitem__(self, key):
         d = self._get_shard(key)
@@ -495,11 +505,16 @@ E = TypeVar('E')
 
 class ShardingSet(Generic[E]):
     def __init__(self, shards):
-        self._sets = [set() for _ in range(shards)]
+        self._shards = shards
+        self._sets = [set()]
+        self._sharded = False
 
     def _get_shard(self, elem) -> set:
-        index = hash(elem) % len(self._sets)
-        return self._sets[index]
+        if self._sharded:
+            index = hash(elem) % len(self._sets)
+            return self._sets[index]
+        else:
+            return self._sets[0]
 
     def __len__(self):
         return sum(len(s) for s in self._sets)
@@ -521,6 +536,11 @@ class ShardingSet(Generic[E]):
     def add(self, elem):
         s = self._get_shard(elem)
         s.add(elem)
+        if not self._sharded and len(s) > 128:
+            self._sets = [set() for _ in range(self._shards)]
+            self._sharded = True
+            for elem in s:
+                self.add(elem)
 
     def remove(self, elem):
         s = self._get_shard(elem)
