@@ -48,8 +48,9 @@ WebSocket.handle_ping = handle_ping
 
 
 class Client:
-    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'step']
+    __slots__ = ['conn_id', 'context', 'ws', 'messages', 'groups', 'step', 'stopping']
     PONG_MESSAGE = object()
+    MAX_SEND_COUNT = 1024
 
     def __init__(self, ws: WebSocket, conn_id):
         self.conn_id = conn_id
@@ -58,12 +59,20 @@ class Client:
         self.messages = Queue()
         self.groups = set()
         self.step = 0
+        self.stopping = False
 
     def __str__(self):
         return f'{self.conn_id} {self.context}'
 
     def send(self, message):
+        if self.stopping:
+            return
         self.messages.put_nowait(message)
+        if message is None:
+            self.stopping = True
+        elif self.messages.qsize() >= self.MAX_SEND_COUNT:
+            self.messages.put_nowait(None)
+            self.stopping = True
 
     def serve(self):
         self.ws.handler.socket.settimeout(const.WS_TIMEOUT)
