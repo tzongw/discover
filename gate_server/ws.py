@@ -71,6 +71,7 @@ class Client:
         if message is None:
             self.stopping = True
         elif self.messages.qsize() >= self.MAX_SEND_COUNT:
+            logging.warning(f'{self} send queue overflow')
             self.messages.put_nowait(None)
             self.stopping = True
 
